@@ -1,0 +1,346 @@
+<main class="page">
+  <header class="hero">
+    <p class="eyebrow">Desmos IDE</p>
+    <h1>DSL Documentation</h1>
+    <p class="lede">
+      Complete reference for the DSL implemented by the compiler in this repository.
+      Covers syntax, semantics, built-ins, entity schemas, codegen output, and known limitations.
+    </p>
+  </header>
+
+  <nav class="toc" aria-label="Table of contents">
+    <a href="#quick-start">Quick Start</a>
+    <a href="#lexical-rules">Lexical Rules</a>
+    <a href="#top-level">Top-Level Statements</a>
+    <a href="#expressions">Expressions</a>
+    <a href="#entities">Entities</a>
+    <a href="#points-map">Points Map</a>
+    <a href="#animation">Animation</a>
+    <a href="#builtins">Built-ins</a>
+    <a href="#codegen">Codegen Notes</a>
+    <a href="#optimizer">Optimizer Notes</a>
+    <a href="#errors">Errors</a>
+    <a href="#limitations">Limitations</a>
+  </nav>
+
+  <section id="quick-start">
+    <h2>Quick Start</h2>
+    <pre><code>let a = 3
+let b = 4
+fn hyp(x, y) = sqrt(x^2 + y^2)
+
+point p &#123;
+  center: (1, 2)
+&#125;
+
+circle c &#123;
+  center: (0, 0),
+  radius: hyp(a, b)
+&#125;
+
+line l &#123;
+  slope: 1,
+  intercept: 0
+&#125;
+
+points ring = map(i in [0, 0.1...6.28]) &#123;
+  (cos(i), sin(i))
+&#125;</code></pre>
+  </section>
+
+  <section id="lexical-rules">
+    <h2>Lexical Rules</h2>
+    <ul>
+      <li><strong>Comments:</strong> single-line, start with <code>//</code>. Everything after <code>//</code> to end-of-line is ignored.</li>
+      <li><strong>Whitespace:</strong> spaces, tabs, and newlines are ignored except for line and column tracking.</li>
+      <li><strong>Numbers:</strong> integers and decimals, including leading-dot decimals like <code>.5</code>.</li>
+      <li><strong>Identifiers:</strong> <code>[A-Za-z_][A-Za-z0-9_]*</code></li>
+      <li><strong>Keywords:</strong> <code>let</code>, <code>fn</code>, <code>in</code>, <code>map</code>, <code>point</code>, <code>circle</code>, <code>line</code>, <code>points</code>, <code>time</code>, <code>project</code>, <code>camera</code></li>
+      <li><strong>Range tokens:</strong>
+        <ul>
+          <li><code>...</code> — list range separator</li>
+          <li><code>..</code> — domain expression separator</li>
+        </ul>
+      </li>
+    </ul>
+    <h3>Comment example</h3>
+    <pre><code>let x = 3       // this is a constant
+// full-line comment</code></pre>
+  </section>
+
+  <section id="top-level">
+    <h2>Top-Level Statements</h2>
+    <p>Only the following statement forms are accepted at program scope:</p>
+    <table>
+      <thead><tr><th>Form</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>let name = expr</code></td><td>Constant or slider binding</td></tr>
+        <tr><td><code>fn name(p1, p2, ...) = expr</code></td><td>User-defined function (inlined by optimizer)</td></tr>
+        <tr><td><code>point name &#123; ... &#125;</code></td><td>Named point entity</td></tr>
+        <tr><td><code>circle name &#123; ... &#125;</code></td><td>Circle entity</td></tr>
+        <tr><td><code>line name &#123; ... &#125;</code></td><td>Line entity</td></tr>
+        <tr><td><code>points name = map(...) &#123; ... &#125;</code></td><td>Parametric point list</td></tr>
+      </tbody>
+    </table>
+    <p>Bare expressions at the top level are not valid. Every statement must begin with one of the keywords above.</p>
+  </section>
+
+  <section id="expressions">
+    <h2>Expressions</h2>
+    <h3>Operator precedence (lowest to highest)</h3>
+    <ol>
+      <li>Addition and subtraction: <code>+</code>, <code>-</code></li>
+      <li>Multiplication and division: <code>*</code>, <code>/</code></li>
+      <li>Power: <code>^</code> (right-associative)</li>
+      <li>Unary minus: <code>-x</code></li>
+    </ol>
+    <p>Example: <code>2^3^2</code> parses as <code>2^(3^2)</code> = 512.</p>
+
+    <h3>Expression forms</h3>
+    <table>
+      <thead><tr><th>Form</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td>Numeric literal</td><td><code>1</code>, <code>3.14</code>, <code>.25</code></td></tr>
+        <tr><td>Identifier</td><td><code>x</code>, <code>theta</code></td></tr>
+        <tr><td>Binary op</td><td><code>a + b</code>, <code>a * b</code>, <code>a^b</code></td></tr>
+        <tr><td>Unary minus</td><td><code>-x</code></td></tr>
+        <tr><td>Function call</td><td><code>sin(x)</code>, <code>f(a, b)</code></td></tr>
+        <tr><td>Tuple</td><td><code>(x, y)</code></td></tr>
+        <tr><td>List range</td><td><code>[start...end]</code>, <code>[start, step...end]</code></td></tr>
+        <tr><td>Map expression</td><td><code>map(i in [0...10]) &#123; expr &#125;</code></td></tr>
+        <tr><td>Domain expression</td><td><code>start..end</code>, optionally <code>.play</code> or <code>.loop</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Division and power LaTeX output</h3>
+    <p>Division compiles to a fraction: <code>a / b</code> → <code>\frac&#123;a&#125;&#123;b&#125;</code>. Power compiles to a superscript: <code>a^b</code> → <code>a^&#123;b&#125;</code>. Parentheses are inserted automatically when precedence requires it.</p>
+  </section>
+
+  <section id="entities">
+    <h2>Entities</h2>
+    <p>Each entity type gets a distinct default color in the Desmos graph.</p>
+    <table>
+      <thead><tr><th>Entity</th><th>Default color</th></tr></thead>
+      <tbody>
+        <tr><td><code>point</code></td><td><span class="swatch" style="background:#2d70b3"></span> <code>#2d70b3</code> (blue)</td></tr>
+        <tr><td><code>circle</code></td><td><span class="swatch" style="background:#c74440"></span> <code>#c74440</code> (red)</td></tr>
+        <tr><td><code>line</code></td><td><span class="swatch" style="background:#388c46"></span> <code>#388c46</code> (green)</td></tr>
+        <tr><td><code>points</code></td><td><span class="swatch" style="background:#6042a6"></span> <code>#6042a6</code> (purple)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Point</h3>
+    <p>A named point rendered with its label shown. Two equivalent forms:</p>
+    <pre><code>// tuple center
+point p &#123;
+  center: (2, 3)
+&#125;
+
+// scalar coordinates
+point p &#123;
+  x: 2,
+  y: 3
+&#125;</code></pre>
+    <p>Both emit a Desmos point expression with <code>showLabel: true</code> and <code>label</code> set to the point name. Missing coordinates default to <code>0</code>.</p>
+
+    <h3>Circle</h3>
+    <pre><code>circle c &#123;
+  center: (0, 0),
+  radius: 5
+&#125;</code></pre>
+    <p>Compiles to the implicit equation <code>(x-h)²+(y-k)²=r²</code>. Fill is enabled with opacity <code>0.1</code>. Missing center defaults to <code>(0,0)</code>; missing radius defaults to <code>1</code>.</p>
+
+    <h3>Line</h3>
+    <p>Four supported forms — use whichever properties match your intent:</p>
+    <table>
+      <thead><tr><th>Properties</th><th>Compiled form</th></tr></thead>
+      <tbody>
+        <tr><td><code>slope</code> + <code>intercept</code></td><td><code>y = mx + b</code></td></tr>
+        <tr><td><code>point1</code> + <code>point2</code> (tuples)</td><td>two-point form</td></tr>
+        <tr><td><code>y</code></td><td>horizontal: <code>y = k</code></td></tr>
+        <tr><td><code>x</code></td><td>vertical: <code>x = h</code></td></tr>
+      </tbody>
+    </table>
+    <pre><code>line axis   &#123; slope: 1, intercept: 0 &#125;
+line horiz  &#123; y: 3 &#125;
+line vert   &#123; x: -2 &#125;
+line seg    &#123; point1: (0, 0), point2: (4, 4) &#125;</code></pre>
+    <p>When <code>slope</code> is <code>1</code> the <code>m</code> coefficient is omitted; when <code>intercept</code> is <code>0</code> the <code>b</code> term is omitted.</p>
+  </section>
+
+  <section id="points-map">
+    <h2>Points Map</h2>
+    <p>The <code>points</code> statement requires a <code>map</code> expression. The loop variable and range are bound locally.</p>
+    <pre><code>points wave = map(t in [0, 0.2...20]) &#123;
+  (t, sin(t))
+&#125;</code></pre>
+    <p>Compiles to a Desmos list comprehension rendered as a point cloud (<code>points: true, lines: false</code>). The step value in <code>[start, step...end]</code> sets the increment between samples.</p>
+    <pre><code>// unit circle with 628 samples
+points ring = map(i in [0, 0.01...6.28]) &#123;
+  (cos(i), sin(i))
+&#125;</code></pre>
+  </section>
+
+  <section id="animation">
+    <h2>Animation and Domain Forms</h2>
+    <p>Domain expressions used in a <code>let</code> binding create a Desmos slider. Appending <code>.play</code> or <code>.loop</code> starts animation automatically.</p>
+    <pre><code>let t  = 0..10          // static slider, range [0, 10]
+let a  = 0..10.play     // plays once then stops
+let b  = -5..5.loop     // loops forward indefinitely
+let c  = -3..3.loop(-1) // loops backward</code></pre>
+    <table>
+      <thead><tr><th>Suffix</th><th>Desmos loopMode</th><th>isPlaying</th></tr></thead>
+      <tbody>
+        <tr><td>(none)</td><td>—</td><td>false</td></tr>
+        <tr><td><code>.play</code></td><td><code>PLAY_ONCE</code></td><td>true</td></tr>
+        <tr><td><code>.loop</code></td><td><code>LOOP_FORWARD</code></td><td>true</td></tr>
+        <tr><td><code>.loop(-1)</code></td><td><code>LOOP_BACKWARD</code></td><td>true</td></tr>
+      </tbody>
+    </table>
+    <p>All animated sliders use an <code>animationPeriod</code> of 4000 ms by default.</p>
+
+    <h3>time() call</h3>
+    <p>The special <code>time(start, end, speed)</code> call in a <code>let</code> creates a playing slider. The <code>animationPeriod</code> is derived as <code>round(1000 / speed)</code>.</p>
+    <pre><code>let t = time(0, 10, 0.5)  // slider 0..10 playing at 0.5 Hz (2000 ms period)</code></pre>
+  </section>
+
+  <section id="builtins">
+    <h2>Built-ins and Functions</h2>
+
+    <h3>Math functions → Desmos LaTeX</h3>
+    <table>
+      <thead><tr><th>DSL call</th><th>LaTeX output</th></tr></thead>
+      <tbody>
+        <tr><td><code>sin(x)</code></td><td><code>\sin\left(x\right)</code></td></tr>
+        <tr><td><code>cos(x)</code></td><td><code>\cos\left(x\right)</code></td></tr>
+        <tr><td><code>tan(x)</code></td><td><code>\tan\left(x\right)</code></td></tr>
+        <tr><td><code>arcsin(x)</code></td><td><code>\arcsin\left(x\right)</code></td></tr>
+        <tr><td><code>arccos(x)</code></td><td><code>\arccos\left(x\right)</code></td></tr>
+        <tr><td><code>arctan(x)</code></td><td><code>\arctan\left(x\right)</code></td></tr>
+        <tr><td><code>ln(x)</code></td><td><code>\ln\left(x\right)</code></td></tr>
+        <tr><td><code>log(x)</code></td><td><code>\log\left(x\right)</code></td></tr>
+        <tr><td><code>min(a, b)</code></td><td><code>\min\left(a,b\right)</code></td></tr>
+        <tr><td><code>max(a, b)</code></td><td><code>\max\left(a,b\right)</code></td></tr>
+        <tr><td><code>floor(x)</code></td><td><code>\operatorname&#123;floor&#125;\left(x\right)</code></td></tr>
+        <tr><td><code>ceil(x)</code></td><td><code>\operatorname&#123;ceil&#125;\left(x\right)</code></td></tr>
+        <tr><td><code>round(x)</code></td><td><code>\operatorname&#123;round&#125;\left(x\right)</code></td></tr>
+        <tr><td><code>sign(x)</code></td><td><code>\operatorname&#123;sign&#125;\left(x\right)</code></td></tr>
+        <tr><td><code>mod(a, b)</code></td><td><code>\operatorname&#123;mod&#125;\left(a,b\right)</code></td></tr>
+        <tr><td><code>sqrt(x)</code></td><td><code>\sqrt&#123;x&#125;</code> (radical notation)</td></tr>
+        <tr><td><code>abs(x)</code></td><td><code>\left|x\right|</code> (bar notation)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Compiler-level special calls</h3>
+    <table>
+      <thead><tr><th>Call</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><code>time(start, end, speed)</code></td><td>In a <code>let</code> binding, creates an auto-playing slider. <code>animationPeriod = round(1000 / speed)</code>.</td></tr>
+        <tr><td><code>project(...)</code></td><td>Stub — emits the first argument unchanged as LaTeX passthrough.</td></tr>
+        <tr><td><code>camera(...)</code></td><td>Reserved keyword; currently passes through the optimizer unmodified.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>User-defined functions</h3>
+    <p>Functions declared with <code>fn</code> are aggressively inlined by the optimizer at every call site. After optimization, all <code>FnDecl</code> nodes are removed before codegen — they produce no Desmos expressions themselves.</p>
+    <pre><code>fn dist(a, b) = sqrt(a^2 + b^2)
+let r = dist(3, 4)   // optimized to: let r = 5</code></pre>
+
+    <h3>Name-to-LaTeX mapping</h3>
+    <p>All identifiers are converted to valid Desmos LaTeX variable names:</p>
+    <table>
+      <thead><tr><th>Identifier</th><th>LaTeX</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>x</code></td><td><code>x</code></td><td>Single letter → unchanged</td></tr>
+        <tr><td><code>theta</code></td><td><code>\theta</code></td><td>Greek name → LaTeX command</td></tr>
+        <tr><td><code>wave</code></td><td><code>w_&#123;ave&#125;</code></td><td>Multi-char → first letter + subscript</td></tr>
+      </tbody>
+    </table>
+    <p>Full list of recognized Greek names:</p>
+    <p class="greek-list">
+      <code>alpha</code> <code>beta</code> <code>gamma</code> <code>delta</code> <code>epsilon</code>
+      <code>zeta</code> <code>eta</code> <code>theta</code> <code>iota</code> <code>kappa</code>
+      <code>lambda</code> <code>mu</code> <code>nu</code> <code>xi</code> <code>pi</code>
+      <code>rho</code> <code>sigma</code> <code>tau</code> <code>upsilon</code> <code>phi</code>
+      <code>chi</code> <code>psi</code> <code>omega</code>
+    </p>
+  </section>
+
+  <section id="codegen">
+    <h2>Codegen Notes</h2>
+    <ul>
+      <li>Output is Desmos state version 9 with an expression list.</li>
+      <li>Default viewport: <code>xmin/ymin = -10</code>, <code>xmax/ymax = 10</code>.</li>
+      <li>Expression IDs are integers starting at 1, incremented per emitted expression.</li>
+      <li>Identical LaTeX strings are deduplicated — emitting the same LaTeX twice returns the same expression ID without adding a duplicate to the list.</li>
+      <li>Multiplication uses <code>\cdot</code>; division uses <code>\frac&#123;&#125;&#123;&#125;</code>.</li>
+      <li>Parentheses are inserted automatically based on operator precedence — the AST is not required to carry unnecessary grouping.</li>
+    </ul>
+
+    <h3>Expression properties by entity type</h3>
+    <table>
+      <thead><tr><th>Entity</th><th>Notable Desmos fields</th></tr></thead>
+      <tbody>
+        <tr><td><code>point</code></td><td><code>showLabel: true</code>, <code>label</code> set to DSL name</td></tr>
+        <tr><td><code>circle</code></td><td><code>fill: true</code>, <code>fillOpacity: "0.1"</code></td></tr>
+        <tr><td><code>line</code></td><td>bare expression, no extra fields</td></tr>
+        <tr><td><code>points</code></td><td><code>points: true</code>, <code>lines: false</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="optimizer">
+    <h2>Optimizer Notes</h2>
+    <p>The optimizer runs before codegen and transforms the AST in place.</p>
+    <ul>
+      <li><strong>Function inlining</strong> — user-defined <code>fn</code> calls are substituted at every call site; the <code>FnDecl</code> node is removed afterwards.</li>
+      <li><strong>Constant folding</strong> — expressions whose operands are all numeric literals are evaluated at compile time.</li>
+      <li><strong>Algebraic identities</strong>:
+        <ul>
+          <li><code>x + 0</code> → <code>x</code></li>
+          <li><code>x - 0</code> → <code>x</code></li>
+          <li><code>x * 1</code> → <code>x</code></li>
+          <li><code>x * 0</code> → <code>0</code></li>
+          <li><code>x ^ 1</code> → <code>x</code></li>
+          <li><code>x ^ 0</code> → <code>1</code></li>
+          <li><code>0 / x</code> → <code>0</code></li>
+        </ul>
+      </li>
+      <li><strong>Shadow-safe substitution</strong> — when inlining a function inside a <code>map</code>, the optimizer avoids substituting the loop variable if it would shadow a parameter name.</li>
+    </ul>
+    <p>Optimization is applied recursively until the AST stabilizes (fixed-point).</p>
+  </section>
+
+  <section id="errors">
+    <h2>Errors</h2>
+    <p>The compiler reports two error phases. Both surface as a <code>CompileFailure</code> return value from <code>compile(src)</code>.</p>
+    <table>
+      <thead><tr><th>Phase</th><th>Format</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td>Lexer</td><td><code>[line:col] Lex error: ...</code></td><td><code>[3:5] Lex error: unexpected character '@'</code></td></tr>
+        <tr><td>Parser</td><td><code>[line:col] Parse error: ...</code></td><td><code>[7:1] Parse error: expected '&#123;'</code></td></tr>
+      </tbody>
+    </table>
+    <p>In the IDE, errors are surfaced as Monaco editor markers with precise line and column positioning.</p>
+  </section>
+
+  <section id="limitations">
+    <h2>Current Limitations</h2>
+    <ul>
+      <li><strong>No implicit multiplication</strong> — write <code>2*x</code>, not <code>2x</code>.</li>
+      <li><strong>No bare expressions</strong> — every top-level statement must start with a DSL keyword.</li>
+      <li><strong>No piecewise syntax</strong> — not yet implemented.</li>
+      <li><strong>No general list comprehensions</strong> — list ranges are only valid inside <code>map(...)</code> in a <code>points</code> statement.</li>
+      <li><strong>No negative step in ranges</strong> — <code>[10, 9...0]</code> is syntactically valid but behavior is undefined; use a reversed parameter instead.</li>
+      <li><strong><code>project</code> and <code>camera</code> are stubs</strong> — reserved keywords with no full implementation yet.</li>
+      <li><strong>No multi-return functions</strong> — <code>fn</code> definitions are single-expression only.</li>
+    </ul>
+  </section>
+  <section id="footer">
+    <h2 style="font-size: 1em; color: var(--muted); text-decoration: none;">made by jayan patel, 2026</h2>
+    <p style="font-size: 0.9em; color: var(--muted); max-width: none; margin-top: 0.5em;">
+      project is open source on <a style="color: var(--muted);" href="https://github.com/KingJayan/desmos-ide">GitHub</a>
+    </p>
+  </section>
+</main>
+
