@@ -4,10 +4,10 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 };
 
 import * as monaco from 'monaco-editor';
-import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus } from 'lucide';
+import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List } from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID } from '../src/monaco/language';
 import CompileWorker from './compile.worker?worker';
-import type { CompileResult } from '../src/index';
+import type { CompileResult, SymbolInfo } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
 import { EnhancedPane } from './enhanced';
@@ -17,7 +17,7 @@ import type { ColorTheme } from './settings';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 createIcons({
-  icons: { GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus },
+  icons: { GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List },
   attrs: { 'stroke-width': '1.9' },
 });
 
@@ -58,13 +58,17 @@ const gitModifiedList = document.getElementById('git-modified-list')!;
 const dividerEl       = document.getElementById('divider')!;
 const leftPanel       = document.getElementById('left-panel')!;
 const workspace       = document.getElementById('workspace')!;
-const btnSidebarGit   = document.getElementById('btn-sidebar-git') as HTMLButtonElement;
-const btnSidebarAi    = document.getElementById('btn-sidebar-ai') as HTMLButtonElement;
+const btnSidebarGit      = document.getElementById('btn-sidebar-git')      as HTMLButtonElement;
+const btnSidebarAi       = document.getElementById('btn-sidebar-ai')       as HTMLButtonElement;
+const btnSidebarOutline  = document.getElementById('btn-sidebar-outline')  as HTMLButtonElement;
 const btnSidebarSettings = document.getElementById('btn-sidebar-settings') as HTMLButtonElement;
-const gitContainer    = document.getElementById('git-sidebar-container')!;
-const aiPanel         = document.getElementById('ai-panel')!;
-const aiDivider       = document.getElementById('ai-divider')!;
-const aiContainer     = document.getElementById('ai-sidebar-container')!;
+const gitContainer       = document.getElementById('git-sidebar-container')!;
+const outlineContainer   = document.getElementById('outline-sidebar-container')!;
+const outlineList        = document.getElementById('outline-list')!;
+const outlineEmpty       = document.getElementById('outline-empty')!;
+const aiPanel            = document.getElementById('ai-panel')!;
+const aiDivider          = document.getElementById('ai-divider')!;
+const aiContainer        = document.getElementById('ai-sidebar-container')!;
 
 
 const DEFAULT_SRC = `// desmos DSL
@@ -342,20 +346,58 @@ type CompileWorkerResponse = {
   result: CompileResult;
 };
 
+function renderOutline(symbols: SymbolInfo[]): void {
+  outlineList.innerHTML = '';
+  if (symbols.length === 0) {
+    outlineEmpty.classList.remove('outline-empty--hidden');
+    return;
+  }
+  outlineEmpty.classList.add('outline-empty--hidden');
+  for (const sym of symbols) {
+    const li = document.createElement('li');
+    li.className = 'outline-item';
+    li.title = `${sym.kind} ${sym.name} — line ${sym.line}`;
+
+    const badge = document.createElement('span');
+    badge.className = `outline-badge outline-badge--${sym.kind}`;
+    badge.textContent = sym.kind === 'points' ? 'pts' : sym.kind;
+
+    const name = document.createElement('span');
+    name.className = 'outline-name';
+    name.textContent = sym.name;
+
+    const lineNum = document.createElement('span');
+    lineNum.className = 'outline-line';
+    lineNum.textContent = String(sym.line);
+
+    li.appendChild(badge);
+    li.appendChild(name);
+    li.appendChild(lineNum);
+    li.addEventListener('click', () => {
+      editor.revealLineInCenter(sym.line);
+      editor.setPosition({ lineNumber: sym.line, column: sym.col });
+      editor.focus();
+    });
+    outlineList.appendChild(li);
+  }
+}
+
 function handleCompileResult(result: CompileResult): void {
   if (result.success) {
-    monaco.editor.setModelMarkers(model, 'desmos-dsl', []);
+    monaco.editor.setModelMarkers(model, 'desmos-dsl', result.warnings);
     if (mode !== 'enhanced') {
       graph.update(result.state.expressions.list);
     }
     if (mode === 'split') {
       ensureEnhancedPane().syncFromGraph(graph.currentList());
     }
-    setStatus(`✓ ${result.state.expressions.list.length} expression(s)`, 'success');
+    renderOutline(result.symbols);
+    const warnNote = result.warnings.length ? ` · ${result.warnings.length} warning(s)` : '';
+    setStatus(`✓ ${result.state.expressions.list.length} expression(s)${warnNote}`, result.warnings.length ? 'info' : 'success');
   } else {
     const markers =
       result.line != null && result.col != null
-        ? [errorToMarker(result.error, result.line, result.col)]
+        ? [errorToMarker(result.error, result.line, result.col, result.tokenLen)]
         : [];
     monaco.editor.setModelMarkers(model, 'desmos-dsl', markers);
     setStatus(`✗ ${result.error}`, 'error');
@@ -999,7 +1041,7 @@ document.addEventListener('mouseup', () => {
 });
 
 // sidebar
-type SidebarView = 'git' | 'ai' | null;
+type SidebarView = 'git' | 'ai' | 'outline' | null;
 let sidebarView: SidebarView = null;
 let aiSidebar: AISidebar | null = null;
 
@@ -1040,9 +1082,11 @@ function setSidebarView(next: SidebarView): void {
   aiDivider.classList.toggle('hidden', !open);
   gitContainer.classList.toggle('hidden', next !== 'git');
   aiContainer.classList.toggle('hidden', next !== 'ai');
+  outlineContainer.classList.toggle('hidden', next !== 'outline');
 
   btnSidebarGit.classList.toggle('active', next === 'git');
   btnSidebarAi.classList.toggle('active', next === 'ai');
+  btnSidebarOutline.classList.toggle('active', next === 'outline');
 
   if (next === 'ai') {
     ensureAiSidebar();
@@ -1060,6 +1104,10 @@ btnSidebarGit.addEventListener('click', () => {
 
 btnSidebarAi.addEventListener('click', () => {
   setSidebarView(sidebarView === 'ai' ? null : 'ai');
+});
+
+btnSidebarOutline.addEventListener('click', () => {
+  setSidebarView(sidebarView === 'outline' ? null : 'outline');
 });
 
 // divider drag

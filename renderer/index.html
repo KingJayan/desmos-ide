@@ -31,14 +31,17 @@
 
     <main id="workspace">
       <aside id="activity-bar" aria-label="Sidebar">
-        <button id="btn-sidebar-git" class="activity-btn" title="Source Control" aria-label="Source Control">
+        <button id="btn-sidebar-git" class="activity-btn" title="source control" aria-label="source control">
           <i data-lucide="git-branch" aria-hidden="true"></i>
         </button>
-        <button id="btn-sidebar-ai" class="activity-btn" title="AI Assistant" aria-label="AI Assistant">
+        <button id="btn-sidebar-ai" class="activity-btn" title="ai assistant" aria-label="ai assistant">
           <i data-lucide="bot" aria-hidden="true"></i>
         </button>
+        <button id="btn-sidebar-outline" class="activity-btn" title="outline" aria-label="outline">
+          <i data-lucide="list" aria-hidden="true"></i>
+        </button>
         <span class="activity-spacer"></span>
-        <button id="btn-sidebar-settings" class="activity-btn" title="Settings" aria-label="Settings">
+        <button id="btn-sidebar-settings" class="activity-btn" title="settings" aria-label="settings">
           <i data-lucide="settings" aria-hidden="true"></i>
         </button>
       </aside>
@@ -50,12 +53,12 @@
         <div id="pane-divider" class="hidden"></div>
         <div id="enhanced-pane" class="pane hidden">
           <div id="enhanced-unsaved-bar" class="hidden">
-            <span>Unsaved enhanced edits</span>
-            <button id="btn-export-json" class="unsaved-export-btn">Export JSON</button>
+            <span>unsaved enhanced edits</span>
+            <button id="btn-export-json" class="unsaved-export-btn">export json</button>
           </div>
           <div id="expr-list"></div>
           <div id="expr-actions">
-            <button id="btn-add-expr" class="action-btn">+ Add Expression</button>
+            <button id="btn-add-expr" class="action-btn">+ add expression</button>
           </div>
         </div>
       </div>
@@ -71,8 +74,8 @@
       <div id="ai-panel" class="hidden">
         <div id="git-sidebar-container" class="hidden">
           <div class="sidepanel-header">
-            <div class="sidepanel-title">Source Control</div>
-            <button id="git-refresh-status" class="git-panel-btn git-panel-btn--icon" type="button" title="Refresh Source Control" aria-label="Refresh Source Control">
+            <div class="sidepanel-title">source control</div>
+            <button id="git-refresh-status" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh source control" aria-label="refresh source control">
               <i data-lucide="refresh-cw" aria-hidden="true"></i>
             </button>
           </div>
@@ -85,59 +88,67 @@
 
           <section class="git-section">
             <div class="git-section-header">
-              <div id="git-modified-panel-title" class="git-modified-panel-title">Modified files</div>
+              <div id="git-modified-panel-title" class="git-modified-panel-title">modified files</div>
             </div>
-            <div id="git-modified-empty" class="git-modified-empty">Working tree clean</div>
+            <div id="git-modified-empty" class="git-modified-empty">working tree clean</div>
             <ul id="git-modified-list" class="git-modified-list"></ul>
           </section>
 
           <section class="git-section">
             <div class="git-section-header">
-              <div id="git-branch-panel-title" class="git-modified-panel-title">Branches</div>
+              <div id="git-branch-panel-title" class="git-modified-panel-title">branches</div>
               <div class="git-inline-actions">
-                <button id="git-branch-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="Refresh Branches" aria-label="Refresh Branches">
+                <button id="git-branch-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh branches" aria-label="refresh branches">
                   <i data-lucide="refresh-cw" aria-hidden="true"></i>
                 </button>
-                <button id="git-branch-create" class="git-panel-btn git-panel-btn--icon" type="button" title="Create Branch" aria-label="Create Branch">
+                <button id="git-branch-create" class="git-panel-btn git-panel-btn--icon" type="button" title="create branch" aria-label="create branch">
                   <i data-lucide="git-branch-plus" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
-            <div id="git-branch-empty" class="git-modified-empty">No branches found</div>
+            <div id="git-branch-empty" class="git-modified-empty">no branches found</div>
             <ul id="git-branch-list" class="git-modified-list"></ul>
           </section>
 
           <section class="git-section">
             <div class="git-section-header">
-              <div id="git-history-panel-title" class="git-modified-panel-title">Version tree</div>
+              <div id="git-history-panel-title" class="git-modified-panel-title">version tree</div>
               <div class="git-inline-actions">
-                <button id="git-history-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="Refresh Version Tree" aria-label="Refresh Version Tree">
+                <button id="git-history-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh version tree" aria-label="refresh version tree">
                   <i data-lucide="refresh-cw" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
-            <div id="git-history-empty" class="git-modified-empty">No history found</div>
+            <div id="git-history-empty" class="git-modified-empty">no history found</div>
             <pre id="git-history-content" class="git-history-content"></pre>
           </section>
 
           <section class="git-section">
             <div class="git-section-header">
-              <div id="git-remote-panel-title" class="git-modified-panel-title">Remotes</div>
+              <div id="git-remote-panel-title" class="git-modified-panel-title">remotes</div>
               <div class="git-inline-actions">
-                <button id="git-remote-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="Refresh Remotes" aria-label="Refresh Remotes">
+                <button id="git-remote-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh remotes" aria-label="refresh remotes">
                   <i data-lucide="refresh-cw" aria-hidden="true"></i>
                 </button>
-                <button id="git-remote-add" class="git-panel-btn git-panel-btn--icon" type="button" title="Add Remote" aria-label="Add Remote">
+                <button id="git-remote-add" class="git-panel-btn git-panel-btn--icon" type="button" title="add remote" aria-label="add remote">
                   <i data-lucide="plus" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
-            <div id="git-remote-empty" class="git-modified-empty">No remotes configured</div>
+            <div id="git-remote-empty" class="git-modified-empty">no remotes configured</div>
             <ul id="git-remote-list" class="git-modified-list"></ul>
           </section>
         </div>
 
         <div id="ai-sidebar-container" class="hidden"></div>
+
+        <div id="outline-sidebar-container" class="hidden">
+          <div class="sidepanel-header">
+            <div class="sidepanel-title">outline</div>
+          </div>
+          <div id="outline-empty" class="outline-empty">no symbols yet, write some DSL</div>
+          <ul id="outline-list" class="outline-list"></ul>
+        </div>
       </div>
     </main>
 

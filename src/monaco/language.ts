@@ -227,6 +227,16 @@ export interface DiagnosticMarker {
 
 //monaco registration 
 
+export interface DocumentSymbol {
+  name: string;
+  detail: string;
+  kind: number;
+  range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number };
+  selectionRange: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number };
+  tags: never[];
+  children: never[];
+}
+
 export function registerLanguage(monaco: {
   languages: {
     register(opts: { id: string }): void;
@@ -243,6 +253,14 @@ export function registerLanguage(monaco: {
         ): { suggestions: unknown[] };
       },
     ): void;
+    registerDocumentSymbolProvider(
+      id: string,
+      provider: {
+        provideDocumentSymbols(
+          model: { getValue(): string },
+        ): DocumentSymbol[];
+      },
+    ): void;
     CompletionItemKind: {
       Keyword: number;
       Snippet: number;
@@ -250,6 +268,14 @@ export function registerLanguage(monaco: {
     };
     CompletionItemInsertTextRule: {
       InsertAsSnippet: number;
+    };
+    SymbolKind: {
+      Variable: number;
+      Function: number;
+      Class: number;
+      Constant: number;
+      Module: number;
+      Array: number;
     };
   };
   editor: {
@@ -289,6 +315,30 @@ export function registerLanguage(monaco: {
       return { suggestions };
     },
   });
+
+  const { Variable, Function: Fn, Class, Constant, Module, Array: Arr } = monaco.languages.SymbolKind;
+  const kindToSymbolKind: Record<string, number> = {
+    let: Variable, fn: Fn, circle: Class, point: Constant, line: Module, points: Arr,
+  };
+  const DECL_RE = /^(let|fn|point|circle|line|points)\s+([a-zA-Z_]\w*)/;
+
+  monaco.languages.registerDocumentSymbolProvider(LANGUAGE_ID, {
+    provideDocumentSymbols(model) {
+      const lines = model.getValue().split('\n');
+      const symbols: DocumentSymbol[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(DECL_RE);
+        if (!m) continue;
+        const lineNum = i + 1;
+        const nameCol = lines[i].indexOf(m[2]) + 1;
+        const nameEnd = nameCol + m[2].length;
+        const range = { startLineNumber: lineNum, startColumn: 1, endLineNumber: lineNum, endColumn: lines[i].length + 1 };
+        const sel   = { startLineNumber: lineNum, startColumn: nameCol, endLineNumber: lineNum, endColumn: nameEnd };
+        symbols.push({ name: m[2], detail: m[1], kind: kindToSymbolKind[m[1]] ?? Variable, range, selectionRange: sel, tags: [], children: [] });
+      }
+      return symbols;
+    },
+  });
 }
 
 // util: map compile errors to Monaco markers
@@ -297,12 +347,13 @@ export function errorToMarker(
   message: string,
   line: number,
   col: number,
+  tokenLen = 1,
 ): DiagnosticMarker {
   return {
     startLineNumber: line,
     startColumn:     col,
     endLineNumber:   line,
-    endColumn:       col + 1,
+    endColumn:       col + Math.max(1, tokenLen),
     message,
     severity: 8,
   };
