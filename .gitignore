@@ -1,0 +1,7 @@
+node_modules
+out
+.env
+.DS_Store
+*/.DS_Store
+CLAUDE.md
+todo.txt

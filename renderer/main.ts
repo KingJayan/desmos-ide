@@ -1,0 +1,1109 @@
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+(globalThis as unknown as { MonacoEnvironment: unknown }).MonacoEnvironment = {
+  getWorker() { return new EditorWorker(); },
+};
+
+import * as monaco from 'monaco-editor';
+import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus } from 'lucide';
+import { registerLanguage, errorToMarker, LANGUAGE_ID } from '../src/monaco/language';
+import CompileWorker from './compile.worker?worker';
+import type { CompileResult } from '../src/index';
+import type { DesmosExpr } from '../src/compiler/codegen';
+import { DesmosGraph } from './desmos';
+import { EnhancedPane } from './enhanced';
+import { AISidebar } from './ai-sidebar';
+import { SettingsPanel, loadSettings } from './settings';
+import type { ColorTheme } from './settings';
+
+registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
+createIcons({
+  icons: { GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus },
+  attrs: { 'stroke-width': '1.9' },
+});
+
+
+const editorContainer = document.getElementById('editor-container')!;
+const graphContainer  = document.getElementById('graph-container')!;
+const dslPane         = document.getElementById('dsl-pane')!;
+const enhancedPane    = document.getElementById('enhanced-pane')!;
+const btnDsl          = document.getElementById('btn-dsl')      as HTMLButtonElement;
+const btnSplit        = document.getElementById('btn-split')    as HTMLButtonElement;
+const btnEnhanced     = document.getElementById('btn-enhanced') as HTMLButtonElement;
+const paneDivider     = document.getElementById('pane-divider')!;
+const btnNew          = document.getElementById('btn-new')      as HTMLButtonElement;
+const btnOpen         = document.getElementById('btn-open')     as HTMLButtonElement;
+const btnSave         = document.getElementById('btn-save')     as HTMLButtonElement;
+const filenameEl      = document.getElementById('filename')!;
+const statusMsg       = document.getElementById('status-msg')!;
+const gitBranchEl     = document.getElementById('git-branch') as HTMLSpanElement;
+const gitSummaryMsg   = document.getElementById('git-summary-msg')!;
+const gitRefreshStatusBtn = document.getElementById('git-refresh-status') as HTMLButtonElement;
+const gitBranchPanelTitle = document.getElementById('git-branch-panel-title')!;
+const gitBranchEmpty  = document.getElementById('git-branch-empty')!;
+const gitBranchList   = document.getElementById('git-branch-list')!;
+const gitBranchRefreshBtn = document.getElementById('git-branch-refresh') as HTMLButtonElement;
+const gitBranchCreateBtn = document.getElementById('git-branch-create') as HTMLButtonElement;
+const gitHistoryEmpty = document.getElementById('git-history-empty')!;
+const gitHistoryContent = document.getElementById('git-history-content')!;
+const gitHistoryRefreshBtn = document.getElementById('git-history-refresh') as HTMLButtonElement;
+const gitRemotePanelTitle = document.getElementById('git-remote-panel-title')!;
+const gitRemoteEmpty  = document.getElementById('git-remote-empty')!;
+const gitRemoteList   = document.getElementById('git-remote-list')!;
+const gitRemoteRefreshBtn = document.getElementById('git-remote-refresh') as HTMLButtonElement;
+const gitRemoteAddBtn = document.getElementById('git-remote-add') as HTMLButtonElement;
+const gitModifiedEl   = document.getElementById('git-modified') as HTMLSpanElement;
+const gitModifiedPanelTitle = document.getElementById('git-modified-panel-title')!;
+const gitModifiedEmpty = document.getElementById('git-modified-empty')!;
+const gitModifiedList = document.getElementById('git-modified-list')!;
+const dividerEl       = document.getElementById('divider')!;
+const leftPanel       = document.getElementById('left-panel')!;
+const workspace       = document.getElementById('workspace')!;
+const btnSidebarGit   = document.getElementById('btn-sidebar-git') as HTMLButtonElement;
+const btnSidebarAi    = document.getElementById('btn-sidebar-ai') as HTMLButtonElement;
+const btnSidebarSettings = document.getElementById('btn-sidebar-settings') as HTMLButtonElement;
+const gitContainer    = document.getElementById('git-sidebar-container')!;
+const aiPanel         = document.getElementById('ai-panel')!;
+const aiDivider       = document.getElementById('ai-divider')!;
+const aiContainer     = document.getElementById('ai-sidebar-container')!;
+
+
+const DEFAULT_SRC = `// desmos DSL
+circle guide {
+  center: (0, 0)
+  radius: 4
+}
+
+point focus {
+  center: (2, 1)
+}
+
+points ring = map(i in [0...40]) {
+  (cos(i/6) * 2.8, sin(i/6) * 2.8)
+}
+`;
+
+const initSettings = loadSettings();
+
+monaco.editor.defineTheme('desmos-dark', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '6c7086', fontStyle: 'italic' },
+    { token: 'keyword',   foreground: 'cba6f7' },
+    { token: 'string',    foreground: 'a6e3a1' },
+    { token: 'number',    foreground: 'fab387' },
+    { token: 'type',      foreground: 'f38ba8' },
+    { token: 'function',  foreground: '89b4fa' },
+    { token: 'variable',  foreground: 'cdd6f4' },
+    { token: 'operator',  foreground: '89dceb' },
+  ],
+  colors: {
+    'editor.background':                '#1e1e2e',
+    'editor.foreground':                '#cdd6f4',
+    'editorLineNumber.foreground':      '#45475a',
+    'editorLineNumber.activeForeground':'#bac2de',
+    'editor.selectionBackground':       '#45475a',
+    'editor.lineHighlightBackground':   '#313244',
+    'editorCursor.foreground':          '#b4befe',
+    'editorIndentGuide.background1':    '#313244',
+    'editorWhitespace.foreground':      '#313244',
+  },
+});
+
+monaco.editor.defineTheme('catppuccin-latte', {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '9ca0b0', fontStyle: 'italic' },
+    { token: 'keyword',   foreground: '8839ef' },
+    { token: 'string',    foreground: '40a02b' },
+    { token: 'number',    foreground: 'fe640b' },
+    { token: 'type',      foreground: 'd20f39' },
+    { token: 'function',  foreground: '1e66f5' },
+    { token: 'variable',  foreground: '4c4f69' },
+    { token: 'operator',  foreground: '179299' },
+  ],
+  colors: {
+    'editor.background':                '#eff1f5',
+    'editor.foreground':                '#4c4f69',
+    'editorLineNumber.foreground':      '#bcc0cc',
+    'editorLineNumber.activeForeground':'#5c5f77',
+    'editor.selectionBackground':       '#acb0be',
+    'editor.lineHighlightBackground':   '#e6e9ef',
+    'editorCursor.foreground':          '#7287fd',
+    'editorIndentGuide.background1':    '#ccd0da',
+    'editorWhitespace.foreground':      '#ccd0da',
+  },
+});
+
+monaco.editor.defineTheme('catppuccin-frappe', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '737994', fontStyle: 'italic' },
+    { token: 'keyword',   foreground: 'ca9ee6' },
+    { token: 'string',    foreground: 'a6d189' },
+    { token: 'number',    foreground: 'ef9f76' },
+    { token: 'type',      foreground: 'e78284' },
+    { token: 'function',  foreground: '8caaee' },
+    { token: 'variable',  foreground: 'c6d0f5' },
+    { token: 'operator',  foreground: '81c8be' },
+  ],
+  colors: {
+    'editor.background':                '#303446',
+    'editor.foreground':                '#c6d0f5',
+    'editorLineNumber.foreground':      '#51576d',
+    'editorLineNumber.activeForeground':'#b5bfe2',
+    'editor.selectionBackground':       '#51576d',
+    'editor.lineHighlightBackground':   '#414559',
+    'editorCursor.foreground':          '#babbf1',
+    'editorIndentGuide.background1':    '#414559',
+    'editorWhitespace.foreground':      '#414559',
+  },
+});
+
+monaco.editor.defineTheme('catppuccin-macchiato', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '6e738d', fontStyle: 'italic' },
+    { token: 'keyword',   foreground: 'c6a0f6' },
+    { token: 'string',    foreground: 'a6da95' },
+    { token: 'number',    foreground: 'f5a97f' },
+    { token: 'type',      foreground: 'ed8796' },
+    { token: 'function',  foreground: '8aadf4' },
+    { token: 'variable',  foreground: 'cad3f5' },
+    { token: 'operator',  foreground: '8bd5ca' },
+  ],
+  colors: {
+    'editor.background':                '#24273a',
+    'editor.foreground':                '#cad3f5',
+    'editorLineNumber.foreground':      '#494d64',
+    'editorLineNumber.activeForeground':'#b8c0e0',
+    'editor.selectionBackground':       '#494d64',
+    'editor.lineHighlightBackground':   '#363a4f',
+    'editorCursor.foreground':          '#b7bdf8',
+    'editorIndentGuide.background1':    '#363a4f',
+    'editorWhitespace.foreground':      '#363a4f',
+  },
+});
+
+monaco.editor.defineTheme('github-dark', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '8b949e', fontStyle: 'italic' },
+    { token: 'keyword',   foreground: 'ff7b72' },
+    { token: 'string',    foreground: 'a5d6ff' },
+    { token: 'number',    foreground: '79c0ff' },
+    { token: 'type',      foreground: 'ffa657' },
+    { token: 'function',  foreground: 'd2a8ff' },
+    { token: 'variable',  foreground: 'e6edf3' },
+    { token: 'operator',  foreground: 'ff7b72' },
+  ],
+  colors: {
+    'editor.background':           '#0d1117',
+    'editor.foreground':           '#e6edf3',
+    'editorLineNumber.foreground': '#6e7681',
+    'editor.selectionBackground':  '#264f78',
+    'editor.lineHighlightBackground': '#161b22',
+    'editorCursor.foreground':     '#58a6ff',
+  },
+});
+
+monaco.editor.defineTheme('github-light', {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '6e7781', fontStyle: 'italic' },
+    { token: 'keyword',   foreground: 'cf222e' },
+    { token: 'string',    foreground: '0a3069' },
+    { token: 'number',    foreground: '0550ae' },
+    { token: 'type',      foreground: 'e36209' },
+    { token: 'function',  foreground: '8250df' },
+    { token: 'variable',  foreground: '24292f' },
+    { token: 'operator',  foreground: 'cf222e' },
+  ],
+  colors: {
+    'editor.background':           '#ffffff',
+    'editor.foreground':           '#24292f',
+    'editorLineNumber.foreground': '#8c959f',
+    'editor.selectionBackground':  '#add6ff',
+    'editor.lineHighlightBackground': '#f6f8fa',
+    'editorCursor.foreground':     '#0969da',
+  },
+});
+
+monaco.editor.defineTheme('monokai', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '88846f', fontStyle: 'italic' },
+    { token: 'keyword',   foreground: 'f92672' },
+    { token: 'string',    foreground: 'e6db74' },
+    { token: 'number',    foreground: 'ae81ff' },
+    { token: 'type',      foreground: '66d9e8' },
+    { token: 'function',  foreground: 'a6e22e' },
+    { token: 'variable',  foreground: 'f8f8f2' },
+    { token: 'operator',  foreground: 'f92672' },
+  ],
+  colors: {
+    'editor.background':           '#272822',
+    'editor.foreground':           '#f8f8f2',
+    'editorLineNumber.foreground': '#90908a',
+    'editor.selectionBackground':  '#49483e',
+    'editor.lineHighlightBackground': '#3e3d32',
+    'editorCursor.foreground':     '#f8f8f0',
+  },
+});
+
+document.documentElement.setAttribute('data-color-theme', initSettings.colorTheme);
+
+const editor = monaco.editor.create(editorContainer, {
+  value: DEFAULT_SRC,
+  language: LANGUAGE_ID,
+  theme: initSettings.editorTheme,
+  fontSize: initSettings.fontSize,
+  lineNumbers: initSettings.lineNumbers,
+  minimap: { enabled: initSettings.minimap },
+  wordWrap: initSettings.wordWrap,
+  scrollBeyondLastLine: false,
+  automaticLayout: true,
+  fontFamily: initSettings.codeFontFamily,
+  fontLigatures: true,
+  padding: { top: 12 },
+  renderWhitespace: 'none',
+  smoothScrolling: true,
+  overviewRulerBorder: false,
+  hideCursorInOverviewRuler: true,
+});
+
+
+const graph = new DesmosGraph(graphContainer);
+
+function applyTheme(theme: ColorTheme): void {
+  document.documentElement.setAttribute('data-color-theme', theme);
+  graph.setTheme(theme);
+}
+
+function applyUiFont(fontFamily: string): void {
+  document.documentElement.style.setProperty('--font-ui', fontFamily);
+}
+
+applyTheme(initSettings.colorTheme);
+applyUiFont(initSettings.uiFontFamily);
+monaco.editor.setTheme(initSettings.editorTheme);
+
+
+let enhanced: EnhancedPane | null = null;
+const enhancedUnsavedBar = document.getElementById('enhanced-unsaved-bar')!;
+const btnExportJson = document.getElementById('btn-export-json') as HTMLButtonElement;
+
+function setEnhancedDirty(dirty: boolean): void {
+  enhancedUnsavedBar.classList.toggle('hidden', !dirty);
+}
+
+function ensureEnhancedPane(): EnhancedPane {
+  if (enhanced) return enhanced;
+  enhanced = new EnhancedPane(
+    document.getElementById('expr-list')!,
+    document.getElementById('btn-add-expr') as HTMLButtonElement,
+    (list: DesmosExpr[], dirty: boolean) => {
+      graph.update(list);
+      setEnhancedDirty(dirty);
+    },
+  );
+  return enhanced;
+}
+
+btnExportJson.addEventListener('click', async () => {
+  if (!enhanced) return;
+  const json = JSON.stringify(enhanced.getList(), null, 2);
+  const result = await window.electronAPI?.exportJson(json);
+  if (!result) return;
+  if (result.ok) {
+    enhanced.clearDirty();
+    setEnhancedDirty(false);
+    setStatus('Exported', 'success');
+  } else if (!result.canceled) {
+    setStatus(result.message, 'error');
+  }
+});
+
+//compilation pipeline
+const model = editor.getModel()!;
+let compileTimer: ReturnType<typeof setTimeout> | null = null;
+let compileRequestId = 0;
+let workerRestarts = 0;
+const MAX_WORKER_RESTARTS = 3;
+
+type CompileWorkerResponse = {
+  id: number;
+  result: CompileResult;
+};
+
+function handleCompileResult(result: CompileResult): void {
+  if (result.success) {
+    monaco.editor.setModelMarkers(model, 'desmos-dsl', []);
+    if (mode !== 'enhanced') {
+      graph.update(result.state.expressions.list);
+    }
+    if (mode === 'split') {
+      ensureEnhancedPane().syncFromGraph(graph.currentList());
+    }
+    setStatus(`✓ ${result.state.expressions.list.length} expression(s)`, 'success');
+  } else {
+    const markers =
+      result.line != null && result.col != null
+        ? [errorToMarker(result.error, result.line, result.col)]
+        : [];
+    monaco.editor.setModelMarkers(model, 'desmos-dsl', markers);
+    setStatus(`✗ ${result.error}`, 'error');
+  }
+}
+
+let activeWorker: Worker | null = null;
+
+function spawnWorker(): Worker {
+  const w = new CompileWorker();
+  w.addEventListener('message', (event: MessageEvent<CompileWorkerResponse>) => {
+    const { id, result } = event.data;
+    if (id !== compileRequestId) return;
+    handleCompileResult(result);
+  });
+  w.addEventListener('error', (e: ErrorEvent) => {
+    console.error('[compile-worker] error:', e.message);
+    if (workerRestarts < MAX_WORKER_RESTARTS) {
+      workerRestarts++;
+      setStatus(`⚠ Compiler restarting (${workerRestarts}/${MAX_WORKER_RESTARTS})…`, 'info');
+      w.terminate();
+      activeWorker = spawnWorker();
+      runCompile();
+    } else {
+      setStatus('✗ Compiler failed — reload to recover', 'error');
+    }
+  });
+  w.addEventListener('messageerror', () => {
+    console.error('[compile-worker] message decode error');
+    setStatus('✗ Compiler message error', 'error');
+  });
+  return w;
+}
+
+activeWorker = spawnWorker();
+
+function runCompile(): void {
+  if (!activeWorker) return;
+  const src = editor.getValue();
+  compileRequestId += 1;
+  activeWorker.postMessage({ id: compileRequestId, src });
+}
+
+editor.onDidChangeModelContent(() => {
+  if (compileTimer !== null) clearTimeout(compileTimer);
+  compileTimer = setTimeout(runCompile, 280);
+});
+
+window.addEventListener('unload', () => {
+  activeWorker?.terminate();
+  activeWorker = null;
+  if (gitRefreshTimer) {
+    clearInterval(gitRefreshTimer);
+    gitRefreshTimer = null;
+  }
+});
+
+function setStatus(msg: string, kind: 'success' | 'error' | 'info' = 'info'): void {
+  statusMsg.textContent = msg;
+  statusMsg.className = kind;
+}
+
+type GitStatusResult =
+  | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }
+  | { ok: false; errorCode: string; message: string };
+type GitBranchesResult =
+  | { ok: true; currentBranch: string; branches: Array<{ name: string; current: boolean; upstream: string | null; tracking: string | null }> }
+  | { ok: false; errorCode: string; message: string };
+type GitHistoryResult =
+  | { ok: true; lines: string[] }
+  | { ok: false; errorCode: string; message: string };
+type GitRemotesResult =
+  | { ok: true; remotes: Array<{ name: string; fetchUrl: string; pushUrl: string }> }
+  | { ok: false; errorCode: string; message: string };
+type GitActionResult =
+  | { ok: true; message: string }
+  | { ok: false; errorCode: string; message: string };
+
+let gitRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let gitRefreshInFlight = false;
+let gitLastStatus: GitStatusResult = {
+  ok: false,
+  errorCode: 'INIT',
+  message: 'Loading Git status...',
+};
+
+function renderGitModifiedPanel(status: GitStatusResult): void {
+  gitModifiedList.innerHTML = '';
+
+  if (!status.ok) {
+    gitModifiedPanelTitle.textContent = 'Git status';
+    gitModifiedEmpty.textContent = status.message;
+    gitModifiedEmpty.classList.add('git-modified-empty--show');
+    return;
+  }
+
+  gitModifiedPanelTitle.textContent = status.modifiedCount === 1 ? '1 modified file' : `${status.modifiedCount} modified files`;
+  if (status.modifiedCount === 0) {
+    gitModifiedEmpty.textContent = 'Working tree clean';
+    gitModifiedEmpty.classList.add('git-modified-empty--show');
+    return;
+  }
+
+  gitModifiedEmpty.classList.remove('git-modified-empty--show');
+  for (const file of status.modifiedFiles) {
+    const li = document.createElement('li');
+    li.textContent = file;
+    li.title = file;
+    gitModifiedList.appendChild(li);
+  }
+}
+
+function setGitPillState(kind: 'clean' | 'dirty' | 'unknown'): void {
+  gitBranchEl.classList.remove('git-pill--clean', 'git-pill--dirty', 'git-pill--unknown');
+  gitModifiedEl.classList.remove('git-pill--clean', 'git-pill--dirty', 'git-pill--unknown');
+  gitBranchEl.classList.add(`git-pill--${kind}`);
+  gitModifiedEl.classList.add(`git-pill--${kind}`);
+}
+
+function renderGitStatus(status: GitStatusResult): void {
+  gitLastStatus = status;
+  renderGitModifiedPanel(status);
+
+  if (!status.ok) {
+    gitBranchEl.textContent = 'branch: --';
+    gitModifiedEl.textContent = 'git unavailable';
+    gitSummaryMsg.textContent = status.message;
+    setGitPillState('unknown');
+    return;
+  }
+
+  gitBranchEl.textContent = `branch: ${status.branch}`;
+  gitModifiedEl.textContent = status.modifiedCount === 1 ? '1 modified' : `${status.modifiedCount} modified`;
+  gitSummaryMsg.textContent = status.modifiedCount
+    ? status.modifiedFiles.slice(0, 12).join(' | ')
+    : 'Working tree clean';
+  setGitPillState(status.modifiedCount > 0 ? 'dirty' : 'clean');
+}
+
+function renderGitBranches(result: GitBranchesResult): void {
+  gitBranchList.innerHTML = '';
+
+  if (!result.ok) {
+    gitBranchPanelTitle.textContent = 'Branches';
+    gitBranchEmpty.textContent = result.message;
+    gitBranchEmpty.classList.add('git-modified-empty--show');
+    return;
+  }
+
+  gitBranchPanelTitle.textContent = `Branches (${result.branches.length})`;
+  if (result.branches.length === 0) {
+    gitBranchEmpty.textContent = 'No branches found';
+    gitBranchEmpty.classList.add('git-modified-empty--show');
+    return;
+  }
+
+  gitBranchEmpty.classList.remove('git-modified-empty--show');
+  for (const branch of result.branches) {
+    const li = document.createElement('li');
+    const row = document.createElement('div');
+    row.className = 'git-branch-row';
+
+    const meta = document.createElement('div');
+    meta.className = 'git-branch-meta';
+    const name = document.createElement('div');
+    name.className = 'git-branch-name';
+    name.textContent = branch.current ? `* ${branch.name}` : branch.name;
+    name.title = branch.name;
+    meta.appendChild(name);
+
+    if (branch.upstream) {
+      const upstream = document.createElement('div');
+      upstream.className = 'git-branch-upstream';
+      upstream.textContent = branch.tracking
+        ? `${branch.upstream} (${branch.tracking})`
+        : branch.upstream;
+      meta.appendChild(upstream);
+    }
+
+    row.appendChild(meta);
+
+    if (!branch.current) {
+      const actions = document.createElement('div');
+      actions.className = 'git-inline-actions';
+      const checkout = document.createElement('button');
+      checkout.type = 'button';
+      checkout.className = 'git-panel-btn';
+      checkout.textContent = 'Checkout';
+      checkout.addEventListener('click', async e => {
+        e.stopPropagation();
+        const action = await window.electronAPI?.gitCheckoutBranch(branch.name);
+        handleGitActionResult(action);
+        await Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory()]);
+      });
+      actions.appendChild(checkout);
+      row.appendChild(actions);
+    }
+
+    li.appendChild(row);
+    gitBranchList.appendChild(li);
+  }
+}
+
+function renderGitHistory(result: GitHistoryResult): void {
+  if (!result.ok) {
+    gitHistoryEmpty.textContent = result.message;
+    gitHistoryEmpty.classList.add('git-modified-empty--show');
+    gitHistoryContent.classList.remove('git-history-content--show');
+    gitHistoryContent.textContent = '';
+    return;
+  }
+
+  if (result.lines.length === 0) {
+    gitHistoryEmpty.textContent = 'No history found';
+    gitHistoryEmpty.classList.add('git-modified-empty--show');
+    gitHistoryContent.classList.remove('git-history-content--show');
+    gitHistoryContent.textContent = '';
+    return;
+  }
+
+  gitHistoryEmpty.classList.remove('git-modified-empty--show');
+  gitHistoryContent.classList.add('git-history-content--show');
+  gitHistoryContent.textContent = result.lines.join('\n');
+}
+
+function renderGitRemotes(result: GitRemotesResult): void {
+  gitRemoteList.innerHTML = '';
+
+  if (!result.ok) {
+    gitRemotePanelTitle.textContent = 'Remotes';
+    gitRemoteEmpty.textContent = result.message;
+    gitRemoteEmpty.classList.add('git-modified-empty--show');
+    return;
+  }
+
+  gitRemotePanelTitle.textContent = `Remotes (${result.remotes.length})`;
+
+  if (result.remotes.length === 0) {
+    gitRemoteEmpty.textContent = 'No remotes configured';
+    gitRemoteEmpty.classList.add('git-modified-empty--show');
+    return;
+  }
+
+  gitRemoteEmpty.classList.remove('git-modified-empty--show');
+  for (const remote of result.remotes) {
+    const li = document.createElement('li');
+    const row = document.createElement('div');
+    row.className = 'git-remote-row';
+
+    const meta = document.createElement('div');
+    meta.className = 'git-remote-meta';
+    const name = document.createElement('div');
+    name.className = 'git-branch-name';
+    name.textContent = remote.name;
+    meta.appendChild(name);
+    const fetchUrl = document.createElement('div');
+    fetchUrl.className = 'git-remote-url';
+    fetchUrl.textContent = `fetch: ${remote.fetchUrl || '--'}`;
+    meta.appendChild(fetchUrl);
+    const pushUrl = document.createElement('div');
+    pushUrl.className = 'git-remote-url';
+    pushUrl.textContent = `push: ${remote.pushUrl || '--'}`;
+    meta.appendChild(pushUrl);
+    row.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'git-inline-actions';
+
+    const fetchBtn = document.createElement('button');
+    fetchBtn.type = 'button';
+    fetchBtn.className = 'git-panel-btn';
+    fetchBtn.textContent = 'Fetch';
+    fetchBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const action = await window.electronAPI?.gitFetch(remote.name);
+      handleGitActionResult(action);
+      await Promise.all([refreshGitStatus(), refreshGitHistory()]);
+    });
+
+    const pullBtn = document.createElement('button');
+    pullBtn.type = 'button';
+    pullBtn.className = 'git-panel-btn';
+    pullBtn.textContent = 'Pull';
+    pullBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const branch = gitLastStatus.ok ? gitLastStatus.branch : undefined;
+      const action = await window.electronAPI?.gitPull(remote.name, branch);
+      handleGitActionResult(action);
+      await Promise.all([refreshGitStatus(), refreshGitHistory()]);
+    });
+
+    const pushBtn = document.createElement('button');
+    pushBtn.type = 'button';
+    pushBtn.className = 'git-panel-btn';
+    pushBtn.textContent = 'Push';
+    pushBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const branch = gitLastStatus.ok ? gitLastStatus.branch : undefined;
+      const action = await window.electronAPI?.gitPush(remote.name, branch);
+      handleGitActionResult(action);
+      await Promise.all([refreshGitStatus(), refreshGitHistory()]);
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'git-panel-btn';
+    removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      if (!confirm(`Remove remote ${remote.name}?`)) return;
+      const action = await window.electronAPI?.gitRemoteRemove(remote.name);
+      handleGitActionResult(action);
+      await refreshGitRemotes();
+    });
+
+    actions.appendChild(fetchBtn);
+    actions.appendChild(pullBtn);
+    actions.appendChild(pushBtn);
+    actions.appendChild(removeBtn);
+    row.appendChild(actions);
+    li.appendChild(row);
+    gitRemoteList.appendChild(li);
+  }
+}
+
+function handleGitActionResult(result: GitActionResult | undefined): void {
+  if (!result) return;
+  if (result.ok) {
+    setStatus(result.message, 'success');
+  } else {
+    setStatus(result.message, 'error');
+  }
+}
+
+async function refreshGitStatus(): Promise<void> {
+  if (gitRefreshInFlight) return;
+  gitRefreshInFlight = true;
+  try {
+    const result = await window.electronAPI?.gitStatus();
+    if (result) renderGitStatus(result);
+  } catch (err) {
+    renderGitStatus({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
+  } finally {
+    gitRefreshInFlight = false;
+  }
+}
+
+async function refreshGitBranches(): Promise<void> {
+  try {
+    const result = await window.electronAPI?.gitBranches();
+    if (result) renderGitBranches(result);
+  } catch (err) {
+    renderGitBranches({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
+  }
+}
+
+async function refreshGitHistory(): Promise<void> {
+  try {
+    const result = await window.electronAPI?.gitHistory(50);
+    if (result) renderGitHistory(result);
+  } catch (err) {
+    renderGitHistory({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
+  }
+}
+
+async function refreshGitRemotes(): Promise<void> {
+  try {
+    const result = await window.electronAPI?.gitRemotes();
+    if (result) renderGitRemotes(result);
+  } catch (err) {
+    renderGitRemotes({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
+  }
+}
+
+function startGitStatusRefresh(): void {
+  void refreshGitStatus();
+  if (gitRefreshTimer) clearInterval(gitRefreshTimer);
+  gitRefreshTimer = setInterval(() => {
+    void refreshGitStatus();
+  }, 9000);
+}
+
+runCompile();
+
+//mode switching
+type Mode = 'dsl' | 'split' | 'enhanced';
+let mode: Mode = 'dsl';
+
+function applyMode(m: Mode): void {
+  mode = m;
+  btnDsl.classList.toggle('active', m === 'dsl');
+  btnSplit.classList.toggle('active', m === 'split');
+  btnEnhanced.classList.toggle('active', m === 'enhanced');
+
+  const showDsl      = m === 'dsl' || m === 'split';
+  const showEnhanced = m === 'enhanced' || m === 'split';
+  const showDivider  = m === 'split';
+
+  dslPane.classList.toggle('hidden', !showDsl);
+  dslPane.classList.toggle('split', m === 'split');
+  enhancedPane.classList.toggle('hidden', !showEnhanced);
+  enhancedPane.classList.toggle('split', m === 'split');
+  paneDivider.classList.toggle('hidden', !showDivider);
+  if (m !== 'split') { dslPane.style.height = ''; dslPane.style.flex = ''; }
+
+  if (showEnhanced) {
+    ensureEnhancedPane().syncFromGraph(graph.currentList());
+    setEnhancedDirty(false);
+  }
+  if (showDsl) editor.layout();
+}
+
+function setMode(m: Mode): void {
+  if (m !== 'enhanced' && mode === 'enhanced' && enhanced?.isDirty) {
+    if (!confirm('Leave Enhanced mode? Unsaved edits will be lost.')) return;
+  }
+  applyMode(m);
+}
+
+btnDsl.addEventListener('click', () => setMode('dsl'));
+btnSplit.addEventListener('click', () => setMode('split'));
+btnEnhanced.addEventListener('click', () => setMode('enhanced'));
+
+//file ops
+let currentPath: string | null = null;
+
+function setFilename(p: string | null): void {
+  currentPath = p;
+  filenameEl.textContent = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
+}
+
+function enhancedDirtyGuard(): boolean {
+  if (mode === 'enhanced' && enhanced?.isDirty) {
+    return confirm('Discard unsaved Enhanced edits and continue?');
+  }
+  return true;
+}
+
+async function cmdNew(): Promise<void> {
+  if (!enhancedDirtyGuard()) return;
+  editor.setValue(DEFAULT_SRC);
+  setFilename(null);
+  setStatus('New file', 'info');
+  applyMode('dsl');
+  runCompile();
+  void refreshGitStatus();
+}
+
+async function cmdOpen(): Promise<void> {
+  if (!enhancedDirtyGuard()) return;
+  const result = await window.electronAPI?.openFile();
+  if (!result) return;
+  if (!result.ok) {
+    if (!result.canceled) setStatus(result.message, 'error');
+    return;
+  }
+  editor.setValue(result.content);
+  setFilename(result.path);
+  applyMode(mode === 'enhanced' ? 'dsl' : mode);
+  runCompile();
+  void refreshGitStatus();
+}
+
+async function cmdSave(saveAs = false): Promise<void> {
+  if (mode === 'enhanced') {
+    setStatus('Switch to DSL or Split to save, or use Export JSON', 'error');
+    return;
+  }
+  const result = await window.electronAPI?.saveFile(
+    saveAs ? null : currentPath,
+    editor.getValue(),
+  );
+  if (!result) return;
+  if (result.ok) {
+    setFilename(result.path);
+    setStatus('Saved', 'success');
+    void refreshGitStatus();
+  } else if (!result.canceled) {
+    setStatus(result.message, 'error');
+  }
+}
+
+btnNew.addEventListener('click',  () => cmdNew());
+btnOpen.addEventListener('click', () => cmdOpen());
+btnSave.addEventListener('click', () => cmdSave());
+
+function runEditorAction(actionId: string): void {
+  editor.focus();
+  const action = editor.getAction(actionId);
+  if (!action) return;
+  void action.run();
+}
+
+function runFindWithRegex(): void {
+  editor.focus();
+  editor.trigger('keyboard', 'actions.findWithArgs', {
+    searchString: editor.getModel()?.getValueInRange(editor.getSelection() ?? new monaco.Selection(1, 1, 1, 1)) ?? '',
+    isRegex: true,
+    matchWholeWord: false,
+    isCaseSensitive: false,
+    preserveCase: false,
+  });
+}
+
+window.addEventListener('keydown', e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+
+  const k = e.key.toLowerCase();
+
+  if (!e.shiftKey && !e.altKey && k === 'n') {
+    e.preventDefault();
+    void cmdNew();
+    return;
+  }
+
+  if (!e.shiftKey && !e.altKey && k === 'o') {
+    e.preventDefault();
+    void cmdOpen();
+    return;
+  }
+
+  if (!e.shiftKey && !e.altKey && k === 's') {
+    e.preventDefault();
+    void cmdSave();
+    return;
+  }
+
+  if (!e.shiftKey && !e.altKey && k === 'f') {
+    e.preventDefault();
+    runEditorAction('actions.find');
+    return;
+  }
+
+  if (!e.altKey && k === 'h') {
+    e.preventDefault();
+    runEditorAction('editor.action.startFindReplaceAction');
+    return;
+  }
+
+  if (e.shiftKey && !e.altKey && k === 'f') {
+    e.preventDefault();
+    setStatus('Global search is not enabled yet', 'info');
+    return;
+  }
+
+  if (e.altKey && k === 'r') {
+    e.preventDefault();
+    runFindWithRegex();
+  }
+});
+
+window.electronAPI?.onMenuNew(cmdNew);
+window.electronAPI?.onMenuOpen(cmdOpen);
+window.electronAPI?.onMenuSave(() => cmdSave());
+window.electronAPI?.onMenuSaveAs(() => cmdSave(true));
+
+window.addEventListener('focus', () => {
+  void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitRemotes()]);
+});
+
+gitRefreshStatusBtn.addEventListener('click', () => {
+  void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory(), refreshGitRemotes()]);
+});
+
+gitBranchRefreshBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  void refreshGitBranches();
+});
+
+gitHistoryRefreshBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  void refreshGitHistory();
+});
+
+gitRemoteRefreshBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  void refreshGitRemotes();
+});
+
+gitBranchCreateBtn.addEventListener('click', async e => {
+  e.stopPropagation();
+  const raw = prompt('New branch name:');
+  const name = raw?.trim();
+  if (!name) return;
+  const action = await window.electronAPI?.gitCreateBranch(name);
+  handleGitActionResult(action);
+  await Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory()]);
+});
+
+gitRemoteAddBtn.addEventListener('click', async e => {
+  e.stopPropagation();
+  const nameRaw = prompt('Remote name:', 'origin');
+  const name = nameRaw?.trim();
+  if (!name) return;
+  const urlRaw = prompt(`Remote URL for ${name}:`);
+  const url = urlRaw?.trim();
+  if (!url) return;
+  const action = await window.electronAPI?.gitRemoteAdd(name, url);
+  handleGitActionResult(action);
+  await refreshGitRemotes();
+});
+
+//divider drag
+let dragging = false;
+
+dividerEl.addEventListener('mousedown', e => {
+  dragging = true;
+  dividerEl.classList.add('dragging');
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (dragging) {
+    const rect = workspace.getBoundingClientRect();
+    const w = Math.max(280, Math.min(e.clientX - rect.left, rect.width - 204));
+    leftPanel.style.width = `${w}px`;
+    editor.layout();
+  }
+  if (paneDragging) {
+    const rect = leftPanel.getBoundingClientRect();
+    const h = Math.max(80, Math.min(e.clientY - rect.top, rect.height - 84));
+    dslPane.style.flex = 'none';
+    dslPane.style.height = `${h}px`;
+    editor.layout();
+  }
+});
+
+let paneDragging = false;
+
+paneDivider.addEventListener('mousedown', e => {
+  paneDragging = true;
+  paneDivider.classList.add('dragging');
+  e.preventDefault();
+});
+
+document.addEventListener('mouseup', () => {
+  if (dragging) { dragging = false; dividerEl.classList.remove('dragging'); }
+  if (aiDragging) { aiDragging = false; aiDivider.classList.remove('dragging'); }
+  if (paneDragging) { paneDragging = false; paneDivider.classList.remove('dragging'); }
+});
+
+// sidebar
+type SidebarView = 'git' | 'ai' | null;
+let sidebarView: SidebarView = null;
+let aiSidebar: AISidebar | null = null;
+
+function ensureAiSidebar(): AISidebar {
+  if (aiSidebar) return aiSidebar;
+  aiSidebar = new AISidebar(
+    aiContainer,
+    () => {
+      const selection = editor.getModel()?.getValueInRange(editor.getSelection()!) ?? '';
+      return { dsl: editor.getValue(), selection };
+    },
+    ({ type, code }) => {
+      const sel = editor.getSelection();
+      if (type === 'replace') {
+        if (sel && !sel.isEmpty()) {
+          editor.executeEdits('ai', [{ range: sel, text: code }]);
+        } else {
+          editor.setValue(code);
+        }
+      } else {
+        const pos = editor.getPosition() ?? { lineNumber: 1, column: 1 };
+        editor.executeEdits('ai', [{
+          range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column),
+          text: '\n' + code,
+        }]);
+      }
+      editor.focus();
+    },
+  );
+  return aiSidebar;
+}
+
+function setSidebarView(next: SidebarView): void {
+  sidebarView = next;
+  const open = next !== null;
+
+  aiPanel.classList.toggle('hidden', !open);
+  aiDivider.classList.toggle('hidden', !open);
+  gitContainer.classList.toggle('hidden', next !== 'git');
+  aiContainer.classList.toggle('hidden', next !== 'ai');
+
+  btnSidebarGit.classList.toggle('active', next === 'git');
+  btnSidebarAi.classList.toggle('active', next === 'ai');
+
+  if (next === 'ai') {
+    ensureAiSidebar();
+  }
+  if (next === 'git') {
+    void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory(), refreshGitRemotes()]);
+  }
+
+  editor.layout();
+}
+
+btnSidebarGit.addEventListener('click', () => {
+  setSidebarView(sidebarView === 'git' ? null : 'git');
+});
+
+btnSidebarAi.addEventListener('click', () => {
+  setSidebarView(sidebarView === 'ai' ? null : 'ai');
+});
+
+// divider drag
+let aiDragging = false;
+
+aiDivider.addEventListener('mousedown', e => {
+  aiDragging = true;
+  aiDivider.classList.add('dragging');
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!aiDragging) return;
+  const rect = workspace.getBoundingClientRect();
+  const w = Math.max(260, Math.min(rect.right - e.clientX, 500));
+  aiPanel.style.width = `${w}px`;
+});
+
+// settings
+let settingsPanel: SettingsPanel | null = null;
+
+function ensureSettingsPanel(): SettingsPanel {
+  if (settingsPanel) return settingsPanel;
+  settingsPanel = new SettingsPanel(s => {
+    applyTheme(s.colorTheme);
+    applyUiFont(s.uiFontFamily);
+    monaco.editor.setTheme(s.editorTheme);
+    editor.updateOptions({
+      fontSize:    s.fontSize,
+      fontFamily:  s.codeFontFamily,
+      lineNumbers: s.lineNumbers,
+      minimap:     { enabled: s.minimap },
+      wordWrap:    s.wordWrap,
+    });
+  });
+  return settingsPanel;
+}
+
+btnSidebarSettings.addEventListener('click', () => ensureSettingsPanel().toggle());
+
+setFilename(null);
+applyMode('dsl');
+startGitStatusRefresh();
+void refreshGitBranches();
+void refreshGitHistory();
+void refreshGitRemotes();
+editor.focus();
