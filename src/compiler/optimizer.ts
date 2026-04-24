@@ -72,14 +72,14 @@ function optimizeMap(map: T.MapExpr, env: Env): T.MapExpr {
 
 // expr optimizer
 
-export function optimizeExpr(expr: T.Expr, env: Env): T.Expr {
+export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
   switch (expr.type) {
     case 'NumLit':
     case 'Ident':
       return expr;
 
     case 'UnaryOp': {
-      const operand = optimizeExpr(expr.operand, env);
+      const operand = optimizeExpr(expr.operand, env, depth);
       if (operand.type === 'NumLit') {
         return num(-operand.value, expr.pos);
       }
@@ -91,8 +91,8 @@ export function optimizeExpr(expr: T.Expr, env: Env): T.Expr {
     }
 
     case 'BinOp': {
-      const left  = optimizeExpr(expr.left,  env);
-      const right = optimizeExpr(expr.right, env);
+      const left  = optimizeExpr(expr.left,  env, depth);
+      const right = optimizeExpr(expr.right, env, depth);
 
       // constant folding
       if (left.type === 'NumLit' && right.type === 'NumLit') {
@@ -130,7 +130,7 @@ export function optimizeExpr(expr: T.Expr, env: Env): T.Expr {
     }
 
     case 'Call': {
-      const args = expr.args.map(a => optimizeExpr(a, env));
+      const args = expr.args.map(a => optimizeExpr(a, env, depth));
 
       // codegen-level builtins
       if (expr.fn === 'time' || expr.fn === 'project' || expr.fn === 'camera' || expr.fn === 'rgb' || expr.fn === 'hsv') {
@@ -141,24 +141,23 @@ export function optimizeExpr(expr: T.Expr, env: Env): T.Expr {
       const fn = env.fns.get(expr.fn);
       if (fn) {
         if (args.length !== fn.params.length) {
-          // arity mismatch — leave as-is
           return { ...expr, args };
         }
-        return inlineCall(fn, args, env);
+        return inlineCall(fn, args, env, depth);
       }
 
       return { ...expr, args };
     }
 
     case 'Tuple':
-      return { ...expr, x: optimizeExpr(expr.x, env), y: optimizeExpr(expr.y, env) };
+      return { ...expr, x: optimizeExpr(expr.x, env, depth), y: optimizeExpr(expr.y, env, depth) };
 
     case 'ListRange':
       return {
         ...expr,
-        start: optimizeExpr(expr.start, env),
-        end:   optimizeExpr(expr.end,   env),
-        step:  expr.step ? optimizeExpr(expr.step, env) : undefined,
+        start: optimizeExpr(expr.start, env, depth),
+        end:   optimizeExpr(expr.end,   env, depth),
+        step:  expr.step ? optimizeExpr(expr.step, env, depth) : undefined,
       };
 
     case 'MapExpr':
@@ -167,12 +166,16 @@ export function optimizeExpr(expr: T.Expr, env: Env): T.Expr {
   }
 }
 
-//helpers
-function inlineCall(fn: FnDef, args: T.Expr[], env: Env): T.Expr {
+const MAX_INLINE_DEPTH = 20;
+
+function inlineCall(fn: FnDef, args: T.Expr[], env: Env, depth: number): T.Expr {
+  if (depth >= MAX_INLINE_DEPTH) {
+    throw new Error(`recursive function exceeds max inline depth — use a non-recursive form`);
+  }
   const subst = new Map<string, T.Expr>();
   fn.params.forEach((p, i) => subst.set(p, args[i]));
   const substituted = substituteExpr(fn.body, subst);
-  return optimizeExpr(substituted, env);
+  return optimizeExpr(substituted, env, depth + 1);
 }
 
 function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {

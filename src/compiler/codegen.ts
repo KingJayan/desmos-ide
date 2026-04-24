@@ -138,7 +138,7 @@ export function nameToLatex(name: string): string {
 }
 
 function fmtNum(n: number): string {
-  return Number.isInteger(n) ? String(n) : String(n);
+  return Number.isInteger(n) ? String(n) : n.toPrecision(15).replace(/\.?0+$/, '');
 }
 
 
@@ -190,8 +190,8 @@ export class Codegen {
       const varName = nameToLatex(stmt.name);
       const minVal  = startArg ? this.toLaTeX(startArg) : '0';
       const maxVal  = endArg   ? this.toLaTeX(endArg)   : '10';
-      const period  = speedArg
-        ? Math.round(1000 / parseFloat(this.toLaTeX(speedArg)))
+      const period  = (speedArg && speedArg.type === 'NumLit' && speedArg.value !== 0)
+        ? Math.round(1000 / speedArg.value)
         : 4000;
       this.emit({
         type: 'expression',
