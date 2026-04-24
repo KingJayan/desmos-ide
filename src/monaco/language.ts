@@ -10,6 +10,7 @@ export const BUILTIN_FNS = [
   'sin', 'cos', 'tan', 'arcsin', 'arccos', 'arctan',
   'ln', 'log', 'sqrt', 'abs', 'floor', 'ceil', 'round',
   'min', 'max', 'mod', 'sign',
+  'rgb', 'hsv',
 ] as const;
 
 export const languageConfig = {
@@ -205,13 +206,30 @@ export function buildCompletions(kinds: {
       detail: 'keyword',
     })),
 
-    ...BUILTIN_FNS.map(fn => ({
+    ...BUILTIN_FNS.filter(fn => fn !== 'rgb' && fn !== 'hsv').map(fn => ({
       label: fn,
       kind: Function,
       insertText: `${fn}(\${1:x})`,
       insertTextRules: 4,
       detail: 'built-in function',
     })),
+
+    {
+      label: 'rgb',
+      kind: Function,
+      insertText: 'rgb(${1:255}, ${2:0}, ${3:0})',
+      insertTextRules: 4,
+      detail: 'color — rgb(r, g, b)',
+      documentation: 'Desmos color via RGB (0–255 each). Shown as an inline color swatch.',
+    },
+    {
+      label: 'hsv',
+      kind: Function,
+      insertText: 'hsv(${1:0}, ${2:1}, ${3:1})',
+      insertTextRules: 4,
+      detail: 'color — hsv(h, s, v)',
+      documentation: 'Desmos color via HSV (h: 0–360, s/v: 0–1). Shown as an inline color swatch.',
+    },
   ];
 }
 

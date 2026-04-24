@@ -2,6 +2,44 @@
 
 import * as T from './types';
 
+const DESMOS_NAMED: Record<string, string> = {
+  red: '#c74440', blue: '#2d70b3', green: '#388c46',
+  orange: '#fa7e19', purple: '#6042a6', black: '#000000', white: '#ffffff',
+};
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(v => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0')).join('');
+}
+
+function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
+  h = ((h % 360) + 360) % 360;
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if      (h < 60)  { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else              { r = c; b = x; }
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+function resolveColor(expr: T.Expr | undefined): string | null {
+  if (!expr) return null;
+  if (expr.type === 'Ident' && DESMOS_NAMED[expr.name]) return DESMOS_NAMED[expr.name];
+  if (expr.type !== 'Call') return null;
+  const nums = expr.args.every(a => a.type === 'NumLit');
+  if (!nums) return null;
+  const [a0 = 0, a1 = 0, a2 = 0] = (expr.args as T.NumLit[]).map(a => a.value);
+  if (expr.fn === 'rgb') return rgbToHex(a0, a1, a2);
+  if (expr.fn === 'hsv') { const [r, g, b] = hsvToRgb(a0, a1, a2); return rgbToHex(r, g, b); }
+  return null;
+}
+
 // output types
 
 export interface DesmosSlider {
@@ -195,7 +233,7 @@ export class Codegen {
 
 
   private genEntityDecl(stmt: T.EntityDecl): void {
-    const color = COLORS[stmt.kind];
+    const color = resolveColor(stmt.props['color']) ?? COLORS[stmt.kind];
     switch (stmt.kind) {
       case 'point': this.genPoint(stmt, color); break;
       case 'circle': this.genCircle(stmt, color); break;

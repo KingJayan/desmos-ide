@@ -132,8 +132,8 @@ export function optimizeExpr(expr: T.Expr, env: Env): T.Expr {
     case 'Call': {
       const args = expr.args.map(a => optimizeExpr(a, env));
 
-      // time() is a codegen-level builtin
-      if (expr.fn === 'time' || expr.fn === 'project' || expr.fn === 'camera') {
+      // codegen-level builtins
+      if (expr.fn === 'time' || expr.fn === 'project' || expr.fn === 'camera' || expr.fn === 'rgb' || expr.fn === 'hsv') {
         return { ...expr, args };
       }
 

@@ -7,11 +7,14 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "check": "npx tsc --noEmit 2>&1",
     "demo": "npx ts-node -P tsconfig.node.json src/demo.ts",
     "bump:patch": "npm version patch --no-git-tag-version",
     "bump:minor": "npm version minor --no-git-tag-version",
     "bump:major": "npm version major --no-git-tag-version",
-    "bump:prepatch": "npm version prepatch --no-git-tag-version --preid=beta"
+    "bump:prepatch": "npm version prepatch --no-git-tag-version --preid=beta",
+    "ready": "npm run bump:patch && npm run build",
+    "r": "npm run build && npm run dev"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

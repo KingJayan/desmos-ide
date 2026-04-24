@@ -16,8 +16,10 @@ import { SettingsPanel, loadSettings } from './settings';
 import type { ColorTheme } from './settings';
 import { CommandPalette } from './command-palette';
 import { InlineSliderManager } from './inline-sliders';
+import { registerColorProvider } from './color-provider';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
+registerColorProvider();
 createIcons({
   icons: { GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List },
   attrs: { 'stroke-width': '1.9' },
