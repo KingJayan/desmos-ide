@@ -16,24 +16,39 @@
 # DSL syntax
 
 ```
-let x = 3                                      -- constant
-let x = 3 [-10..10]                            -- slider (explicit domain required)
-fn f(a, b) = a + b                             -- function
+// variables and functions
+x = 3
+a = slider(0, 0, 10)              -- slider(initial, min, max) — add speed=n to auto-play
+fn f(a, b) = a + b                -- inlined at every call site
 
-point origin { (0, 0) }                        -- named point
-circle ring  { center: (0,0), radius: 3 }      -- circle
-line  axis   { through: (0,0), slope: 1 }      -- line
+// geometry
+point p (1, 2)
+circle c = circle((0, 0), 3)
+line l = slope(2), intercept(1)
+line l2 = 2*x + y = 4            -- standard form
+segment s = (0,0) -> (1,1)
+polygon tri = [(0,0),(1,0),(0,1)]
 
-points trail = map(i in [0...60]) {            -- parametric point list
-  (cos(i), sin(i))
-}
+// curves and regions
+curve ring (t in 0..6.28) { (cos(t), sin(t)) }   -- parametric (tuple body)
+pts = (cos(t), sin(t)) for t in 0..6.28           -- inline for-comprehension
+region r = y > x^2
+
+// conditional expressions
+v = x^2 where x > 0 else -x^2
+z = { x > 0: x^2, x < 0: -x, else: 0 }
+
+// text and folders
+text lbl = "hello" at (1, 2)
+group g as "My Folder"
+
+// optional styling
+point p2 (0, 0) as { color red pointSize 12 }
+region r2 = y < x as { color blue opacity 0.3 fill }
 ```
 
-**Sliders:** `let x = 3 [-10..10]` — shown only when a domain is explicitly given; whitespace inside `[min..max]` is flexible. Without a domain the variable is a plain constant with no slider.  
-**Animated sliders:** `let t = 0 [0..10].play` / `.loop` / `.loop(-1)` — appended directly after the domain bracket.  
-**Supported entities:** `point`, `circle`, `line`, `points` (map)  
-**Expressions:** arithmetic, `let` bindings, `fn` definitions  
-**Limitations:** no implicit multiplication, no piecewise yet, no list comprehensions outside `map`
+**Expressions:** full arithmetic (`+ - * / ^`), comparison operators, `where/else` conditionals, piecewise blocks, `map()` list comprehensions, `abs()`, `sqrt()`, trig, and all standard Desmos math functions.  
+**Colors:** named (`red blue green orange purple black white`) or `rgb(r,g,b)` / `hsv(h,s,v)`.
 
 # architecture
 

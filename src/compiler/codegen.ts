@@ -1,13 +1,15 @@
-// code generator to desmos expre JSON
+// code generator
 
 import * as T from './types';
+
+//color utils
 
 const DESMOS_NAMED: Record<string, string> = {
   red: '#c74440', blue: '#2d70b3', green: '#388c46',
   orange: '#fa7e19', purple: '#6042a6', black: '#000000', white: '#ffffff',
 };
 
-function clamp(v: number, lo: number, hi: number): number {
+function clamp(v: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, v));
 }
 
@@ -30,6 +32,7 @@ function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
 
 function resolveColor(expr: T.Expr | undefined): string | null {
   if (!expr) return null;
+  if (expr.type === 'StringLit') return DESMOS_NAMED[expr.value] ?? null;
   if (expr.type === 'Ident' && DESMOS_NAMED[expr.name]) return DESMOS_NAMED[expr.name];
   if (expr.type !== 'Call') return null;
   const nums = expr.args.every(a => a.type === 'NumLit');
@@ -68,6 +71,8 @@ export interface DesmosExpr {
   label?: string;
   showLabel?: boolean;
   slider?: DesmosSlider;
+  title?: string;
+  parametricDomain?: { min: string; max: string };
 }
 
 export interface DesmosState {
@@ -78,21 +83,23 @@ export interface DesmosState {
   expressions: { list: DesmosExpr[] };
 }
 
-// color palette
 
 const COLORS: Record<string, string> = {
-  point:  '#2d70b3',
-  circle: '#c74440',
-  line:   '#388c46',
-  points: '#6042a6',
+  point:   '#2d70b3',
+  circle:  '#c74440',
+  line:    '#388c46',
+  points:  '#6042a6',
+  curve:   '#6042a6',
+  region:  '#c74440',
+  polygon: '#fa7e19',
+  segment: '#388c46',
 };
 
-// math function to LaTeX cmd map
 
 const MATH_FNS: Record<string, string> = {
   sin:    '\\sin',    cos:    '\\cos',    tan:    '\\tan',
   arcsin: '\\arcsin', arccos: '\\arccos', arctan: '\\arctan',
-  ln:     '\\ln',     log:    '\\log',
+  ln:     '\\ln',     log:    '\\log',    exp:    '\\exp',
   min:    '\\min',    max:    '\\max',
   floor:  '\\operatorname{floor}',
   ceil:   '\\operatorname{ceil}',
@@ -101,26 +108,9 @@ const MATH_FNS: Record<string, string> = {
   mod:    '\\operatorname{mod}',
 };
 
-// operator precedence (for paren elision)
-
-const PREC: Record<string, number> = {
-  '+': 1, '-': 1, '*': 2, '/': 2, '^': 3, unary: 4,
-};
-
-function needsParens(childOp: string, parentOp: string, side: 'left' | 'right'): boolean {
-  const cp = PREC[childOp] ?? 0;
-  const pp = PREC[parentOp] ?? 0;
-  if (cp < pp) return true;
-  // e.g. (a - b) - c is fine, but a - (b - c) is not
-  if (cp === pp && side === 'right' && (parentOp === '-' || parentOp === '/')) return true;
-  return false;
-}
-
-// name to Desmos LaTeX identifier
-//
-//   single char     to  used as-is:  x  t  r
-//   greek name      to  \alpha  \beta  \theta  …
-//   multi-char      →to first letter + subscript:  wave → w_{ave}
+//   single char  →  as-is:  x  t  r
+//   greek name   →  \alpha  \theta  …
+//   multi-char   →  first + subscript:  wave → w_{ave}
 
 const GREEK: Record<string, string> = {
   alpha: '\\alpha', beta: '\\beta', gamma: '\\gamma', delta: '\\delta',
@@ -148,15 +138,26 @@ function fmtNum(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toPrecision(15).replace(/\.?0+$/, '');
 }
 
+//op precedence and parens
+const PREC: Record<string, number> = {
+  '+': 1, '-': 1, '*': 2, '/': 2, '^': 3, unary: 4,
+};
+
+function needsParens(childOp: string, parentOp: string, side: 'left' | 'right'): boolean {
+  const cp = PREC[childOp] ?? 0;
+  const pp = PREC[parentOp] ?? 0;
+  if (cp < pp) return true;
+  if (cp === pp && side === 'right' && (parentOp === '-' || parentOp === '/')) return true;
+  return false;
+}
+
 
 export class Codegen {
   private list: DesmosExpr[] = [];
   private idCounter = 1;
 
   generate(program: T.Program): DesmosState {
-    for (const stmt of program.body) {
-      this.genStmt(stmt);
-    }
+    for (const stmt of program.body) this.genStmt(stmt);
     return {
       version: 9,
       graph: { viewport: { xmin: -10, ymin: -10, xmax: 10, ymax: 10 } },
@@ -164,167 +165,193 @@ export class Codegen {
     };
   }
 
-
   private emit(partial: Omit<DesmosExpr, 'id'>): string {
     const id = String(this.idCounter++);
     this.list.push({ ...partial, id });
     return id;
   }
 
-  // stmt dispatch
 
   private genStmt(stmt: T.Statement): void {
     switch (stmt.type) {
-      case 'LetDecl':    this.genLetDecl(stmt);    break;
-      case 'EntityDecl': this.genEntityDecl(stmt); break;
-      case 'ListDecl':   this.genListDecl(stmt);   break;
-      // FnDecl is eliminated by the optimizer
+      case 'VarDecl':    this.genVarDecl(stmt);    break;
+      case 'PointDecl':  this.genPointDecl(stmt);  break;
+      case 'CircleDecl': this.genCircleDecl(stmt); break;
+      case 'LineDecl':   this.genLineDecl(stmt);   break;
+      case 'CurveDecl':  this.genCurveDecl(stmt);  break;
+      case 'RegionDecl': this.genRegionDecl(stmt); break;
+      case 'PolygonDecl':this.genPolygonDecl(stmt);break;
+      case 'SegmentDecl':this.genSegmentDecl(stmt);break;
+      case 'TextDecl':   this.genTextDecl(stmt);   break;
+      case 'GroupDecl':  this.genGroupDecl(stmt);  break;
     }
   }
 
-  // let declarations
 
-  private genLetDecl(stmt: T.LetDecl): void {
-    if (stmt.value.type === 'Call' && stmt.value.fn === 'time') {
-      const [startArg, endArg, speedArg] = stmt.value.args;
-      const varName = nameToLatex(stmt.name);
-      const minVal  = startArg ? this.toLaTeX(startArg) : '0';
-      const maxVal  = endArg   ? this.toLaTeX(endArg)   : '10';
-      const period  = (speedArg && speedArg.type === 'NumLit' && speedArg.value !== 0)
-        ? Math.round(1000 / speedArg.value)
-        : 4000;
-      this.emit({
-        type: 'expression',
-        latex: `${varName}=0`,
-        slider: {
-          min: minVal, max: maxVal,
-          hardMin: true, hardMax: true,
-          isPlaying: true,
-          animationPeriod: period,
-        },
-      });
-      return;
-    }
-
+  private genVarDecl(stmt: T.VarDecl): void {
     const varName = nameToLatex(stmt.name);
-    const value   = this.toLaTeX(stmt.value);
-    if (stmt.domain) {
-      const { min, max, animMethod, loopDir } = stmt.domain;
+
+    if (stmt.value.type === 'Call' && stmt.value.fn === 'slider') {
+      const [valArg, minArg, maxArg, speedArg] = stmt.value.args;
+      const speedKwarg = stmt.value.kwargs?.['speed'];
+      const speedExpr = speedKwarg ?? speedArg;
+      const period = (speedExpr?.type === 'NumLit' && speedExpr.value !== 0)
+        ? Math.round(1000 / speedExpr.value)
+        : undefined;
       const slider: DesmosSlider = {
-        min: this.toLaTeX(min),
-        max: this.toLaTeX(max),
-        hardMin: true,
-        hardMax: true,
+        min: minArg ? this.toLaTeX(minArg) : undefined,
+        max: maxArg ? this.toLaTeX(maxArg) : undefined,
+        hardMin: minArg !== undefined,
+        hardMax: maxArg !== undefined,
       };
-      if (animMethod === 'play') {
+      if (period !== undefined) {
         slider.isPlaying = true;
-        slider.loopMode = 'PLAY_ONCE';
-        slider.animationPeriod = 4000;
-      } else if (animMethod === 'loop') {
-        slider.isPlaying = true;
-        slider.loopMode = loopDir === -1 ? 'LOOP_BACKWARD' : 'LOOP_FORWARD';
-        slider.animationPeriod = 4000;
+        slider.loopMode = 'LOOP_FORWARD';
+        slider.animationPeriod = period;
       }
-      this.emit({ type: 'expression', latex: `${varName}=${value}`, slider });
+      const initVal = valArg ? this.toLaTeX(valArg) : '0';
+      this.emit({ type: 'expression', latex: `${varName}=${initVal}`, slider });
       return;
     }
-    this.emit({ type: 'expression', latex: `${varName}=${value}` });
+
+    this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` });
   }
 
-
-  private genEntityDecl(stmt: T.EntityDecl): void {
-    const color = resolveColor(stmt.props['color']) ?? COLORS[stmt.kind];
-    switch (stmt.kind) {
-      case 'point': this.genPoint(stmt, color); break;
-      case 'circle': this.genCircle(stmt, color); break;
-      case 'line':   this.genLine(stmt, color);   break;
-    }
+  /** point p (x, y) */
+  private genPointDecl(stmt: T.PointDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.point;
+    const varName = nameToLatex(stmt.name);
+    const tx = this.toLaTeX(stmt.x);
+    const ty = this.toLaTeX(stmt.y);
+    const partial: Omit<DesmosExpr, 'id'> = {
+      type: 'expression',
+      latex: `${varName}=\\left(${tx},${ty}\\right)`,
+      color, showLabel: true, label: stmt.name,
+    };
+    if (stmt.style?.pointSize) partial.pointSize = String(stmt.style.pointSize);
+    this.emit(partial);
   }
 
-  private genPoint(stmt: T.EntityDecl, color: string): void {
-    let tx = '0', ty = '0';
-    const center = stmt.props['center'];
-    if (center?.type === 'Tuple') {
-      tx = this.toLaTeX(center.x);
-      ty = this.toLaTeX(center.y);
+  /** circle c = circle((cx, cy), r) */
+  private genCircleDecl(stmt: T.CircleDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.circle;
+    const cx = this.toLaTeX(stmt.cx);
+    const cy = this.toLaTeX(stmt.cy);
+    const r  = this.toLaTeX(stmt.r);
+    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.1';
+    this.emit({
+      type: 'expression',
+      latex: this.circleLatex(cx, cy, r),
+      color, fill: true, fillOpacity,
+    });
+  }
+
+  /** line l = slope(m), intercept(b)  |  standard  |  expr */
+  private genLineDecl(stmt: T.LineDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.line;
+    let latex: string;
+
+    if (stmt.form === 'slope-intercept') {
+      const m = stmt.slope ? this.toLaTeX(stmt.slope) : '1';
+      const b = stmt.intercept ? this.toLaTeX(stmt.intercept) : '0';
+      const mPart = m === '1' ? '' : m === '-1' ? '-' : /[+\-]/.test(m.slice(1)) ? `\\left(${m}\\right)` : m;
+      latex = b === '0' ? `y=${mPart}x` : `y=${mPart}x+${b}`;
+    } else if (stmt.form === 'standard') {
+      const lhs = stmt.lhs ? this.toLaTeX(stmt.lhs) : 'y';
+      const rhs = stmt.rhs ? this.toLaTeX(stmt.rhs) : '0';
+      latex = `${lhs}=${rhs}`;
     } else {
-      tx = stmt.props['x'] ? this.toLaTeX(stmt.props['x']) : '0';
-      ty = stmt.props['y'] ? this.toLaTeX(stmt.props['y']) : '0';
+      latex = stmt.expr ? this.toLaTeX(stmt.expr) : 'y=x';
     }
+
+    this.emit({ type: 'expression', latex, color });
+  }
+
+  /** curve / for-comprehension → parametric or sampled list */
+  private genCurveDecl(stmt: T.CurveDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.curve;
+    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : undefined;
+
+    const bodyLatex = this.toLaTeX(stmt.body);
+    const startLatex = this.toLaTeX(stmt.start);
+    const endLatex   = this.toLaTeX(stmt.end);
+    const stepLatex  = stmt.step ? this.toLaTeX(stmt.step) : undefined;
+
+    if (stmt.body.type === 'Tuple') {
+      const partial: Omit<DesmosExpr, 'id'> = {
+        type: 'expression',
+        latex: bodyLatex,
+        color,
+        parametricDomain: { min: startLatex, max: endLatex },
+      };
+      if (fillOpacity) { partial.fill = true; partial.fillOpacity = fillOpacity; }
+      this.emit(partial);
+      return;
+    }
+
+    const rangeLatex = stepLatex
+      ? `\\left[${startLatex},${stepLatex},...,${endLatex}\\right]`
+      : `\\left[${startLatex},...,${endLatex}\\right]`;
+    const listLatex = `\\left[${bodyLatex}\\operatorname{for}${nameToLatex(stmt.var)}=${rangeLatex}\\right]`;
+    this.emit({ type: 'expression', latex: listLatex, color, points: true, lines: false });
+  }
+
+  /** region r = y > x^2 → inequality expression */
+  private genRegionDecl(stmt: T.RegionDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.region;
+    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.4';
+    this.emit({
+      type: 'expression',
+      latex: this.toLaTeX(stmt.expr),
+      color, fill: stmt.style?.fill !== false,
+      fillOpacity,
+    });
+  }
+
+  /** polygon p = [(0,0), (2,0), (1,2)] */
+  private genPolygonDecl(stmt: T.PolygonDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.polygon;
+    const pts = stmt.points.map(p => `\\left(${this.toLaTeX(p.x)},${this.toLaTeX(p.y)}\\right)`).join(',');
+    const latex = `\\operatorname{polygon}\\left(${pts}\\right)`;
+    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.2';
+    this.emit({ type: 'expression', latex, color, fill: true, fillOpacity });
+  }
+
+  /** segment s = (0,0) -> (2,3) → 2-point list with lines */
+  private genSegmentDecl(stmt: T.SegmentDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.segment;
+    const x1 = this.toLaTeX(stmt.p1.x), y1 = this.toLaTeX(stmt.p1.y);
+    const x2 = this.toLaTeX(stmt.p2.x), y2 = this.toLaTeX(stmt.p2.y);
+    const latex = `\\left[\\left(${x1},${y1}\\right),\\left(${x2},${y2}\\right)\\right]`;
+    this.emit({ type: 'expression', latex, color, lines: true, points: false });
+  }
+
+  /** text t = "hello" at (x, y) → labeled point */
+  private genTextDecl(stmt: T.TextDecl): void {
+    const tx = this.toLaTeX(stmt.x);
+    const ty = this.toLaTeX(stmt.y);
     const varName = nameToLatex(stmt.name);
     this.emit({
       type: 'expression',
       latex: `${varName}=\\left(${tx},${ty}\\right)`,
-      color,
+      label: stmt.content,
       showLabel: true,
-      label: stmt.name,
+      points: false,
     });
   }
 
-  private genCircle(stmt: T.EntityDecl, color: string): void {
-    let cx = '0', cy = '0', r = '1';
-    const center = stmt.props['center'];
-    const radius = stmt.props['radius'];
-    if (center?.type === 'Tuple') {
-      cx = this.toLaTeX(center.x);
-      cy = this.toLaTeX(center.y);
-    }
-    if (radius) r = this.toLaTeX(radius);
+  /** group orbit as "Motion" → Desmos folder */
+  private genGroupDecl(stmt: T.GroupDecl): void {
+    this.emit({ type: 'folder', title: stmt.label });
+  }
 
+//helpers
+  private circleLatex(cx: string, cy: string, r: string): string {
     const hPart = cx === '0' ? 'x^{2}' : `\\left(x-\\left(${cx}\\right)\\right)^{2}`;
     const kPart = cy === '0' ? 'y^{2}' : `\\left(y-\\left(${cy}\\right)\\right)^{2}`;
     const rPart = r  === '1' ? '1'     : `\\left(${r}\\right)^{2}`;
-
-    this.emit({
-      type: 'expression',
-      latex: `${hPart}+${kPart}=${rPart}`,
-      color,
-      fill: true,
-      fillOpacity: '0.1',
-    });
+    return `${hPart}+${kPart}=${rPart}`;
   }
-
-  private genLine(stmt: T.EntityDecl, color: string): void {
-    const latex = this.buildLineLatex(stmt.props);
-    this.emit({ type: 'expression', latex, color });
-  }
-
-  private buildLineLatex(props: Record<string, T.Expr>): string {
-    if (props['slope'] && props['intercept']) {
-      const m = this.toLaTeX(props['slope']);
-      const b = this.toLaTeX(props['intercept']);
-      const mPart = m === '1' ? '' : m === '-1' ? '-' : /[+\-]/.test(m.slice(1)) ? `\\left(${m}\\right)` : m;
-      return b === '0' ? `y=${mPart}x` : `y=${mPart}x+${b}`;
-    }
-    if (props['point1'] && props['point2']) {
-      const p1 = props['point1'], p2 = props['point2'];
-      if (p1.type === 'Tuple' && p2.type === 'Tuple') {
-        const x1 = this.toLaTeX(p1.x), y1 = this.toLaTeX(p1.y);
-        const x2 = this.toLaTeX(p2.x), y2 = this.toLaTeX(p2.y);
-        if (x1 === x2) return `x=${x1}`;
-        return `y-${y1}=\\frac{${y2}-${y1}}{${x2}-${x1}}\\left(x-${x1}\\right)`;
-      }
-    }
-    if (props['y']) return `y=${this.toLaTeX(props['y'])}`;
-    if (props['x']) return `x=${this.toLaTeX(props['x'])}`;
-    return 'y=x';
-  }
-
-  // pt lists
-
-  private genListDecl(stmt: T.ListDecl): void {
-    const varName = nameToLatex(stmt.name);
-    const latex   = this.mapToLatex(stmt.map);
-    this.emit({
-      type: 'expression',
-      latex: `${varName}=${latex}`,
-      color: COLORS.points,
-      points: true,
-      lines: false,
-    });
-  }
-
-  // LaTeX emitters
 
   private mapToLatex(map: T.MapExpr): string {
     const body  = this.toLaTeX(map.body);
@@ -342,11 +369,12 @@ export class Codegen {
     return `\\left[${start},...,${end}\\right]`;
   }
 
-  // central LaTeX emitter for expres
+
   toLaTeX(expr: T.Expr): string {
     switch (expr.type) {
-      case 'NumLit': return fmtNum(expr.value);
-      case 'Ident':  return nameToLatex(expr.name);
+      case 'NumLit':    return fmtNum(expr.value);
+      case 'StringLit': return expr.value;
+      case 'Ident':     return nameToLatex(expr.name);
 
       case 'UnaryOp':
         return `-${this.wrap(expr.operand, 'unary', 'left')}`;
@@ -365,6 +393,35 @@ export class Codegen {
         }
       }
 
+      case 'CompareExpr': {
+        const l = this.toLaTeX(expr.left);
+        const r = this.toLaTeX(expr.right);
+        const opMap: Record<T.CompareOp, string> = {
+          '>':  '>',
+          '<':  '<',
+          '>=': '\\ge ',
+          '<=': '\\le ',
+          '!=': '\\ne ',
+          '==': '=',
+        };
+        return `${l}${opMap[expr.op]}${r}`;
+      }
+
+      case 'ConditionalExpr': {
+        const cond  = this.toLaTeX(expr.cond);
+        const then  = this.toLaTeX(expr.then);
+        const else_ = this.toLaTeX(expr.else_);
+        return `\\left\\{${cond}:${then},${else_}\\right\\}`;
+      }
+
+      case 'PiecewiseExpr': {
+        const parts = expr.branches.map(b => {
+          if (b.cond === null) return this.toLaTeX(b.body); // else branch: value only
+          return `${this.toLaTeX(b.cond)}:${this.toLaTeX(b.body)}`;
+        });
+        return `\\left\\{${parts.join(',')}\\right\\}`;
+      }
+
       case 'Call': return this.callToLatex(expr);
 
       case 'Tuple':
@@ -376,6 +433,15 @@ export class Codegen {
       case 'MapExpr':
         return this.mapToLatex(expr);
 
+      case 'ForExpr': {
+        const body  = this.toLaTeX(expr.body);
+        const start = this.toLaTeX(expr.start);
+        const end   = this.toLaTeX(expr.end);
+        const rangeLatex = expr.step
+          ? `\\left[${start},${this.toLaTeX(expr.step)},...,${end}\\right]`
+          : `\\left[${start},...,${end}\\right]`;
+        return `\\left[${body}\\operatorname{for}${nameToLatex(expr.var)}=${rangeLatex}\\right]`;
+      }
     }
   }
 
@@ -384,18 +450,14 @@ export class Codegen {
 
     if (call.fn === 'sqrt') return `\\sqrt{${args[0] ?? '0'}}`;
     if (call.fn === 'abs')  return `\\left|${args[0] ?? '0'}\\right|`;
-
-    // project() stub — emit the vector argument unchanged
     if (call.fn === 'project') return args[0] ?? '0';
 
     const latexFn = MATH_FNS[call.fn];
     if (latexFn) return `${latexFn}\\left(${args.join(',')}\\right)`;
 
-    // user-defined function (should be inlined, but emit as fallback)
     return `${nameToLatex(call.fn)}\\left(${args.join(',')}\\right)`;
   }
 
-  // wrap child in parens if its precedence is lower than parent's
   private wrap(expr: T.Expr, parentOp: string, side: 'left' | 'right'): string {
     const latex = this.toLaTeX(expr);
     const requiresParens =

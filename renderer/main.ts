@@ -364,7 +364,7 @@ function renderOutline(symbols: SymbolInfo[]): void {
 
     const badge = document.createElement('span');
     badge.className = `outline-badge outline-badge--${sym.kind}`;
-    badge.textContent = sym.kind === 'points' ? 'pts' : sym.kind;
+    badge.textContent = sym.kind;
 
     const name = document.createElement('span');
     name.className = 'outline-name';

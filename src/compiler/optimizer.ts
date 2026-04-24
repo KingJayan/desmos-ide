@@ -1,20 +1,9 @@
 // optimizer
-//
-// collect function definitions
-// inline all function calls (aggressive)
-// algebraic identity reduction
-// strip fn declarations 
 
 import * as T from './types';
 
-interface FnDef {
-  params: string[];
-  body: T.Expr;
-}
-
-interface Env {
-  fns: Map<string, FnDef>;
-}
+interface FnDef { params: string[]; body: T.Expr; }
+interface Env { fns: Map<string, FnDef>; }
 
 export function optimize(program: T.Program): T.Program {
   const env: Env = { fns: new Map() };
@@ -34,29 +23,61 @@ export function optimize(program: T.Program): T.Program {
   return { type: 'Program', body };
 }
 
-// stmt dispatch
+//dispatch
 
 function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
+  const ox = (e: T.Expr) => optimizeExpr(e, env);
+  const oxopt = (e: T.Expr | undefined) => e ? ox(e) : undefined;
+
   switch (stmt.type) {
-    case 'LetDecl': {
-      const domain = stmt.domain ? {
-        ...stmt.domain,
-        min: optimizeExpr(stmt.domain.min, env),
-        max: optimizeExpr(stmt.domain.max, env),
-      } : stmt.domain;
-      return { ...stmt, value: optimizeExpr(stmt.value, env), domain };
+    case 'VarDecl':
+      return { ...stmt, value: ox(stmt.value) };
+
+    case 'PointDecl':
+      return { ...stmt, x: ox(stmt.x), y: ox(stmt.y) };
+
+    case 'CircleDecl':
+      return { ...stmt, cx: ox(stmt.cx), cy: ox(stmt.cy), r: ox(stmt.r) };
+
+    case 'LineDecl': {
+      const s = stmt;
+      return {
+        ...s,
+        slope:     oxopt(s.slope),
+        intercept: oxopt(s.intercept),
+        lhs:       oxopt(s.lhs),
+        rhs:       oxopt(s.rhs),
+        expr:      oxopt(s.expr),
+      };
     }
 
-    case 'EntityDecl': {
-      const props: Record<string, T.Expr> = {};
-      for (const [k, v] of Object.entries(stmt.props)) {
-        props[k] = optimizeExpr(v, env);
-      }
-      return { ...stmt, props };
-    }
+    case 'CurveDecl':
+      return {
+        ...stmt,
+        start: ox(stmt.start),
+        end:   ox(stmt.end),
+        step:  oxopt(stmt.step),
+        body:  ox(stmt.body),
+      };
 
-    case 'ListDecl':
-      return { ...stmt, map: optimizeMap(stmt.map, env) };
+    case 'RegionDecl':
+      return { ...stmt, expr: ox(stmt.expr) };
+
+    case 'PolygonDecl':
+      return { ...stmt, points: stmt.points.map(p => ox(p) as T.Tuple) };
+
+    case 'SegmentDecl':
+      return {
+        ...stmt,
+        p1: ox(stmt.p1) as T.Tuple,
+        p2: ox(stmt.p2) as T.Tuple,
+      };
+
+    case 'TextDecl':
+      return { ...stmt, x: ox(stmt.x), y: ox(stmt.y) };
+
+    case 'GroupDecl':
+      return stmt;
 
     default:
       return stmt;
@@ -76,37 +97,33 @@ function optimizeMap(map: T.MapExpr, env: Env): T.MapExpr {
   };
 }
 
-// expr optimizer
+
 
 export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
+  const ox = (e: T.Expr) => optimizeExpr(e, env, depth);
+
   switch (expr.type) {
     case 'NumLit':
+    case 'StringLit':
     case 'Ident':
       return expr;
 
     case 'UnaryOp': {
-      const operand = optimizeExpr(expr.operand, env, depth);
-      if (operand.type === 'NumLit') {
-        return num(-operand.value, expr.pos);
-      }
-      // --x  -->  x
-      if (operand.type === 'UnaryOp' && operand.op === '-') {
-        return operand.operand;
-      }
+      const operand = ox(expr.operand);
+      if (operand.type === 'NumLit') return num(-operand.value, expr.pos);
+      if (operand.type === 'UnaryOp' && operand.op === '-') return operand.operand;
       return { ...expr, operand };
     }
 
     case 'BinOp': {
-      const left  = optimizeExpr(expr.left,  env, depth);
-      const right = optimizeExpr(expr.right, env, depth);
+      const left  = ox(expr.left);
+      const right = ox(expr.right);
 
-      // constant folding
       if (left.type === 'NumLit' && right.type === 'NumLit') {
         const v = foldBinOp(expr.op, left.value, right.value);
         if (v !== null) return num(v, expr.pos);
       }
 
-      // alg identities
       switch (expr.op) {
         case '+':
           if (isZero(left))  return right;
@@ -135,15 +152,30 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
       return { ...expr, left, right };
     }
 
+    case 'CompareExpr':
+      return { ...expr, left: ox(expr.left), right: ox(expr.right) };
+
+    case 'ConditionalExpr':
+      return { ...expr, cond: ox(expr.cond), then: ox(expr.then), else_: ox(expr.else_) };
+
+    case 'PiecewiseExpr':
+      return {
+        ...expr,
+        branches: expr.branches.map(b => ({
+          cond: b.cond ? ox(b.cond) : null,
+          body: ox(b.body),
+        })),
+      };
+
     case 'Call': {
-      const args = expr.args.map(a => optimizeExpr(a, env, depth));
+      const args = expr.args.map(a => ox(a));
+      const kwargs = expr.kwargs
+        ? Object.fromEntries(Object.entries(expr.kwargs).map(([k, v]) => [k, ox(v)]))
+        : undefined;
 
-      // codegen-level builtins
-      if (expr.fn === 'time' || expr.fn === 'project' || expr.fn === 'camera' || expr.fn === 'rgb' || expr.fn === 'hsv') {
-        return { ...expr, args };
-      }
+      const BUILTINS = new Set(['time', 'project', 'camera', 'rgb', 'hsv', 'slider']);
+      if (BUILTINS.has(expr.fn)) return { ...expr, args, kwargs };
 
-      // inline user-defined functions
       const fn = env.fns.get(expr.fn);
       if (fn) {
         if (args.length !== fn.params.length) {
@@ -152,31 +184,41 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
         return inlineCall(fn, args, env, depth);
       }
 
-      return { ...expr, args };
+      return { ...expr, args, kwargs };
     }
 
     case 'Tuple':
-      return { ...expr, x: optimizeExpr(expr.x, env, depth), y: optimizeExpr(expr.y, env, depth) };
+      return { ...expr, x: ox(expr.x), y: ox(expr.y) };
 
     case 'ListRange':
       return {
         ...expr,
-        start: optimizeExpr(expr.start, env, depth),
-        end:   optimizeExpr(expr.end,   env, depth),
-        step:  expr.step ? optimizeExpr(expr.step, env, depth) : undefined,
+        start: ox(expr.start),
+        end:   ox(expr.end),
+        step:  expr.step ? ox(expr.step) : undefined,
       };
 
     case 'MapExpr':
       return optimizeMap(expr, env);
 
+    case 'ForExpr':
+      return {
+        ...expr,
+        body:  ox(expr.body),
+        start: ox(expr.start),
+        end:   ox(expr.end),
+        step:  expr.step ? ox(expr.step) : undefined,
+      };
   }
 }
+
+//inlining
 
 const MAX_INLINE_DEPTH = 20;
 
 function inlineCall(fn: FnDef, args: T.Expr[], env: Env, depth: number): T.Expr {
   if (depth >= MAX_INLINE_DEPTH) {
-    throw new Error(`recursive function exceeds max inline depth — use a non-recursive form`);
+    throw new Error('Recursive function exceeds max inline depth — use a non-recursive form');
   }
   const subst = new Map<string, T.Expr>();
   fn.params.forEach((p, i) => subst.set(p, args[i]));
@@ -186,8 +228,11 @@ function inlineCall(fn: FnDef, args: T.Expr[], env: Env, depth: number): T.Expr 
 
 function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
   switch (expr.type) {
-    case 'NumLit': return expr;
-    case 'Ident':  return subst.get(expr.name) ?? expr;
+    case 'NumLit':
+    case 'StringLit':
+      return expr;
+    case 'Ident':
+      return subst.get(expr.name) ?? expr;
 
     case 'BinOp':
       return { ...expr, left: substituteExpr(expr.left, subst), right: substituteExpr(expr.right, subst) };
@@ -195,26 +240,50 @@ function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
     case 'UnaryOp':
       return { ...expr, operand: substituteExpr(expr.operand, subst) };
 
+    case 'CompareExpr':
+      return { ...expr, left: substituteExpr(expr.left, subst), right: substituteExpr(expr.right, subst) };
+
+    case 'ConditionalExpr':
+      return {
+        ...expr,
+        cond:  substituteExpr(expr.cond, subst),
+        then:  substituteExpr(expr.then, subst),
+        else_: substituteExpr(expr.else_, subst),
+      };
+
+    case 'PiecewiseExpr':
+      return {
+        ...expr,
+        branches: expr.branches.map(b => ({
+          cond: b.cond ? substituteExpr(b.cond, subst) : null,
+          body: substituteExpr(b.body, subst),
+        })),
+      };
+
     case 'Call':
-      return { ...expr, args: expr.args.map(a => substituteExpr(a, subst)) };
+      return {
+        ...expr,
+        args: expr.args.map(a => substituteExpr(a, subst)),
+        kwargs: expr.kwargs
+          ? Object.fromEntries(Object.entries(expr.kwargs).map(([k, v]) => [k, substituteExpr(v, subst)]))
+          : undefined,
+      };
 
     case 'Tuple':
       return { ...expr, x: substituteExpr(expr.x, subst), y: substituteExpr(expr.y, subst) };
 
     case 'ListRange': {
-      const newSubst = new Map(subst);
       return {
         ...expr,
-        start: substituteExpr(expr.start, newSubst),
-        end:   substituteExpr(expr.end,   newSubst),
-        step:  expr.step ? substituteExpr(expr.step, newSubst) : undefined,
+        start: substituteExpr(expr.start, subst),
+        end:   substituteExpr(expr.end,   subst),
+        step:  expr.step ? substituteExpr(expr.step, subst) : undefined,
       };
     }
 
     case 'MapExpr': {
-      // Loop variable shadows outer bindings
       const newSubst = new Map(subst);
-      newSubst.delete(expr.var);
+      newSubst.delete(expr.var); // loop var shadows outer
       return {
         ...expr,
         range: substituteExpr(expr.range, newSubst) as T.ListRange,
@@ -222,8 +291,21 @@ function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
       };
     }
 
+    case 'ForExpr': {
+      const newSubst = new Map(subst);
+      newSubst.delete(expr.var); // loop var shadows outer
+      return {
+        ...expr,
+        body:  substituteExpr(expr.body,  newSubst),
+        start: substituteExpr(expr.start, subst),
+        end:   substituteExpr(expr.end,   subst),
+        step:  expr.step ? substituteExpr(expr.step, subst) : undefined,
+      };
+    }
   }
 }
+
+//helpers
 
 function foldBinOp(op: string, a: number, b: number): number | null {
   switch (op) {

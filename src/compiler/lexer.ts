@@ -1,24 +1,28 @@
 // lexer + tokenizer
 
 export const KEYWORDS = new Set([
-  'let', 'fn', 'in', 'map',
-  'point', 'circle', 'line', 'points',
+  'fn', 'in', 'map', 'point', 'circle', 'line',
   'time', 'project', 'camera',
+
+  'for', 'step', 'where', 'else', 'region', 'polygon', 'segment',
+  'curve', 'group', 'text', 'as', 'at',
 ]);
 
 export type TT =
   | 'kw'
-  | 'ident'       // identifier
-  | 'num'         // num literal
-  | 'op'          // operator: + - * / ^ =
+  | 'ident'
+  | 'num'
+  | 'str'        // string literal "..."
+  | 'op'         // + - * / ^ = > < >= <= != == (single or multi-char)
   | 'lparen' | 'rparen'
   | 'lbrace' | 'rbrace'
   | 'lbracket' | 'rbracket'
   | 'comma'
   | 'colon'
-  | 'ellipsis'    // ...
-  | 'dotdot'      // ..
+  | 'ellipsis'   // ...
+  | 'dotdot'     // ..
   | 'dot'
+  | 'arrow'      // ->
   | 'eof';
 
 export interface Token {
@@ -53,7 +57,7 @@ export function tokenize(src: string): Token[] {
   while (i < src.length) {
     const ch = src[i];
 
-    // newline — track for line/col
+    // newline
     if (ch === '\n') { line++; lineStart = ++i; continue; }
     if (ch === ' ' || ch === '\t' || ch === '\r') { i++; continue; }
 
@@ -63,12 +67,11 @@ export function tokenize(src: string): Token[] {
       continue;
     }
 
-    // nums  (ints and decimals)
+    // nums (ints and decimals)
     if ((ch >= '0' && ch <= '9') || (ch === '.' && src[i + 1] >= '0' && src[i + 1] <= '9')) {
       const start = i;
       const startCol = col();
       while (i < src.length && src[i] >= '0' && src[i] <= '9') i++;
-      // Only consume decimal point when followed by a digit (not `...`)
       if (i < src.length && src[i] === '.' && i + 1 < src.length && src[i + 1] >= '0' && src[i + 1] <= '9') {
         i++;
         while (i < src.length && src[i] >= '0' && src[i] <= '9') i++;
@@ -77,7 +80,7 @@ export function tokenize(src: string): Token[] {
       continue;
     }
 
-    // idnets / kws
+    // idents / kws
     if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_') {
       const start = i;
       const startCol = col();
@@ -93,20 +96,33 @@ export function tokenize(src: string): Token[] {
       continue;
     }
 
-    // ellipsis/dotdot must come before single dot check
-    if (ch === '.' && src.slice(i, i + 3) === '...') {
-      push('ellipsis', '...');
-      i += 3;
-      continue;
-    }
-    if (ch === '.' && src[i + 1] === '.' && src[i + 2] !== '.') {
-      push('dotdot', '..');
-      i += 2;
+    // string literal "..."
+    if (ch === '"') {
+      const startCol = col();
+      i++;
+      const start = i;
+      while (i < src.length && src[i] !== '"') {
+        if (src[i] === '\n') throw new LexError('Unterminated string literal', line, col());
+        i++;
+      }
+      if (i >= src.length) throw new LexError('Unterminated string literal', line, col());
+      const value = src.slice(start, i);
+      i++;
+      push('str', value, startCol);
       continue;
     }
 
-    // single-char tokens
+    // ellipsis/dotdot before single dot
+    if (ch === '.' && src.slice(i, i + 3) === '...') { push('ellipsis', '...'); i += 3; continue; }
+    if (ch === '.' && src[i + 1] === '.' && src[i + 2] !== '.') { push('dotdot', '..'); i += 2; continue; }
+
     const startCol = col();
+    if (ch === '-' && src[i + 1] === '>') { push('arrow', '->',  startCol); i += 2; continue; }
+    if (ch === '>' && src[i + 1] === '=') { push('op',    '>=',  startCol); i += 2; continue; }
+    if (ch === '<' && src[i + 1] === '=') { push('op',    '<=',  startCol); i += 2; continue; }
+    if (ch === '!' && src[i + 1] === '=') { push('op',    '!=',  startCol); i += 2; continue; }
+    if (ch === '=' && src[i + 1] === '=') { push('op',    '==',  startCol); i += 2; continue; }
+
     switch (ch) {
       case '(': push('lparen',   ch, startCol); i++; break;
       case ')': push('rparen',   ch, startCol); i++; break;
@@ -117,6 +133,8 @@ export function tokenize(src: string): Token[] {
       case ',': push('comma',    ch, startCol); i++; break;
       case ':': push('colon',    ch, startCol); i++; break;
       case '.': push('dot',      ch, startCol); i++; break;
+      case '>': push('op',       ch, startCol); i++; break;
+      case '<': push('op',       ch, startCol); i++; break;
       case '+': case '-': case '*': case '/':
       case '^': case '=':
         push('op', ch, startCol); i++; break;

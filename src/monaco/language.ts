@@ -1,8 +1,11 @@
 export const LANGUAGE_ID = 'desmos-dsl';
 
 export const KEYWORDS = [
-  'let', 'fn', 'in', 'map',
-  'point', 'circle', 'line', 'points',
+  'fn', 'in', 'map',
+  'point', 'circle', 'line',
+  'curve', 'region', 'polygon', 'segment',
+  'text', 'group', 'as', 'at',
+  'for', 'step', 'where', 'else',
   'time', 'project', 'camera',
 ] as const;
 
@@ -68,7 +71,6 @@ export const monarchTokens = {
       //ellipsis and dotdot (before single-dot or operator catch-all)
       [/\.\.\./, 'operator.ellipsis'],
       [/\.\./, 'operator.ellipsis'],
-      [/\.(play|loop)/, 'function.builtin'],
 
       //idents, keywords, builtins
       [
@@ -143,60 +145,106 @@ export function buildCompletions(kinds: {
   return [
 
     {
-      label: 'let',
-      kind: Snippet,
-      insertText: 'let ${1:name} = ${2:value}',
-      insertTextRules: 4,
-      detail: 'variable binding',
-      documentation: 'Declare a variable or slider (use time() for animation).',
-    },
-    {
       label: 'fn',
       kind: Snippet,
       insertText: 'fn ${1:name}(${2:x}) = ${3:body}',
       insertTextRules: 4,
       detail: 'inline function',
-      documentation: 'Define a function — it will be inlined at every call site during compilation.',
-    },
-    {
-      label: 'time',
-      kind: Snippet,
-      insertText: 'let ${1:t} = time(${2:0}, ${3:10})',
-      insertTextRules: 4,
-      detail: 'animated slider',
-      documentation: 'Creates an auto-playing Desmos slider. Optional third argument sets speed.',
-    },
-    {
-      label: 'circle',
-      kind: Snippet,
-      insertText: 'circle ${1:name} {\n  center: (${2:0}, ${3:0})\n  radius: ${4:1}\n}',
-      insertTextRules: 4,
-      detail: 'circle entity',
-      documentation: 'Compiles to an implicit circle equation (x-h)²+(y-k)²=r².',
+      documentation: 'Define a function — inlined at every call site during compilation.',
     },
     {
       label: 'point',
       kind: Snippet,
-      insertText: 'point ${1:name} {\n  center: (${2:0}, ${3:0})\n}',
+      insertText: 'point ${1:name} (${2:0}, ${3:0})',
       insertTextRules: 4,
-      detail: 'point entity',
-      documentation: 'A labelled point. Supports dynamic coordinates.',
+      detail: 'labelled point',
+      documentation: 'A labelled point at (x, y). Supports dynamic coordinates.',
     },
     {
-      label: 'line',
+      label: 'circle',
       kind: Snippet,
-      insertText: 'line ${1:name} {\n  slope: ${2:1}\n  intercept: ${3:0}\n}',
+      insertText: 'circle ${1:name} = circle((${2:0}, ${3:0}), ${4:1})',
       insertTextRules: 4,
-      detail: 'line entity',
-      documentation: 'A line in slope-intercept form. Alternatively use point1/point2 props.',
+      detail: 'circle',
+      documentation: 'Compiles to (x-h)²+(y-k)²=r².',
     },
     {
-      label: 'points map',
+      label: 'line slope',
       kind: Snippet,
-      insertText: 'points ${1:name} = map(${2:i} in [${3:0}...${4:100}]) {\n  (${5:cos(i)}, ${6:sin(i)})\n}',
+      insertText: 'line ${1:name} = slope(${2:1}), intercept(${3:0})',
       insertTextRules: 4,
-      detail: 'point list via map',
-      documentation: 'Generates a Desmos list comprehension over a range.',
+      detail: 'line — slope-intercept',
+    },
+    {
+      label: 'line standard',
+      kind: Snippet,
+      insertText: 'line ${1:name} = ${2:2*x + y} = ${3:4}',
+      insertTextRules: 4,
+      detail: 'line — standard form (lhs = rhs)',
+    },
+    {
+      label: 'curve',
+      kind: Snippet,
+      insertText: 'curve ${1:name} (${2:t} in ${3:0}..${4:6.28}) {\n  (cos(${2:t}), sin(${2:t}))\n}',
+      insertTextRules: 4,
+      detail: 'parametric curve / sampled list',
+      documentation: 'Tuple body → parametric curve with domain. Scalar body → list comprehension.',
+    },
+    {
+      label: 'region',
+      kind: Snippet,
+      insertText: 'region ${1:name} = ${2:y > x^2}',
+      insertTextRules: 4,
+      detail: 'filled inequality region',
+    },
+    {
+      label: 'polygon',
+      kind: Snippet,
+      insertText: 'polygon ${1:name} = [(${2:0},${3:0}), (${4:1},${5:0}), (${6:0},${7:1})]',
+      insertTextRules: 4,
+      detail: 'filled polygon',
+    },
+    {
+      label: 'segment',
+      kind: Snippet,
+      insertText: 'segment ${1:name} = (${2:0},${3:0}) -> (${4:1},${5:1})',
+      insertTextRules: 4,
+      detail: 'line segment',
+    },
+    {
+      label: 'text',
+      kind: Snippet,
+      insertText: 'text ${1:name} = "${2:label}" at (${3:0}, ${4:0})',
+      insertTextRules: 4,
+      detail: 'text label at position',
+    },
+    {
+      label: 'group',
+      kind: Snippet,
+      insertText: 'group ${1:name} as "${2:Folder label}"',
+      insertTextRules: 4,
+      detail: 'Desmos folder',
+    },
+    {
+      label: 'slider',
+      kind: Snippet,
+      insertText: '${1:a} = slider(${2:0}, ${3:0}, ${4:10})',
+      insertTextRules: 4,
+      detail: 'slider(initial, min, max)',
+      documentation: 'Add speed=n kwarg to auto-play.',
+    },
+    {
+      label: 'for-curve',
+      kind: Snippet,
+      insertText: '${1:pts} = ${2:(cos(t), sin(t))} for ${3:t} in ${4:0}..${5:6.28}',
+      insertTextRules: 4,
+      detail: 'inline for-comprehension curve',
+    },
+    {
+      label: 'where',
+      kind: Keyword,
+      insertText: 'where',
+      detail: 'conditional — expr where cond else alt',
     },
 
     ...KEYWORDS.map(kw => ({
@@ -336,9 +384,11 @@ export function registerLanguage(monaco: {
 
   const { Variable, Function: Fn, Class, Constant, Module, Array: Arr } = monaco.languages.SymbolKind;
   const kindToSymbolKind: Record<string, number> = {
-    let: Variable, fn: Fn, circle: Class, point: Constant, line: Module, points: Arr,
+    fn: Fn, point: Constant, circle: Class, line: Module,
+    curve: Arr, region: Arr, polygon: Arr, segment: Arr,
+    text: Constant, group: Module,
   };
-  const DECL_RE = /^(let|fn|point|circle|line|points)\s+([a-zA-Z_]\w*)/;
+  const DECL_RE = /^(fn|point|circle|line|curve|region|polygon|segment|text|group)\s+([a-zA-Z_]\w*)|^([a-zA-Z_]\w*)\s*=/;
 
   monaco.languages.registerDocumentSymbolProvider(LANGUAGE_ID, {
     provideDocumentSymbols(model) {
@@ -348,11 +398,13 @@ export function registerLanguage(monaco: {
         const m = lines[i].match(DECL_RE);
         if (!m) continue;
         const lineNum = i + 1;
-        const nameCol = lines[i].indexOf(m[2]) + 1;
-        const nameEnd = nameCol + m[2].length;
+        const kw   = m[1] ?? 'var';
+        const name = m[2] ?? m[3];
+        const nameCol = lines[i].indexOf(name) + 1;
+        const nameEnd = nameCol + name.length;
         const range = { startLineNumber: lineNum, startColumn: 1, endLineNumber: lineNum, endColumn: lines[i].length + 1 };
         const sel   = { startLineNumber: lineNum, startColumn: nameCol, endLineNumber: lineNum, endColumn: nameEnd };
-        symbols.push({ name: m[2], detail: m[1], kind: kindToSymbolKind[m[1]] ?? Variable, range, selectionRange: sel, tags: [], children: [] });
+        symbols.push({ name, detail: kw, kind: kindToSymbolKind[kw] ?? Variable, range, selectionRange: sel, tags: [], children: [] });
       }
       return symbols;
     },

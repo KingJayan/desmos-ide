@@ -1,27 +1,139 @@
-// AST node types for the dsl
+// ast node types
 
 export interface Pos {
   line: number;
   col: number;
 }
 
-// top-level
-
 export interface Program {
   type: 'Program';
   body: Statement[];
 }
 
-export type Statement = LetDecl | FnDecl | EntityDecl | ListDecl;
+export type Statement =
+  | VarDecl
+  | PointDecl
+  | CircleDecl
+  | LineDecl
+  | CurveDecl
+  | RegionDecl
+  | PolygonDecl
+  | SegmentDecl
+  | TextDecl
+  | GroupDecl
+  | FnDecl;
 
-export type AnimMethod = 'play' | 'loop';
+//stmts
 
-export interface LetDecl {
-  type: 'LetDecl';
+/** a = expr   */
+export interface VarDecl {
+  type: 'VarDecl';
   name: string;
   value: Expr;
-  domain?: { min: Expr; max: Expr; animMethod?: AnimMethod; loopDir?: 1 | -1 };
   pos: Pos;
+}
+
+/** point p (1, 2) [as { ... }] */
+export interface PointDecl {
+  type: 'PointDecl';
+  name: string;
+  x: Expr;
+  y: Expr;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** circle c = circle((cx, cy), r) [as { ... }] */
+export interface CircleDecl {
+  type: 'CircleDecl';
+  name: string;
+  cx: Expr;
+  cy: Expr;
+  r: Expr;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+export type LineForm = 'slope-intercept' | 'standard' | 'expr';
+
+/** line l = slope(m), intercept(b)  |  line l = lhs = rhs  |  line l = expr */
+export interface LineDecl {
+  type: 'LineDecl';
+  name: string;
+  form: LineForm;
+  slope?: Expr;
+  intercept?: Expr;
+  lhs?: Expr;
+  rhs?: Expr;
+  expr?: Expr;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** curve ring (t in 0..6.28 step 0.1) { (cos(t), sin(t)) } [as { ... }] */
+export interface CurveDecl {
+  type: 'CurveDecl';
+  name: string;
+  var: string;
+  start: Expr;
+  end: Expr;
+  step?: Expr;
+  body: Expr;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** region r = y > x^2 [as { ... }] */
+export interface RegionDecl {
+  type: 'RegionDecl';
+  name: string;
+  expr: Expr;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** polygon p = [(0,0), (2,0), (1,2)] [as { ... }] */
+export interface PolygonDecl {
+  type: 'PolygonDecl';
+  name: string;
+  points: Tuple[];
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** segment s = (0,0) -> (2,3) [as { ... }] */
+export interface SegmentDecl {
+  type: 'SegmentDecl';
+  name: string;
+  p1: Tuple;
+  p2: Tuple;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** text t = "hello" at (x, y) */
+export interface TextDecl {
+  type: 'TextDecl';
+  name: string;
+  content: string;
+  x: Expr;
+  y: Expr;
+  pos: Pos;
+}
+
+/** group orbit as "Motion" */
+export interface GroupDecl {
+  type: 'GroupDecl';
+  name: string;
+  label: string;
+  pos: Pos;
+}
+
+export interface StyleBlock {
+  color?: Expr;
+  opacity?: number;
+  fill?: boolean;
+  pointSize?: number;
 }
 
 export interface FnDecl {
@@ -32,37 +144,30 @@ export interface FnDecl {
   pos: Pos;
 }
 
-export type EntityKind = 'point' | 'circle' | 'line';
-
-export interface EntityDecl {
-  type: 'EntityDecl';
-  kind: EntityKind;
-  name: string;
-  props: Record<string, Expr>;
-  pos: Pos;
-}
-
-export interface ListDecl {
-  type: 'ListDecl';
-  name: string;
-  map: MapExpr;
-  pos: Pos;
-}
-
-
 export type Expr =
   | NumLit
+  | StringLit
   | Ident
   | BinOp
   | UnaryOp
+  | CompareExpr
+  | ConditionalExpr
+  | PiecewiseExpr
   | Call
   | Tuple
   | ListRange
-  | MapExpr;
+  | MapExpr
+  | ForExpr;
 
 export interface NumLit {
   type: 'NumLit';
   value: number;
+  pos: Pos;
+}
+
+export interface StringLit {
+  type: 'StringLit';
+  value: string;
   pos: Pos;
 }
 
@@ -87,10 +192,36 @@ export interface UnaryOp {
   pos: Pos;
 }
 
+export type CompareOp = '>' | '<' | '>=' | '<=' | '!=' | '==';
+
+export interface CompareExpr {
+  type: 'CompareExpr';
+  op: CompareOp;
+  left: Expr;
+  right: Expr;
+  pos: Pos;
+}
+
+export interface ConditionalExpr {
+  type: 'ConditionalExpr';
+  cond: Expr;
+  then: Expr;
+  else_: Expr;
+  pos: Pos;
+}
+
+/** { cond: expr, ..., else: expr } — block piecewise */
+export interface PiecewiseExpr {
+  type: 'PiecewiseExpr';
+  branches: Array<{ cond: Expr | null; body: Expr }>;
+  pos: Pos;
+}
+
 export interface Call {
   type: 'Call';
   fn: string;
   args: Expr[];
+  kwargs?: Record<string, Expr>;
   pos: Pos;
 }
 
@@ -114,5 +245,15 @@ export interface MapExpr {
   var: string;
   range: ListRange;
   body: Expr;
+  pos: Pos;
+}
+
+export interface ForExpr {
+  type: 'ForExpr';
+  body: Expr;
+  var: string;
+  start: Expr;
+  end: Expr;
+  step?: Expr;
   pos: Pos;
 }
