@@ -132,8 +132,15 @@ const GREEK: Record<string, string> = {
 };
 
 export function nameToLatex(name: string): string {
+  const uscore = name.indexOf('_');
+  if (uscore !== -1) {
+    const prefix = name.slice(0, uscore);
+    const suffix = name.slice(uscore + 1).replace(/_/g, '');
+    const base = GREEK[prefix] ?? (prefix.length === 1 ? prefix : prefix[0]);
+    return suffix ? `${base}_{${suffix}}` : base;
+  }
   if (name.length === 1) return name;
-  if (GREEK[name])       return GREEK[name];
+  if (GREEK[name]) return GREEK[name];
   return `${name[0]}_{${name.slice(1)}}`;
 }
 

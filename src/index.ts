@@ -56,6 +56,8 @@ function extractSymbols(ast: Program): SymbolInfo[] {
   });
 }
 
+const RESERVED = new Set(['t', 'r', 'theta']);
+
 function checkWarnings(ast: Program): WarningMarker[] {
   const seen = new Map<string, number>();
   const markers: WarningMarker[] = [];
@@ -64,6 +66,16 @@ function checkWarnings(ast: Program): WarningMarker[] {
     const kw = stmt.type === 'LetDecl' ? 'let' : stmt.type === 'FnDecl' ? 'fn' : stmt.type === 'ListDecl' ? 'points' : (stmt as { kind: string }).kind;
     const col = stmt.pos.col;
     const line = stmt.pos.line;
+    if (RESERVED.has(name)) {
+      markers.push({
+        startLineNumber: line,
+        startColumn: col,
+        endLineNumber: line,
+        endColumn: col + kw.length + 1 + name.length,
+        message: `'${name}' is a Desmos built-in — redeclaring it will break parametric/polar expressions`,
+        severity: 4,
+      });
+    }
     if (seen.has(name)) {
       markers.push({
         startLineNumber: line,
