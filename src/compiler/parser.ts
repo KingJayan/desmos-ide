@@ -100,7 +100,8 @@ class Parser {
           if (this.check('lparen')) {
             this.advance();
             if (this.check('op', '-')) { this.advance(); loopDir = -1; }
-            this.eat('num');
+            const dirTok = this.eat('num');
+            if (dirTok.value !== '1') throw new ParseError(`loop() argument must be 1 or -1`, dirTok);
             this.eat('rparen');
           }
         } else {
@@ -272,7 +273,7 @@ class Parser {
       result = this.parseListRange();
     }
     // ident, kw-as-call, or func call
-    else if (t.type === 'ident' || t.type === 'kw') {
+    else if (t.type === 'ident' || (t.type === 'kw' && ['time', 'project', 'camera'].includes(t.value))) {
       const name = this.advance().value;
       if (this.check('lparen')) {
         this.advance();

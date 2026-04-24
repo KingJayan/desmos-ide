@@ -118,7 +118,7 @@ export function tokenize(src: string): Token[] {
       case ':': push('colon',    ch, startCol); i++; break;
       case '.': push('dot',      ch, startCol); i++; break;
       case '+': case '-': case '*': case '/':
-      case '^': case '=': case '<': case '>':
+      case '^': case '=':
         push('op', ch, startCol); i++; break;
       default:
         throw new LexError(`Unexpected character '${ch}'`, line, col());

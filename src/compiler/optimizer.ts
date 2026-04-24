@@ -38,8 +38,14 @@ export function optimize(program: T.Program): T.Program {
 
 function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
   switch (stmt.type) {
-    case 'LetDecl':
-      return { ...stmt, value: optimizeExpr(stmt.value, env) };
+    case 'LetDecl': {
+      const domain = stmt.domain ? {
+        ...stmt.domain,
+        min: optimizeExpr(stmt.domain.min, env),
+        max: optimizeExpr(stmt.domain.max, env),
+      } : stmt.domain;
+      return { ...stmt, value: optimizeExpr(stmt.value, env), domain };
+    }
 
     case 'EntityDecl': {
       const props: Record<string, T.Expr> = {};
@@ -141,7 +147,7 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
       const fn = env.fns.get(expr.fn);
       if (fn) {
         if (args.length !== fn.params.length) {
-          return { ...expr, args };
+          throw new Error(`'${expr.fn}' expects ${fn.params.length} argument(s), got ${args.length}`);
         }
         return inlineCall(fn, args, env, depth);
       }
