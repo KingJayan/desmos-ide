@@ -80,7 +80,36 @@ class Parser {
     const name = this.eat('ident').value;
     this.eat('op', '=');
     const value = this.parseExpr();
-    return { type: 'LetDecl', name, value, pos };
+    let domain: T.LetDecl['domain'];
+    if (this.check('lbracket')) {
+      this.advance();
+      const min = this.parseExpr();
+      this.eat('dotdot');
+      const max = this.parseExpr();
+      this.eat('rbracket');
+      let animMethod: T.AnimMethod | undefined;
+      let loopDir: 1 | -1 | undefined;
+      if (this.check('dot')) {
+        this.advance();
+        const methodName = this.eat('ident').value;
+        if (methodName === 'play') {
+          animMethod = 'play';
+        } else if (methodName === 'loop') {
+          animMethod = 'loop';
+          loopDir = 1;
+          if (this.check('lparen')) {
+            this.advance();
+            if (this.check('op', '-')) { this.advance(); loopDir = -1; }
+            this.eat('num');
+            this.eat('rparen');
+          }
+        } else {
+          throw new ParseError(`unknown animation method '${methodName}'`, this.peek());
+        }
+      }
+      domain = { min, max, animMethod, loopDir };
+    }
+    return { type: 'LetDecl', name, value, domain, pos };
   }
 
   private parseFnDecl(): T.FnDecl {
@@ -260,32 +289,6 @@ class Parser {
     }
     else {
       throw new ParseError('Unexpected token in expression', t);
-    }
-
-    // domain range: expr..expr  (optionally chained with .play / .loop / .loop(-1))
-    if (this.check('dotdot')) {
-      this.advance();
-      const end = this.parseAdditive();
-      let method: T.AnimMethod = 'static';
-      let loopDir: 1 | -1 = 1;
-      if (this.check('dot')) {
-        this.advance();
-        const methodName = this.eat('ident').value;
-        if (methodName === 'play') {
-          method = 'play';
-        } else if (methodName === 'loop') {
-          method = 'loop';
-          if (this.check('lparen')) {
-            this.advance();
-            if (this.check('op', '-')) { this.advance(); loopDir = -1; }
-            this.eat('num'); // consume the 1
-            this.eat('rparen');
-          }
-        } else {
-          throw new ParseError(`Unknown animation method '${methodName}'`, this.peek());
-        }
-      }
-      result = { type: 'DomainExpr', start: result, end, method, loopDir, pos };
     }
 
     return result;

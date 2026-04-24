@@ -101,8 +101,8 @@ points ring = map(i in [0, 0.1...6.28]) &#123;
       <li><strong>keywords:</strong> <code>let</code>, <code>fn</code>, <code>in</code>, <code>map</code>, <code>point</code>, <code>circle</code>, <code>line</code>, <code>points</code>, <code>time</code>, <code>project</code>, <code>camera</code></li>
       <li><strong>range tokens:</strong>
         <ul>
-          <li><code>...</code> — list range separator</li>
-          <li><code>..</code> — domain expression separator</li>
+          <li><code>...</code> — list range separator (inside <code>[start...end]</code>)</li>
+          <li><code>..</code> — slider domain separator (inside <code>[min..max]</code> on a <code>let</code>)</li>
         </ul>
       </li>
     </ul>
@@ -117,7 +117,10 @@ points ring = map(i in [0, 0.1...6.28]) &#123;
     <table>
       <thead><tr><th>form</th><th>description</th></tr></thead>
       <tbody>
-        <tr><td><code>let name = expr</code></td><td>constant or slider binding</td></tr>
+        <tr><td><code>let name = expr</code></td><td>constant binding (no slider)</td></tr>
+        <tr><td><code>let name = expr [min..max]</code></td><td>slider with fixed domain</td></tr>
+        <tr><td><code>let name = expr [min..max].play</code></td><td>auto-playing slider (once)</td></tr>
+        <tr><td><code>let name = expr [min..max].loop</code></td><td>looping animated slider</td></tr>
         <tr><td><code>fn name(p1, p2, ...) = expr</code></td><td>user-defined function (inlined by optimizer)</td></tr>
         <tr><td><code>point name &#123; ... &#125;</code></td><td>named point entity</td></tr>
         <tr><td><code>circle name &#123; ... &#125;</code></td><td>circle entity</td></tr>
@@ -151,7 +154,6 @@ points ring = map(i in [0, 0.1...6.28]) &#123;
         <tr><td>tuple</td><td><code>(x, y)</code></td></tr>
         <tr><td>list range</td><td><code>[start...end]</code>, <code>[start, step...end]</code></td></tr>
         <tr><td>map expression</td><td><code>map(i in [0...10]) &#123; expr &#125;</code></td></tr>
-        <tr><td>domain expression</td><td><code>start..end</code>, optionally <code>.play</code> or <code>.loop</code></td></tr>
       </tbody>
     </table>
 
@@ -225,12 +227,16 @@ points ring = map(i in [0, 0.01...6.28]) &#123;
   </section>
 
   <section id="animation">
-    <h2>animation and domain forms</h2>
-    <p>domain expressions used in a <code>let</code> binding create a desmos slider. appending <code>.play</code> or <code>.loop</code> starts animation automatically.</p>
-    <pre><code>let t  = 0..10          // static slider, range [0, 10]
-let a  = 0..10.play     // plays once then stops
-let b  = -5..5.loop     // loops forward indefinitely
-let c  = -3..3.loop(-1) // loops backward</code></pre>
+    <h2>sliders and animation</h2>
+    <p>a slider is created by appending a domain <code>[min..max]</code> to a <code>let</code> binding. without a domain the variable is a plain constant — no slider is shown.</p>
+    <pre><code>let r = 5 [1..20]           // static slider, initial value 5, range [1, 20]
+let k = 0.5 [ 0 .. 1 ]     // whitespace inside [..] is flexible
+let n = 3                   // plain constant, no slider</code></pre>
+
+    <p>append <code>.play</code> or <code>.loop</code> / <code>.loop(-1)</code> directly after the domain bracket to start animation automatically:</p>
+    <pre><code>let t = 0 [0..10].play      // plays once then stops
+let a = 0 [-5..5].loop      // loops forward indefinitely
+let b = 5 [0..10].loop(-1)  // loops backward</code></pre>
     <table>
       <thead><tr><th>suffix</th><th>desmos loopMode</th><th>isPlaying</th></tr></thead>
       <tbody>
@@ -240,10 +246,13 @@ let c  = -3..3.loop(-1) // loops backward</code></pre>
         <tr><td><code>.loop(-1)</code></td><td><code>LOOP_BACKWARD</code></td><td>true</td></tr>
       </tbody>
     </table>
-    <p>all animated sliders use an <code>animationPeriod</code> of 4000 ms by default.</p>
+    <p>all animated sliders use an <code>animationPeriod</code> of 4000 ms. the initial value is preserved as the slider default (not reset to 0).</p>
+
+    <h3>inline slider overlays</h3>
+    <p>the ide renders an interactive mini-slider widget directly over any <code>let</code> line that has a domain. dragging updates the live graph instantly. the widget shows the min and max bounds from the domain bracket.</p>
 
     <h3>time() call</h3>
-    <p>the special <code>time(start, end, speed)</code> call in a <code>let</code> creates a playing slider. the <code>animationPeriod</code> is derived as <code>round(1000 / speed)</code>.</p>
+    <p>the special <code>time(start, end, speed)</code> call in a <code>let</code> creates an auto-playing slider. the <code>animationPeriod</code> is derived as <code>round(1000 / speed)</code>.</p>
     <pre><code>let t = time(0, 10, 0.5)  // slider 0..10 playing at 0.5 Hz (2000 ms period)</code></pre>
   </section>
 

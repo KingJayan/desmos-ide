@@ -1,13 +1,17 @@
 {
   "name": "desmos-ide",
-  "version": "0.5.4",
-  "description": "An IDE for Desmos with a custom DSL",
+  "version": "0.5.5",
+  "description": "an ide for Desmos with a custom dsl",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "demo": "npx ts-node -P tsconfig.node.json src/demo.ts"
+    "demo": "npx ts-node -P tsconfig.node.json src/demo.ts",
+    "bump:patch": "npm version patch --no-git-tag-version",
+    "bump:minor": "npm version minor --no-git-tag-version",
+    "bump:major": "npm version major --no-git-tag-version",
+    "bump:prepatch": "npm version prepatch --no-git-tag-version --preid=beta"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

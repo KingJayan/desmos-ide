@@ -1,4 +1,4 @@
-// AST node types for the Desmos DSL
+// AST node types for the dsl
 
 export interface Pos {
   line: number;
@@ -14,10 +14,13 @@ export interface Program {
 
 export type Statement = LetDecl | FnDecl | EntityDecl | ListDecl;
 
+export type AnimMethod = 'play' | 'loop';
+
 export interface LetDecl {
   type: 'LetDecl';
   name: string;
   value: Expr;
+  domain?: { min: Expr; max: Expr; animMethod?: AnimMethod; loopDir?: 1 | -1 };
   pos: Pos;
 }
 
@@ -55,8 +58,7 @@ export type Expr =
   | Call
   | Tuple
   | ListRange
-  | MapExpr
-  | DomainExpr;
+  | MapExpr;
 
 export interface NumLit {
   type: 'NumLit';
@@ -112,16 +114,5 @@ export interface MapExpr {
   var: string;
   range: ListRange;
   body: Expr;
-  pos: Pos;
-}
-
-export type AnimMethod = 'static' | 'play' | 'loop';
-
-export interface DomainExpr {
-  type: 'DomainExpr';
-  start: Expr;
-  end: Expr;
-  method: AnimMethod;
-  loopDir: 1 | -1;
   pos: Pos;
 }

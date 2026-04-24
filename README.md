@@ -17,6 +17,7 @@
 
 ```
 let x = 3                                      -- constant
+let x = 3 [-10..10]                            -- slider (explicit domain required)
 fn f(a, b) = a + b                             -- function
 
 point origin { (0, 0) }                        -- named point
@@ -28,6 +29,8 @@ points trail = map(i in [0...60]) {            -- parametric point list
 }
 ```
 
+**Sliders:** `let x = 3 [-10..10]` — shown only when a domain is explicitly given; whitespace inside `[min..max]` is flexible. Without a domain the variable is a plain constant with no slider.  
+**Animated sliders:** `let t = 0 [0..10].play` / `.loop` / `.loop(-1)` — appended directly after the domain bracket.  
 **Supported entities:** `point`, `circle`, `line`, `points` (map)  
 **Expressions:** arithmetic, `let` bindings, `fn` definitions  
 **Limitations:** no implicit multiplication, no piecewise yet, no list comprehensions outside `map`

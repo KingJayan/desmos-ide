@@ -147,26 +147,6 @@ export class Codegen {
   // let declarations
 
   private genLetDecl(stmt: T.LetDecl): void {
-    if (stmt.value.type === 'DomainExpr') {
-      const { start, end, method, loopDir } = stmt.value;
-      const varName = nameToLatex(stmt.name);
-      const slider: DesmosSlider = {
-        min: this.toLaTeX(start), max: this.toLaTeX(end),
-        hardMin: true, hardMax: true,
-      };
-      if (method === 'play') {
-        slider.isPlaying = true;
-        slider.loopMode = 'PLAY_ONCE';
-        slider.animationPeriod = 4000;
-      } else if (method === 'loop') {
-        slider.isPlaying = true;
-        slider.loopMode = loopDir === -1 ? 'LOOP_BACKWARD' : 'LOOP_FORWARD';
-        slider.animationPeriod = 4000;
-      }
-      this.emit({ type: 'expression', latex: `${varName}=0`, slider });
-      return;
-    }
-
     if (stmt.value.type === 'Call' && stmt.value.fn === 'time') {
       const [startArg, endArg, speedArg] = stmt.value.args;
       const varName = nameToLatex(stmt.name);
@@ -190,6 +170,26 @@ export class Codegen {
 
     const varName = nameToLatex(stmt.name);
     const value   = this.toLaTeX(stmt.value);
+    if (stmt.domain) {
+      const { min, max, animMethod, loopDir } = stmt.domain;
+      const slider: DesmosSlider = {
+        min: this.toLaTeX(min),
+        max: this.toLaTeX(max),
+        hardMin: true,
+        hardMax: true,
+      };
+      if (animMethod === 'play') {
+        slider.isPlaying = true;
+        slider.loopMode = 'PLAY_ONCE';
+        slider.animationPeriod = 4000;
+      } else if (animMethod === 'loop') {
+        slider.isPlaying = true;
+        slider.loopMode = loopDir === -1 ? 'LOOP_BACKWARD' : 'LOOP_FORWARD';
+        slider.animationPeriod = 4000;
+      }
+      this.emit({ type: 'expression', latex: `${varName}=${value}`, slider });
+      return;
+    }
     this.emit({ type: 'expression', latex: `${varName}=${value}` });
   }
 
@@ -337,8 +337,6 @@ export class Codegen {
       case 'MapExpr':
         return this.mapToLatex(expr);
 
-      case 'DomainExpr':
-        return `\\left[${this.toLaTeX(expr.start)},...,${this.toLaTeX(expr.end)}\\right]`;
     }
   }
 

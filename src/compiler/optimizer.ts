@@ -164,12 +164,6 @@ export function optimizeExpr(expr: T.Expr, env: Env): T.Expr {
     case 'MapExpr':
       return optimizeMap(expr, env);
 
-    case 'DomainExpr':
-      return {
-        ...expr,
-        start: optimizeExpr(expr.start, env),
-        end:   optimizeExpr(expr.end,   env),
-      };
   }
 }
 
@@ -219,12 +213,6 @@ function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
       };
     }
 
-    case 'DomainExpr':
-      return {
-        ...expr,
-        start: substituteExpr(expr.start, subst),
-        end:   substituteExpr(expr.end,   subst),
-      };
   }
 }
 

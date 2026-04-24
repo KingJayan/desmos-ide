@@ -129,7 +129,53 @@ export class EnhancedPane {
           this.editingId = expr.id;
           this.render();
         });
-        row.append(dot, mathEl);
+
+        const sliderMatch = /^([a-zA-Z_]\w*)\s*=\s*(-?\d+(?:\.\d*)?)$/.exec(expr.latex ?? '');
+        if (sliderMatch) {
+          const sliderVal = parseFloat(sliderMatch[2]);
+          const abs = Math.abs(sliderVal);
+          const span = Math.max(abs * 3, 10);
+          const step = Number.isInteger(sliderVal) ? 1 : 0.01;
+          const min = Math.floor(sliderVal - span);
+          const max = Math.ceil(sliderVal + span);
+
+          const sliderWrap = document.createElement('div');
+          sliderWrap.className = 'expr-slider-wrap';
+
+          const track = document.createElement('input');
+          track.type = 'range';
+          track.className = 'expr-slider-track';
+          track.min = String(min);
+          track.max = String(max);
+          track.step = String(step);
+          track.value = String(sliderVal);
+
+          const badge = document.createElement('span');
+          badge.className = 'expr-slider-badge';
+          badge.textContent = step === 1 ? String(sliderVal) : sliderVal.toFixed(2);
+
+          const updateFill = () => {
+            const pct = ((parseFloat(track.value) - min) / (max - min)) * 100;
+            track.style.background = `linear-gradient(to right, var(--blue) ${pct}%, var(--surface1) ${pct}%)`;
+          };
+          updateFill();
+
+          track.addEventListener('input', () => {
+            const raw = parseFloat(track.value);
+            const newStr = step === 1 ? String(Math.round(raw)) : raw.toFixed(2);
+            badge.textContent = newStr;
+            updateFill();
+            const newLatex = `${sliderMatch[1]}=${newStr}`;
+            this.patchLatex(expr.id, newLatex);
+          });
+
+          track.addEventListener('mousedown', e => e.stopPropagation());
+
+          sliderWrap.append(track, badge);
+          row.append(dot, mathEl, sliderWrap);
+        } else {
+          row.append(dot, mathEl);
+        }
       }
 
       const del = document.createElement('button');

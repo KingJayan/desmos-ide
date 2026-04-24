@@ -15,6 +15,7 @@ import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings } from './settings';
 import type { ColorTheme } from './settings';
 import { CommandPalette } from './command-palette';
+import { InlineSliderManager } from './inline-sliders';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 createIcons({
@@ -384,6 +385,7 @@ function renderOutline(symbols: SymbolInfo[]): void {
 }
 
 let lastCompileResult: CompileResult | null = null;
+const sliderManager = new InlineSliderManager(editor);
 
 function handleCompileResult(result: CompileResult): void {
   lastCompileResult = result;
@@ -395,6 +397,7 @@ function handleCompileResult(result: CompileResult): void {
     if (mode === 'split') {
       ensureEnhancedPane().syncFromGraph(graph.currentList());
     }
+    sliderManager.update(editor.getValue());
     renderOutline(result.symbols);
     const warnNote = result.warnings.length ? ` · ${result.warnings.length} warning(s)` : '';
     setStatus(`✓ ${result.state.expressions.list.length} expression(s)${warnNote}`, result.warnings.length ? 'info' : 'success');
