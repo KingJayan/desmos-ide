@@ -278,4 +278,12 @@ export class DesmosGraph {
   currentList(): DesmosExpr[] {
     return this.calc.getExpressions() as unknown as DesmosExpr[];
   }
+
+  screenshot(): string | null {
+    try {
+      return (this.calc as unknown as { screenshot: () => string }).screenshot();
+    } catch {
+      return null;
+    }
+  }
 }

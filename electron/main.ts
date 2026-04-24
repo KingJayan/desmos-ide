@@ -4,6 +4,7 @@ import {
 } from 'electron';
 import { join } from 'path';
 import { readFile, writeFile } from 'fs/promises';
+import { watch, type FSWatcher } from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -264,6 +265,42 @@ function fallbackCompact(messages: AIMessage[]): string {
   const latest = messages.slice(-8).map(m => `${m.role}: ${m.content}`).join('\n');
   return latest || 'No conversation to summarize.';
 }
+
+const fileWatchers = new Map<string, { watcher: FSWatcher; debounce: ReturnType<typeof setTimeout> | null }>();
+
+function stopWatcher(path: string): void {
+  const entry = fileWatchers.get(path);
+  if (!entry) return;
+  if (entry.debounce) clearTimeout(entry.debounce);
+  entry.watcher.close();
+  fileWatchers.delete(path);
+}
+
+ipcMain.handle('file:watch', async (event, path: unknown) => {
+  if (typeof path !== 'string' || !path) return;
+  stopWatcher(path);
+  const entry: { watcher: FSWatcher; debounce: ReturnType<typeof setTimeout> | null } = {
+    watcher: null!,
+    debounce: null,
+  };
+  entry.watcher = watch(path, { persistent: false }, eventType => {
+    if (eventType !== 'change') return;
+    if (entry.debounce) clearTimeout(entry.debounce);
+    entry.debounce = setTimeout(async () => {
+      try {
+        const content = await readFile(path, 'utf-8');
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('file:changed', { path, content });
+        }
+      } catch {}
+    }, 250);
+  });
+  fileWatchers.set(path, entry);
+});
+
+ipcMain.handle('file:unwatch', (_event, path: unknown) => {
+  if (typeof path === 'string' && path) stopWatcher(path);
+});
 
 let gitRepoPathCache: string | null = null;
 
@@ -684,6 +721,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  for (const path of [...fileWatchers.keys()]) stopWatcher(path);
   if (process.platform !== 'darwin') app.quit();
 });
 

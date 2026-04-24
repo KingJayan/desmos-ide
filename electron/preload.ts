@@ -71,4 +71,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ai:done',  (_e, data: { reqId: string }) => cb(data.reqId)),
   onAiError: (cb: (reqId: string, error: string) => void) =>
     ipcRenderer.on('ai:error', (_e, data: { reqId: string; error: string }) => cb(data.reqId, data.error)),
+  watchFile: (path: string) =>
+    ipcRenderer.invoke('file:watch', path) as Promise<void>,
+  unwatchFile: (path: string) =>
+    ipcRenderer.invoke('file:unwatch', path) as Promise<void>,
+  onFileChanged: (cb: (path: string, content: string) => void) =>
+    ipcRenderer.on('file:changed', (_e, data: { path: string; content: string }) => cb(data.path, data.content)),
 });

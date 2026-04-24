@@ -5,7 +5,7 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 
 import * as monaco from 'monaco-editor';
 import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List } from 'lucide';
-import { registerLanguage, errorToMarker, LANGUAGE_ID } from '../src/monaco/language';
+import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
 import CompileWorker from './compile.worker?worker';
 import type { CompileResult, SymbolInfo } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
@@ -14,6 +14,7 @@ import { EnhancedPane } from './enhanced';
 import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings } from './settings';
 import type { ColorTheme } from './settings';
+import { CommandPalette } from './command-palette';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 createIcons({
@@ -382,7 +383,10 @@ function renderOutline(symbols: SymbolInfo[]): void {
   }
 }
 
+let lastCompileResult: CompileResult | null = null;
+
 function handleCompileResult(result: CompileResult): void {
+  lastCompileResult = result;
   if (result.success) {
     monaco.editor.setModelMarkers(model, 'desmos-dsl', result.warnings);
     if (mode !== 'enhanced') {
@@ -403,6 +407,74 @@ function handleCompileResult(result: CompileResult): void {
     setStatus(`✗ ${result.error}`, 'error');
   }
 }
+
+monaco.languages.registerHoverProvider(LANGUAGE_ID, {
+  provideHover(model, position) {
+    if (!lastCompileResult?.success) return null;
+    const word = model.getWordAtPosition(position);
+    if (!word) return null;
+
+    const sym = lastCompileResult.symbols.find(s => s.name === word.word);
+    if (!sym) return null;
+
+    const expr = lastCompileResult.state.expressions.list.find(
+      e => e.type === 'expression' && e.id && e.id.includes(sym.name),
+    );
+    const latex = expr && 'latex' in expr ? expr.latex : null;
+
+    const kindLabel = sym.kind.charAt(0).toUpperCase() + sym.kind.slice(1);
+    const lines: string[] = [`**${kindLabel}** \`${sym.name}\``];
+    if (latex) lines.push(`\`\`\`latex\n${latex}\n\`\`\``);
+
+    return {
+      range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+      contents: lines.map(value => ({ value, isTrusted: true })),
+    };
+  },
+});
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const RESERVED = new Set<string>([...KEYWORDS, ...BUILTIN_FNS]);
+
+monaco.languages.registerRenameProvider(LANGUAGE_ID, {
+  resolveRenameLocation(model, position) {
+    const word = model.getWordAtPosition(position);
+    if (!word) return { text: '', range: new monaco.Range(0, 0, 0, 0), rejectReason: 'No symbol at cursor' };
+    if (RESERVED.has(word.word)) return { text: '', range: new monaco.Range(0, 0, 0, 0), rejectReason: 'Cannot rename built-in keyword' };
+    if (!lastCompileResult?.success) return { text: '', range: new monaco.Range(0, 0, 0, 0), rejectReason: 'File must compile successfully to rename' };
+    const sym = lastCompileResult.symbols.find(s => s.name === word.word);
+    if (!sym) return { text: '', range: new monaco.Range(0, 0, 0, 0), rejectReason: 'Symbol not declared in this file' };
+    return {
+      range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+      text: word.word,
+    };
+  },
+  provideRenameEdits(model, position, newName) {
+    const word = model.getWordAtPosition(position);
+    if (!word || RESERVED.has(word.word)) return { edits: [] };
+    const oldName = word.word;
+    const text = model.getValue();
+    const re = new RegExp(`\\b${escapeRe(oldName)}\\b`, 'g');
+    const edits: monaco.languages.IWorkspaceTextEdit[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const startPos = model.getPositionAt(m.index);
+      const endPos = model.getPositionAt(m.index + oldName.length);
+      edits.push({
+        resource: model.uri,
+        textEdit: {
+          range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+          text: newName,
+        },
+        versionId: undefined,
+      });
+    }
+    return { edits };
+  },
+});
 
 let activeWorker: Worker | null = null;
 
@@ -449,6 +521,7 @@ editor.onDidChangeModelContent(() => {
 window.addEventListener('unload', () => {
   activeWorker?.terminate();
   activeWorker = null;
+  stopWatching();
   if (gitRefreshTimer) {
     clearInterval(gitRefreshTimer);
     gitRefreshTimer = null;
@@ -823,11 +896,35 @@ btnEnhanced.addEventListener('click', () => setMode('enhanced'));
 
 //file ops
 let currentPath: string | null = null;
+let watchedPath: string | null = null;
 
 function setFilename(p: string | null): void {
   currentPath = p;
   filenameEl.textContent = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
 }
+
+function startWatching(path: string): void {
+  if (watchedPath && watchedPath !== path) {
+    void window.electronAPI?.unwatchFile(watchedPath);
+  }
+  watchedPath = path;
+  void window.electronAPI?.watchFile(path);
+}
+
+function stopWatching(): void {
+  if (watchedPath) {
+    void window.electronAPI?.unwatchFile(watchedPath);
+    watchedPath = null;
+  }
+}
+
+window.electronAPI?.onFileChanged((changedPath, content) => {
+  if (changedPath !== currentPath) return;
+  if (content === editor.getValue()) return;
+  editor.setValue(content);
+  setStatus('↻ Reloaded from disk', 'info');
+  runCompile();
+});
 
 function enhancedDirtyGuard(): boolean {
   if (mode === 'enhanced' && enhanced?.isDirty) {
@@ -838,6 +935,7 @@ function enhancedDirtyGuard(): boolean {
 
 async function cmdNew(): Promise<void> {
   if (!enhancedDirtyGuard()) return;
+  stopWatching();
   editor.setValue(DEFAULT_SRC);
   setFilename(null);
   setStatus('New file', 'info');
@@ -856,6 +954,7 @@ async function cmdOpen(): Promise<void> {
   }
   editor.setValue(result.content);
   setFilename(result.path);
+  startWatching(result.path);
   applyMode(mode === 'enhanced' ? 'dsl' : mode);
   runCompile();
   void refreshGitStatus();
@@ -873,6 +972,7 @@ async function cmdSave(saveAs = false): Promise<void> {
   if (!result) return;
   if (result.ok) {
     setFilename(result.path);
+    startWatching(result.path);
     setStatus('Saved', 'success');
     void refreshGitStatus();
   } else if (!result.canceled) {
@@ -947,8 +1047,22 @@ window.addEventListener('keydown', e => {
   if (e.altKey && k === 'r') {
     e.preventDefault();
     runFindWithRegex();
+    return;
+  }
+
+  if (e.shiftKey && !e.altKey && k === 'p') {
+    e.preventDefault();
+    palette.toggle();
+    return;
   }
 });
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'F1') {
+    e.preventDefault();
+    palette.toggle();
+  }
+}, true);
 
 window.electronAPI?.onMenuNew(cmdNew);
 window.electronAPI?.onMenuOpen(cmdOpen);
@@ -1147,6 +1261,137 @@ function ensureSettingsPanel(): SettingsPanel {
 }
 
 btnSidebarSettings.addEventListener('click', () => ensureSettingsPanel().toggle());
+
+const palette = new CommandPalette();
+palette.register([
+  {
+    id: 'file.new',
+    label: 'New File',
+    description: 'Clear the editor and start fresh',
+    keybinding: '⌘N',
+    action: () => cmdNew(),
+  },
+  {
+    id: 'file.open',
+    label: 'Open File…',
+    description: 'Open a .dsmx file from disk',
+    keybinding: '⌘O',
+    action: () => cmdOpen(),
+  },
+  {
+    id: 'file.save',
+    label: 'Save File',
+    description: 'Save the current DSL file',
+    keybinding: '⌘S',
+    action: () => cmdSave(),
+  },
+  {
+    id: 'file.saveas',
+    label: 'Save File As…',
+    description: 'Save to a new location',
+    action: () => cmdSave(true),
+  },
+  {
+    id: 'graph.reset',
+    label: 'Reset Graph',
+    description: 'Clear all expressions from the graph',
+    action: () => {
+      graph.update([]);
+      setStatus('Graph reset', 'info');
+    },
+  },
+  {
+    id: 'graph.export-image',
+    label: 'Export as Image',
+    description: 'Download the current graph as a PNG',
+    action: async () => {
+      try {
+        const url = graph.screenshot();
+        if (!url) { setStatus('Screenshot not available', 'error'); return; }
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'desmos-graph.png';
+        a.click();
+        setStatus('Graph exported as PNG', 'success');
+      } catch {
+        setStatus('Export failed', 'error');
+      }
+    },
+  },
+  {
+    id: 'editor.format',
+    label: 'Format Code',
+    description: 'Auto-format the DSL source',
+    keybinding: '⇧⌥F',
+    action: () => runEditorAction('editor.action.formatDocument'),
+  },
+  {
+    id: 'editor.find',
+    label: 'Find',
+    description: 'Open the find widget',
+    keybinding: '⌘F',
+    action: () => runEditorAction('actions.find'),
+  },
+  {
+    id: 'editor.replace',
+    label: 'Find & Replace',
+    description: 'Open find & replace widget',
+    keybinding: '⌘H',
+    action: () => runEditorAction('editor.action.startFindReplaceAction'),
+  },
+  {
+    id: 'mode.dsl',
+    label: 'Switch to DSL Mode',
+    description: 'Show only the DSL editor',
+    action: () => setMode('dsl'),
+  },
+  {
+    id: 'mode.split',
+    label: 'Switch to Split Mode',
+    description: 'Show DSL editor and Enhanced pane side by side',
+    action: () => setMode('split'),
+  },
+  {
+    id: 'mode.enhanced',
+    label: 'Switch to Enhanced Mode',
+    description: 'Show the expression editor with LaTeX rendering',
+    action: () => setMode('enhanced'),
+  },
+  {
+    id: 'sidebar.git',
+    label: 'Toggle Source Control Sidebar',
+    description: 'Open or close the Git panel',
+    action: () => setSidebarView(sidebarView === 'git' ? null : 'git'),
+  },
+  {
+    id: 'sidebar.ai',
+    label: 'Toggle AI Assistant Sidebar',
+    description: 'Open or close the AI chat panel',
+    action: () => setSidebarView(sidebarView === 'ai' ? null : 'ai'),
+  },
+  {
+    id: 'sidebar.outline',
+    label: 'Toggle Outline Sidebar',
+    description: 'Open or close the symbol outline',
+    action: () => setSidebarView(sidebarView === 'outline' ? null : 'outline'),
+  },
+  {
+    id: 'compile.run',
+    label: 'Recompile',
+    description: 'Manually trigger a DSL recompile',
+    action: () => { runCompile(); setStatus('Recompiling…', 'info'); },
+  },
+  {
+    id: 'editor.rename',
+    label: 'Rename Symbol (F2)',
+    description: 'Rename the symbol under the cursor throughout the file',
+    keybinding: 'F2',
+    action: () => {
+      editor.focus();
+      void editor.getAction('editor.action.rename')?.run();
+    },
+  },
+]);
 
 setFilename(null);
 applyMode('dsl');

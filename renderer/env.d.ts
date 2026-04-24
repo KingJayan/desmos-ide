@@ -70,6 +70,9 @@ interface Window {
     onAiChunk(cb: (reqId: string, text: string) => void): void;
     onAiDone(cb: (reqId: string) => void): void;
     onAiError(cb: (reqId: string, error: string) => void): void;
+    watchFile(path: string): Promise<void>;
+    unwatchFile(path: string): Promise<void>;
+    onFileChanged(cb: (path: string, content: string) => void): void;
   };
 }
 
