@@ -145,7 +145,6 @@ function fmtNum(n: number): string {
 export class Codegen {
   private list: DesmosExpr[] = [];
   private idCounter = 1;
-  private latexCache = new Map<string, string>(); // latex → id (dedup)
 
   generate(program: T.Program): DesmosState {
     for (const stmt of program.body) {
@@ -160,14 +159,8 @@ export class Codegen {
 
 
   private emit(partial: Omit<DesmosExpr, 'id'>): string {
-    const key = partial.latex ?? '';
-    if (key && this.latexCache.has(key)) {
-      return this.latexCache.get(key)!; // dedup identical expressions
-    }
     const id = String(this.idCounter++);
-    const full: DesmosExpr = { ...partial, id };
-    this.list.push(full);
-    if (key) this.latexCache.set(key, id);
+    this.list.push({ ...partial, id });
     return id;
   }
 
@@ -271,8 +264,8 @@ export class Codegen {
     }
     if (radius) r = this.toLaTeX(radius);
 
-    const hPart = cx === '0' ? 'x^{2}' : `\\left(x-${cx}\\right)^{2}`;
-    const kPart = cy === '0' ? 'y^{2}' : `\\left(y-${cy}\\right)^{2}`;
+    const hPart = cx === '0' ? 'x^{2}' : `\\left(x-\\left(${cx}\\right)\\right)^{2}`;
+    const kPart = cy === '0' ? 'y^{2}' : `\\left(y-\\left(${cy}\\right)\\right)^{2}`;
     const rPart = r  === '1' ? '1'     : `\\left(${r}\\right)^{2}`;
 
     this.emit({
@@ -293,7 +286,7 @@ export class Codegen {
     if (props['slope'] && props['intercept']) {
       const m = this.toLaTeX(props['slope']);
       const b = this.toLaTeX(props['intercept']);
-      const mPart = m === '1' ? '' : m === '-1' ? '-' : m;
+      const mPart = m === '1' ? '' : m === '-1' ? '-' : /[+\-]/.test(m.slice(1)) ? `\\left(${m}\\right)` : m;
       return b === '0' ? `y=${mPart}x` : `y=${mPart}x+${b}`;
     }
     if (props['point1'] && props['point2']) {
@@ -301,6 +294,7 @@ export class Codegen {
       if (p1.type === 'Tuple' && p2.type === 'Tuple') {
         const x1 = this.toLaTeX(p1.x), y1 = this.toLaTeX(p1.y);
         const x2 = this.toLaTeX(p2.x), y2 = this.toLaTeX(p2.y);
+        if (x1 === x2) return `x=${x1}`;
         return `y-${y1}=\\frac{${y2}-${y1}}{${x2}-${x1}}\\left(x-${x1}\\right)`;
       }
     }
