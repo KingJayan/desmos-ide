@@ -13,7 +13,7 @@ export const BUILTIN_FNS = [
   'sin', 'cos', 'tan', 'arcsin', 'arccos', 'arctan',
   'ln', 'log', 'sqrt', 'abs', 'floor', 'ceil', 'round',
   'min', 'max', 'mod', 'sign',
-  'rgb', 'hsv',
+  'rgb', 'hsv', 'gradient',
   'slider', 'time',
 ] as const;
 
@@ -295,6 +295,14 @@ export function buildCompletions(kinds: {
       insertTextRules: 4,
       detail: 'color — hsv(h, s, v)',
       documentation: 'Desmos color via HSV (h: 0–360, s/v: 0–1). Shown as an inline color swatch.',
+    },
+    {
+      label: 'gradient',
+      kind: Function,
+      insertText: 'gradient(${1:"blue"}, ${2:"red"})',
+      insertTextRules: 4,
+      detail: 'gradient(from, to)',
+      documentation: 'Applies a color gradient along a curve or list. Colors can be named ("red"), hex ("#ff0000"), rgb(), or hsv().',
     },
   ];
 }

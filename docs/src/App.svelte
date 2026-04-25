@@ -252,16 +252,19 @@ region r2 = y &lt; x as &#123; color blue opacity 0.3 fill &#125;</code></pre>
 
   <section id="styling">
     <h2>styling</h2>
-    <p>any geometry statement can be followed by <code>as &#123; ... &#125;</code> with space-separated style properties:</p>
+    <p>any geometry statement can be followed by <code>as &#123; ... &#125;</code> with space-separated style properties, or by <code>as gradient(from, to)</code>:</p>
     <pre><code>point p2 (0, 0) as &#123; color red pointSize 12 &#125;
 circle c = circle((0,0), 3) as &#123; color rgb(0, 128, 255) opacity 0.2 &#125;
-region r = y > x^2 as &#123; color green fill &#125;</code></pre>
+region r = y > x^2 as &#123; color "#e040fb" fill &#125;
+curve ring (t in 0..6.28) &#123; (cos(t), sin(t)) &#125; as gradient("blue", "red")
+pts = (cos(i), sin(i)) for i in 0..6.28 step 0.1 as gradient(rgb(123, 33, 22), "#33dd33")</code></pre>
 
     <h3>style properties</h3>
     <table>
       <thead><tr><th>property</th><th>value</th><th>applicable to</th></tr></thead>
       <tbody>
-        <tr><td><code>color</code></td><td>named color or <code>rgb(r,g,b)</code> / <code>hsv(h,s,v)</code></td><td>all</td></tr>
+        <tr><td><code>color</code></td><td>named, hex string, <code>rgb(r,g,b)</code>, or <code>hsv(h,s,v)</code></td><td>all</td></tr>
+        <tr><td><code>gradient(from, to)</code></td><td>two color values (named / hex / rgb / hsv)</td><td>curve, for-comprehension</td></tr>
         <tr><td><code>opacity</code></td><td>number 0–1</td><td>all</td></tr>
         <tr><td><code>fill</code></td><td>(flag, no value)</td><td>region, circle, polygon</td></tr>
         <tr><td><code>pointSize</code></td><td>number</td><td>point</td></tr>
@@ -274,9 +277,18 @@ region r = y > x^2 as &#123; color green fill &#125;</code></pre>
     <h3>named colors</h3>
     <p><code>red</code> <code>blue</code> <code>green</code> <code>orange</code> <code>purple</code> <code>black</code> <code>white</code></p>
 
-    <h3>color functions</h3>
-    <pre><code>color rgb(255, 128, 0)   // r g b each 0–255
-color hsv(240, 1, 1)     // h 0–360, s/v 0–1</code></pre>
+    <h3>color formats</h3>
+    <pre><code>color red              // named color
+color "red"            // named color as string
+color "#e040fb"        // hex string
+color rgb(255, 128, 0) // r g b each 0–255
+color hsv(240, 1, 1)   // h 0–360, s/v 0–1</code></pre>
+
+    <h3>gradients</h3>
+    <p>gradients interpolate color along the parameter or loop variable. they can be written as a shorthand suffix or inside a style block:</p>
+    <pre><code>curve ring (t in 0..6.28) &#123; (cos(t), sin(t)) &#125; as gradient("blue", "red")
+pts = (cos(i), sin(i)) for i in 0..6.28 step 0.1 as gradient(rgb(123, 33, 22), "#33dd33")
+curve c (t in 0..4) &#123; (t, sin(t)) &#125; as &#123; gradient("green", "orange") opacity 0.9 &#125;</code></pre>
   </section>
 
   <section id="animation">
@@ -327,8 +339,9 @@ x = 3                    // plain constant, no slider</code></pre>
       <tbody>
         <tr><td><code>slider(init, min, max)</code></td><td>creates a desmos slider expression with the given domain.</td></tr>
         <tr><td><code>time(start, end, speed)</code></td><td>auto-playing slider. <code>animationPeriod = round(1000 / speed)</code>.</td></tr>
-        <tr><td><code>rgb(r, g, b)</code></td><td>desmos color value. r/g/b each 0–255.</td></tr>
-        <tr><td><code>hsv(h, s, v)</code></td><td>desmos color value. h: 0–360, s/v: 0–1.</td></tr>
+        <tr><td><code>rgb(r, g, b)</code></td><td>color value. r/g/b each 0–255.</td></tr>
+        <tr><td><code>hsv(h, s, v)</code></td><td>color value. h: 0–360, s/v: 0–1.</td></tr>
+        <tr><td><code>gradient(from, to)</code></td><td>style suffix — interpolates color along curve/list parameter. colors can be named, hex strings, rgb(), or hsv().</td></tr>
         <tr><td><code>project(...)</code></td><td>stub — emits the first argument unchanged as latex passthrough.</td></tr>
         <tr><td><code>camera(...)</code></td><td>reserved — passes through the optimizer unmodified.</td></tr>
       </tbody>

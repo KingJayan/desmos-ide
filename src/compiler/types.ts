@@ -131,6 +131,7 @@ export interface GroupDecl {
 
 export interface StyleBlock {
   color?: Expr;
+  gradient?: { from: Expr; to: Expr };
   opacity?: number;
   fill?: boolean;
   pointSize?: number;

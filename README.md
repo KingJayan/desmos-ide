@@ -45,10 +45,21 @@ group g as "My Folder"
 // optional styling
 point p2 (0, 0) as { color red pointSize 12 }
 region r2 = y < x as { color blue opacity 0.3 fill }
+
+// color accepts named, hex string, rgb(), or hsv()
+curve c (t in 0..6.28) { (cos(t), sin(t)) } as { color "#e040fb" }
+curve c2 (t in 0..6.28) { (cos(t), sin(t)) } as { color rgb(64, 128, 255) }
+
+// gradient — smoothly interpolates color along a curve or list
+curve ring (t in 0..6.28) { (cos(t), sin(t)) } as gradient("blue", "red")
+pts = (cos(i), sin(i)) for i in 0..6.28 step 0.1 as gradient(rgb(123, 33, 22), "#33dd33")
+// can also nest gradient inside the style block alongside other properties:
+curve c3 (t in 0..6.28) { (cos(t), sin(t)) } as { gradient("purple", "orange") opacity 0.8 }
 ```
 
 **Expressions:** full arithmetic (`+ - * / ^`), comparison operators, `where/else` conditionals, piecewise blocks, `map()` list comprehensions, `abs()`, `sqrt()`, trig, and all standard Desmos math functions.  
-**Colors:** named (`red blue green orange purple black white`) or `rgb(r,g,b)` / `hsv(h,s,v)`.
+**Colors:** named (`red blue green orange purple black white`), hex strings (`"#ff0000"`), `rgb(r,g,b)`, or `hsv(h,s,v)`.  
+**Gradients:** `as gradient(from, to)` on curves/for-comprehensions; interpolates between two colors along the parameter/loop variable. Colors can be named, hex strings, `rgb()`, or `hsv()`.
 
 # architecture
 

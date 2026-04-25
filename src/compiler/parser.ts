@@ -341,9 +341,24 @@ class Parser {
   }
 
 
+  private parseGradientArgs(): T.StyleBlock['gradient'] {
+    this.eat('lparen');
+    const from = this.parsePrimary();
+    this.eat('comma');
+    const to = this.parsePrimary();
+    this.eat('rparen');
+    return { from, to };
+  }
+
   private parseStyleBlock(): T.StyleBlock | undefined {
     if (!this.check('kw', 'as')) return undefined;
     this.advance();
+
+    if (this.check('ident') && this.peek().value === 'gradient') {
+      this.advance();
+      return { gradient: this.parseGradientArgs() };
+    }
+
     this.eat('lbrace');
     const style: T.StyleBlock = {};
     while (!this.check('rbrace') && !this.check('eof')) {
@@ -352,6 +367,9 @@ class Parser {
         switch (prop.value) {
           case 'color':
             style.color = this.parsePrimary();
+            break;
+          case 'gradient':
+            style.gradient = this.parseGradientArgs();
             break;
           case 'opacity': {
             const n = this.eat('num');

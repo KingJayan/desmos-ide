@@ -32,7 +32,10 @@ function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
 
 function resolveColor(expr: T.Expr | undefined): string | null {
   if (!expr) return null;
-  if (expr.type === 'StringLit') return DESMOS_NAMED[expr.value] ?? null;
+  if (expr.type === 'StringLit') {
+    if (expr.value.startsWith('#')) return expr.value;
+    return DESMOS_NAMED[expr.value] ?? null;
+  }
   if (expr.type === 'Ident' && DESMOS_NAMED[expr.name]) return DESMOS_NAMED[expr.name];
   if (expr.type !== 'Call') return null;
   const nums = expr.args.every(a => a.type === 'NumLit');
@@ -41,6 +44,26 @@ function resolveColor(expr: T.Expr | undefined): string | null {
   if (expr.fn === 'rgb') return rgbToHex(a0, a1, a2);
   if (expr.fn === 'hsv') { const [r, g, b] = hsvToRgb(a0, a1, a2); return rgbToHex(r, g, b); }
   return null;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function gradientColorLatex(
+  fromExpr: T.Expr, toExpr: T.Expr,
+  varLtx: string, startLtx: string, endLtx: string
+): string | null {
+  const fromHex = resolveColor(fromExpr);
+  const toHex   = resolveColor(toExpr);
+  if (!fromHex || !toHex) return null;
+  const [r1, g1, b1] = hexToRgb(fromHex);
+  const [r2, g2, b2] = hexToRgb(toHex);
+  const norm = `\\frac{${varLtx}-${startLtx}}{${endLtx}-${startLtx}}`;
+  const ch = (a: number, b: number) =>
+    b === a ? `${a}` : `${a}+${b - a}\\cdot\\left(${norm}\\right)`;
+  return `\\operatorname{rgb}\\left(${ch(r1, r2)},${ch(g1, g2)},${ch(b1, b2)}\\right)`;
 }
 
 // output types
@@ -61,6 +84,7 @@ export interface DesmosExpr {
   id: string;
   latex?: string;
   color?: string;
+  colorLatex?: string;
   lineOpacity?: string;
   pointOpacity?: string;
   pointSize?: string;
@@ -267,15 +291,19 @@ export class Codegen {
     this.emit({ type: 'expression', latex, color });
   }
 
-  /** curve / for-comprehension → parametric or sampled list */
+  /** curve / for-comprehension -> parametric or sampled list */
   private genCurveDecl(stmt: T.CurveDecl): void {
-    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.curve;
+    const grad = stmt.style?.gradient;
+    const color = grad
+      ? (resolveColor(grad.from) ?? COLORS.curve)
+      : ((stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.curve);
     const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : undefined;
 
-    const bodyLatex = this.toLaTeX(stmt.body);
+    const bodyLatex  = this.toLaTeX(stmt.body);
     const startLatex = this.toLaTeX(stmt.start);
     const endLatex   = this.toLaTeX(stmt.end);
     const stepLatex  = stmt.step ? this.toLaTeX(stmt.step) : undefined;
+    const varLtx     = nameToLatex(stmt.var);
 
     if (stmt.body.type === 'Tuple') {
       const partial: Omit<DesmosExpr, 'id'> = {
@@ -284,6 +312,10 @@ export class Codegen {
         color,
         parametricDomain: { min: startLatex, max: endLatex },
       };
+      if (grad) {
+        const cl = gradientColorLatex(grad.from, grad.to, varLtx, startLatex, endLatex);
+        if (cl) partial.colorLatex = cl;
+      }
       if (fillOpacity) { partial.fill = true; partial.fillOpacity = fillOpacity; }
       this.emit(partial);
       return;
@@ -292,8 +324,17 @@ export class Codegen {
     const rangeLatex = stepLatex
       ? `\\left[${startLatex},${stepLatex},...,${endLatex}\\right]`
       : `\\left[${startLatex},...,${endLatex}\\right]`;
-    const listLatex = `\\left[${bodyLatex}\\operatorname{for}${nameToLatex(stmt.var)}=${rangeLatex}\\right]`;
-    this.emit({ type: 'expression', latex: listLatex, color, points: true, lines: false });
+    const listLatex = `\\left[${bodyLatex}\\operatorname{for}${varLtx}=${rangeLatex}\\right]`;
+    const partial: Omit<DesmosExpr, 'id'> = {
+      type: 'expression', latex: listLatex, color, points: true, lines: false,
+    };
+    if (grad) {
+      const gradListLatex = `\\left[${
+        gradientColorLatex(grad.from, grad.to, varLtx, startLatex, endLatex)
+      }\\operatorname{for}${varLtx}=${rangeLatex}\\right]`;
+      partial.colorLatex = gradListLatex;
+    }
+    this.emit(partial);
   }
 
   /** region r = y > x^2 → inequality expression */

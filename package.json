@@ -1,6 +1,6 @@
 {
   "name": "desmos-ide",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "an ide for Desmos with a custom dsl",
   "main": "out/main/index.js",
   "scripts": {
