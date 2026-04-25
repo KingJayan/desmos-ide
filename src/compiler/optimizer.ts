@@ -79,6 +79,39 @@ function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
     case 'GroupDecl':
       return stmt;
 
+    case 'SpiralDecl':
+      return {
+        ...stmt,
+        turns:   ox(stmt.turns),
+        spacing: ox(stmt.spacing),
+        cx:      oxopt(stmt.cx),
+        cy:      oxopt(stmt.cy),
+        rotate:  oxopt(stmt.rotate),
+      };
+
+    case 'WaveDecl':
+      return {
+        ...stmt,
+        freq:  ox(stmt.freq),
+        amp:   ox(stmt.amp),
+        phase: oxopt(stmt.phase),
+        cx:    oxopt(stmt.cx),
+        cy:    oxopt(stmt.cy),
+        xmin:  oxopt(stmt.xmin),
+        xmax:  oxopt(stmt.xmax),
+      };
+
+    case 'GridDecl':
+      return {
+        ...stmt,
+        cols: ox(stmt.cols),
+        rows: ox(stmt.rows),
+        xmin: oxopt(stmt.xmin),
+        xmax: oxopt(stmt.xmax),
+        ymin: oxopt(stmt.ymin),
+        ymax: oxopt(stmt.ymax),
+      };
+
     default:
       return stmt;
   }

@@ -21,7 +21,10 @@ export type Statement =
   | SegmentDecl
   | TextDecl
   | GroupDecl
-  | FnDecl;
+  | FnDecl
+  | SpiralDecl
+  | WaveDecl
+  | GridDecl;
 
 //stmts
 
@@ -135,6 +138,50 @@ export interface StyleBlock {
   opacity?: number;
   fill?: boolean;
   pointSize?: number;
+  lineWidth?: number;
+  lineOpacity?: number;
+}
+
+/** spiral s = spiral(turns=5, spacing=0.2) [as { ... }] */
+export interface SpiralDecl {
+  type: 'SpiralDecl';
+  name: string;
+  turns: Expr;
+  spacing: Expr;
+  cx?: Expr;
+  cy?: Expr;
+  rotate?: Expr;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** wave w = wave(freq=2, amp=1) [as { ... }] */
+export interface WaveDecl {
+  type: 'WaveDecl';
+  name: string;
+  freq: Expr;
+  amp: Expr;
+  phase?: Expr;
+  cx?: Expr;
+  cy?: Expr;
+  xmin?: Expr;
+  xmax?: Expr;
+  style?: StyleBlock;
+  pos: Pos;
+}
+
+/** grid g = grid(10, 10) [as { ... }] */
+export interface GridDecl {
+  type: 'GridDecl';
+  name: string;
+  cols: Expr;
+  rows: Expr;
+  xmin?: Expr;
+  xmax?: Expr;
+  ymin?: Expr;
+  ymax?: Expr;
+  style?: StyleBlock;
+  pos: Pos;
 }
 
 export interface FnDecl {

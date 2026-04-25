@@ -6,6 +6,8 @@ export const KEYWORDS = new Set([
 
   'for', 'step', 'where', 'else', 'region', 'polygon', 'segment',
   'curve', 'group', 'text', 'as', 'at',
+
+  'spiral', 'wave', 'grid',
 ]);
 
 export type TT =

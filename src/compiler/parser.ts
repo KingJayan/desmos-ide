@@ -82,7 +82,7 @@ class Parser {
   }
 
   private recoverToNextStatement(): void {
-    const stmtStartKws = new Set(['fn', 'point', 'circle', 'line', 'curve', 'region', 'polygon', 'segment', 'text', 'group']);
+    const stmtStartKws = new Set(['fn', 'point', 'circle', 'line', 'curve', 'region', 'polygon', 'segment', 'text', 'group', 'spiral', 'wave', 'grid']);
     while (!this.check('eof')) {
       const t = this.peek();
       if (t.type === 'kw' && stmtStartKws.has(t.value)) return;
@@ -106,6 +106,9 @@ class Parser {
         case 'segment': return this.parseSegmentDecl();
         case 'text':    return this.parseTextDecl();
         case 'group':   return this.parseGroupDecl();
+        case 'spiral':  return this.parseSpiralDecl();
+        case 'wave':    return this.parseWaveDecl();
+        case 'grid':    return this.parseGridDecl();
       }
     }
 
@@ -340,6 +343,64 @@ class Parser {
     return { type: 'GroupDecl', name, label: labelTok.value, pos };
   }
 
+  private parseGeneratorKwargs(allowed: string[]): Record<string, T.Expr> {
+    const out: Record<string, T.Expr> = {};
+    this.eat('lparen');
+    while (!this.check('rparen') && !this.check('eof')) {
+      if (this.check('ident') && allowed.includes(this.peek().value) && this.checkNext('op', '=')) {
+        const key = this.advance().value;
+        this.advance();
+        out[key] = this.parseExpr();
+      } else {
+        const key = allowed[Object.keys(out).length];
+        if (key) out[key] = this.parseExpr();
+        else throw new ParseError('Unexpected positional argument', this.peek());
+      }
+      if (this.check('comma')) this.advance();
+    }
+    this.eat('rparen');
+    return out;
+  }
+
+  private parseSpiralDecl(): T.SpiralDecl {
+    const pos = this.curPos();
+    this.eat('kw', 'spiral');
+    const name = this.eat('ident').value;
+    this.eat('op', '=');
+    this.eat('kw', 'spiral');
+    const kw = this.parseGeneratorKwargs(['turns', 'spacing', 'cx', 'cy', 'rotate']);
+    if (!kw['turns']) throw new ParseError("spiral requires 'turns'", this.peek());
+    if (!kw['spacing']) throw new ParseError("spiral requires 'spacing'", this.peek());
+    const style = this.parseStyleBlock();
+    return { type: 'SpiralDecl', name, turns: kw['turns'], spacing: kw['spacing'], cx: kw['cx'], cy: kw['cy'], rotate: kw['rotate'], style, pos };
+  }
+
+  private parseWaveDecl(): T.WaveDecl {
+    const pos = this.curPos();
+    this.eat('kw', 'wave');
+    const name = this.eat('ident').value;
+    this.eat('op', '=');
+    this.eat('kw', 'wave');
+    const kw = this.parseGeneratorKwargs(['freq', 'amp', 'phase', 'cx', 'cy', 'xmin', 'xmax']);
+    if (!kw['freq']) throw new ParseError("wave requires 'freq'", this.peek());
+    if (!kw['amp']) throw new ParseError("wave requires 'amp'", this.peek());
+    const style = this.parseStyleBlock();
+    return { type: 'WaveDecl', name, freq: kw['freq'], amp: kw['amp'], phase: kw['phase'], cx: kw['cx'], cy: kw['cy'], xmin: kw['xmin'], xmax: kw['xmax'], style, pos };
+  }
+
+  private parseGridDecl(): T.GridDecl {
+    const pos = this.curPos();
+    this.eat('kw', 'grid');
+    const name = this.eat('ident').value;
+    this.eat('op', '=');
+    this.eat('kw', 'grid');
+    const kw = this.parseGeneratorKwargs(['cols', 'rows', 'xmin', 'xmax', 'ymin', 'ymax']);
+    if (!kw['cols']) throw new ParseError("grid requires 'cols'", this.peek());
+    if (!kw['rows']) throw new ParseError("grid requires 'rows'", this.peek());
+    const style = this.parseStyleBlock();
+    return { type: 'GridDecl', name, cols: kw['cols'], rows: kw['rows'], xmin: kw['xmin'], xmax: kw['xmax'], ymin: kw['ymin'], ymax: kw['ymax'], style, pos };
+  }
+
 
   private parseGradientArgs(): T.StyleBlock['gradient'] {
     this.eat('lparen');
@@ -382,6 +443,16 @@ class Parser {
           case 'pointSize': {
             const n = this.eat('num');
             style.pointSize = parseFloat(n.value);
+            break;
+          }
+          case 'lineWidth': {
+            const n = this.eat('num');
+            style.lineWidth = parseFloat(n.value);
+            break;
+          }
+          case 'lineOpacity': {
+            const n = this.eat('num');
+            style.lineOpacity = parseFloat(n.value);
             break;
           }
           default:

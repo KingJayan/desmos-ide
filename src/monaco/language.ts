@@ -7,6 +7,7 @@ export const KEYWORDS = [
   'text', 'group', 'as', 'at',
   'for', 'step', 'where', 'else',
   'time', 'project', 'camera',
+  'spiral', 'wave', 'grid',
 ] as const;
 
 export const BUILTIN_FNS = [
@@ -15,6 +16,7 @@ export const BUILTIN_FNS = [
   'min', 'max', 'mod', 'sign',
   'rgb', 'hsv', 'gradient',
   'slider', 'time',
+  'spiral', 'wave', 'grid',
 ] as const;
 
 export const languageConfig = {

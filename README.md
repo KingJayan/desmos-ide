@@ -42,6 +42,14 @@ z = { x > 0: x^2, x < 0: -x, else: 0 }
 text lbl = "hello" at (1, 2)
 group g as "My Folder"
 
+// built-in generators
+spiral s = spiral(turns=5, spacing=0.2)
+spiral s = spiral(turns=8, spacing=0.15, cx=1, cy=0, rotate=0.3) as gradient("blue", "red")
+wave w = wave(freq=2, amp=1)
+wave w = wave(freq=3, amp=0.5, phase=1.57, xmin=-8, xmax=8) as { color orange lineWidth 2.5 }
+grid g = grid(10, 10)
+grid g = grid(cols=6, rows=6, xmin=-3, xmax=3) as { color "#888" opacity 0.3 lineWidth 0.5 }
+
 // optional styling
 point p2 (0, 0) as { color red pointSize 12 }
 region r2 = y < x as { color blue opacity 0.3 fill }
@@ -59,7 +67,8 @@ curve c3 (t in 0..6.28) { (cos(t), sin(t)) } as { gradient("purple", "orange") o
 
 **Expressions:** full arithmetic (`+ - * / ^`), comparison operators, `where/else` conditionals, piecewise blocks, `map()` list comprehensions, `abs()`, `sqrt()`, trig, and all standard Desmos math functions.  
 **Colors:** named (`red blue green orange purple black white`), hex strings (`"#ff0000"`), `rgb(r,g,b)`, or `hsv(h,s,v)`.  
-**Gradients:** `as gradient(from, to)` on curves/for-comprehensions; interpolates between two colors along the parameter/loop variable. Colors can be named, hex strings, `rgb()`, or `hsv()`.
+**Gradients:** `as gradient(from, to)` on curves/for-comprehensions; interpolates between two colors along the parameter/loop variable. Colors can be named, hex strings, `rgb()`, or `hsv()`.  
+**Line style:** `lineWidth` (number, default 2.5) and `lineOpacity` (0–1) apply to curves, lines, segments, and all generators.
 
 # architecture
 

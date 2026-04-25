@@ -88,6 +88,7 @@ export interface DesmosExpr {
   lineOpacity?: string;
   pointOpacity?: string;
   pointSize?: string;
+  lineWidth?: string;
   lines?: boolean;
   points?: boolean;
   fill?: boolean;
@@ -208,6 +209,9 @@ export class Codegen {
       case 'SegmentDecl':this.genSegmentDecl(stmt);break;
       case 'TextDecl':   this.genTextDecl(stmt);   break;
       case 'GroupDecl':  this.genGroupDecl(stmt);  break;
+      case 'SpiralDecl': this.genSpiralDecl(stmt); break;
+      case 'WaveDecl':   this.genWaveDecl(stmt);   break;
+      case 'GridDecl':   this.genGridDecl(stmt);   break;
     }
   }
 
@@ -288,7 +292,9 @@ export class Codegen {
       latex = stmt.expr ? this.toLaTeX(stmt.expr) : 'y=x';
     }
 
-    this.emit({ type: 'expression', latex, color });
+    const partial: Omit<DesmosExpr, 'id'> = { type: 'expression', latex, color };
+    this.applyLineStyle(partial, stmt.style);
+    this.emit(partial);
   }
 
   /** curve / for-comprehension -> parametric or sampled list */
@@ -317,6 +323,7 @@ export class Codegen {
         if (cl) partial.colorLatex = cl;
       }
       if (fillOpacity) { partial.fill = true; partial.fillOpacity = fillOpacity; }
+      this.applyLineStyle(partial, stmt.style);
       this.emit(partial);
       return;
     }
@@ -334,6 +341,7 @@ export class Codegen {
       }\\operatorname{for}${varLtx}=${rangeLatex}\\right]`;
       partial.colorLatex = gradListLatex;
     }
+    this.applyLineStyle(partial, stmt.style);
     this.emit(partial);
   }
 
@@ -364,7 +372,9 @@ export class Codegen {
     const x1 = this.toLaTeX(stmt.p1.x), y1 = this.toLaTeX(stmt.p1.y);
     const x2 = this.toLaTeX(stmt.p2.x), y2 = this.toLaTeX(stmt.p2.y);
     const latex = `\\left[\\left(${x1},${y1}\\right),\\left(${x2},${y2}\\right)\\right]`;
-    this.emit({ type: 'expression', latex, color, lines: true, points: false });
+    const partial: Omit<DesmosExpr, 'id'> = { type: 'expression', latex, color, lines: true, points: false };
+    this.applyLineStyle(partial, stmt.style);
+    this.emit(partial);
   }
 
   /** text t = "hello" at (x, y) → labeled point */
@@ -384,6 +394,86 @@ export class Codegen {
   /** group orbit as "Motion" → Desmos folder */
   private genGroupDecl(stmt: T.GroupDecl): void {
     this.emit({ type: 'folder', title: stmt.label });
+  }
+
+  private applyLineStyle(partial: Omit<DesmosExpr, 'id'>, style?: T.StyleBlock): void {
+    if (style?.lineWidth !== undefined) partial.lineWidth = String(style.lineWidth);
+    if (style?.lineOpacity !== undefined) partial.lineOpacity = String(style.lineOpacity);
+  }
+
+  private genSpiralDecl(stmt: T.SpiralDecl): void {
+    const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? '#6042a6';
+    const turns   = this.toLaTeX(stmt.turns);
+    const spacing = this.toLaTeX(stmt.spacing);
+    const cx      = stmt.cx     ? this.toLaTeX(stmt.cx)     : '0';
+    const cy      = stmt.cy     ? this.toLaTeX(stmt.cy)     : '0';
+    const rotate  = stmt.rotate ? this.toLaTeX(stmt.rotate) : '0';
+    const tVar    = nameToLatex(`t_${stmt.name}`);
+    const end     = `${turns}\\cdot 2\\pi`;
+    const rx      = `${tVar}\\cdot\\left(${spacing}\\right)\\cdot\\cos\\left(${tVar}+\\left(${rotate}\\right)\\right)`;
+    const ry      = `${tVar}\\cdot\\left(${spacing}\\right)\\cdot\\sin\\left(${tVar}+\\left(${rotate}\\right)\\right)`;
+    const xExpr   = cx === '0' ? rx : `${cx}+${rx}`;
+    const yExpr   = cy === '0' ? ry : `${cy}+${ry}`;
+    const latex   = `\\left(${xExpr},${yExpr}\\right)`;
+    const partial: Omit<DesmosExpr, 'id'> = {
+      type: 'expression', latex, color,
+      parametricDomain: { min: '0', max: end },
+    };
+    const grad = stmt.style?.gradient;
+    if (grad) {
+      const cl = gradientColorLatex(grad.from, grad.to, tVar, '0', end);
+      if (cl) partial.colorLatex = cl;
+    }
+    this.applyLineStyle(partial, stmt.style);
+    this.emit(partial);
+  }
+
+  private genWaveDecl(stmt: T.WaveDecl): void {
+    const color  = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? '#2d70b3';
+    const freq   = this.toLaTeX(stmt.freq);
+    const amp    = this.toLaTeX(stmt.amp);
+    const phase  = stmt.phase ? this.toLaTeX(stmt.phase) : '0';
+    const cx     = stmt.cx   ? this.toLaTeX(stmt.cx)   : '0';
+    const cy     = stmt.cy   ? this.toLaTeX(stmt.cy)   : '0';
+    const xmin   = stmt.xmin ? this.toLaTeX(stmt.xmin) : '-10';
+    const xmax   = stmt.xmax ? this.toLaTeX(stmt.xmax) : '10';
+    const tVar   = nameToLatex(`t_${stmt.name}`);
+    const yBody  = `\\left(${amp}\\right)\\cdot\\sin\\left(\\left(${freq}\\right)\\cdot${tVar}+\\left(${phase}\\right)\\right)`;
+    const xExpr  = cx === '0' ? tVar : `${tVar}+\\left(${cx}\\right)`;
+    const yExpr  = cy === '0' ? yBody : `${yBody}+\\left(${cy}\\right)`;
+    const latex  = `\\left(${xExpr},${yExpr}\\right)`;
+    const partial: Omit<DesmosExpr, 'id'> = {
+      type: 'expression', latex, color,
+      parametricDomain: { min: xmin, max: xmax },
+    };
+    const grad = stmt.style?.gradient;
+    if (grad) {
+      const cl = gradientColorLatex(grad.from, grad.to, tVar, xmin, xmax);
+      if (cl) partial.colorLatex = cl;
+    }
+    this.applyLineStyle(partial, stmt.style);
+    this.emit(partial);
+  }
+
+  private genGridDecl(stmt: T.GridDecl): void {
+    const color      = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? '#888888';
+    const lineOpacity = stmt.style?.lineOpacity ?? stmt.style?.opacity ?? 0.4;
+    const cols = stmt.cols.type === 'NumLit' ? stmt.cols.value : 10;
+    const rows = stmt.rows.type === 'NumLit' ? stmt.rows.value : 10;
+    const xmin = stmt.xmin?.type === 'NumLit' ? stmt.xmin.value : -(cols / 2);
+    const xmax = stmt.xmax?.type === 'NumLit' ? stmt.xmax.value : (cols / 2);
+    const ymin = stmt.ymin?.type === 'NumLit' ? stmt.ymin.value : -(rows / 2);
+    const ymax = stmt.ymax?.type === 'NumLit' ? stmt.ymax.value : (rows / 2);
+    const buildList = (lo: number, hi: number): string => {
+      const vals: string[] = [];
+      for (let v = lo; v <= hi; v++) vals.push(fmtNum(v));
+      return `\\left[${vals.join(',')}\\right]`;
+    };
+    const xList = buildList(Math.ceil(xmin), Math.floor(xmax));
+    const yList = buildList(Math.ceil(ymin), Math.floor(ymax));
+    const lw = stmt.style?.lineWidth !== undefined ? String(stmt.style.lineWidth) : '1';
+    this.emit({ type: 'expression', latex: `y=${yList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw });
+    this.emit({ type: 'expression', latex: `x=${xList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw });
   }
 
 //helpers

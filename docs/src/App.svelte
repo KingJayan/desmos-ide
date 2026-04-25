@@ -59,6 +59,7 @@
     <a href="#conditionals"   class:active={activeId === 'conditionals'}>conditionals</a>
     <a href="#geometry"       class:active={activeId === 'geometry'}>geometry</a>
     <a href="#curves"         class:active={activeId === 'curves'}>curves &amp; regions</a>
+    <a href="#generators"     class:active={activeId === 'generators'}>generators</a>
     <a href="#styling"        class:active={activeId === 'styling'}>styling</a>
     <a href="#animation"      class:active={activeId === 'animation'}>sliders &amp; animation</a>
     <a href="#builtins"       class:active={activeId === 'builtins'}>built-ins</a>
@@ -91,7 +92,7 @@ region r = y > x^2</code></pre>
       <li><strong>whitespace:</strong> spaces, tabs, and newlines are ignored except for line and column tracking.</li>
       <li><strong>numbers:</strong> integers and decimals. leading-dot decimals like <code>.5</code> are not supported — write <code>0.5</code>.</li>
       <li><strong>identifiers:</strong> <code>[A-Za-z_][A-Za-z0-9_]*</code></li>
-      <li><strong>keywords:</strong> <code>fn</code>, <code>in</code>, <code>map</code>, <code>point</code>, <code>circle</code>, <code>line</code>, <code>curve</code>, <code>region</code>, <code>polygon</code>, <code>segment</code>, <code>text</code>, <code>group</code>, <code>as</code>, <code>at</code>, <code>for</code>, <code>step</code>, <code>where</code>, <code>else</code>, <code>time</code>, <code>project</code>, <code>camera</code></li>
+      <li><strong>keywords:</strong> <code>fn</code>, <code>in</code>, <code>map</code>, <code>point</code>, <code>circle</code>, <code>line</code>, <code>curve</code>, <code>region</code>, <code>polygon</code>, <code>segment</code>, <code>text</code>, <code>group</code>, <code>as</code>, <code>at</code>, <code>for</code>, <code>step</code>, <code>where</code>, <code>else</code>, <code>time</code>, <code>project</code>, <code>camera</code>, <code>spiral</code>, <code>wave</code>, <code>grid</code></li>
       <li><strong>range tokens:</strong>
         <ul>
           <li><code>..</code> — domain separator in curve/for ranges (<code>0..6.28</code>)</li>
@@ -125,6 +126,9 @@ region r = y > x^2</code></pre>
         <tr><td><code>region name = inequality</code></td><td>filled inequality region</td></tr>
         <tr><td><code>text name = "label" at (x, y)</code></td><td>text label at position</td></tr>
         <tr><td><code>group name as "Folder label"</code></td><td>desmos folder</td></tr>
+        <tr><td><code>spiral name = spiral(turns, spacing)</code></td><td>archimedean spiral (parametric)</td></tr>
+        <tr><td><code>wave name = wave(freq, amp)</code></td><td>sine wave (parametric)</td></tr>
+        <tr><td><code>grid name = grid(cols, rows)</code></td><td>cartesian grid lines</td></tr>
       </tbody>
     </table>
   </section>
@@ -269,7 +273,8 @@ pts = (cos(i), sin(i)) for i in 0..6.28 step 0.1 as gradient(rgb(123, 33, 22), "
         <tr><td><code>fill</code></td><td>(flag, no value)</td><td>region, circle, polygon</td></tr>
         <tr><td><code>pointSize</code></td><td>number</td><td>point</td></tr>
         <tr><td><code>lineStyle</code></td><td><code>solid</code> / <code>dashed</code> / <code>dotted</code></td><td>line, curve, segment</td></tr>
-        <tr><td><code>lineWidth</code></td><td>number</td><td>line, curve, segment</td></tr>
+        <tr><td><code>lineWidth</code></td><td>number</td><td>line, curve, segment, spiral, wave, grid</td></tr>
+        <tr><td><code>lineOpacity</code></td><td>number 0–1</td><td>curve, segment, spiral, wave, grid</td></tr>
         <tr><td><code>hidden</code></td><td>(flag, no value)</td><td>all</td></tr>
       </tbody>
     </table>
@@ -369,6 +374,65 @@ r = dist(3, 4)   // optimized to: r = 5</code></pre>
       <code>rho</code> <code>sigma</code> <code>tau</code> <code>upsilon</code> <code>phi</code>
       <code>chi</code> <code>psi</code> <code>omega</code>
     </p>
+  </section>
+
+  <section id="generators">
+    <h2>generators</h2>
+    <p>built-in generators produce complex shapes from a few parameters. all generators accept optional styling including <code>color</code>, <code>gradient</code>, <code>lineWidth</code>, and <code>lineOpacity</code>.</p>
+
+    <h3>spiral</h3>
+    <p>archimedean spiral — radius grows linearly with angle. compiles to a parametric curve.</p>
+    <pre><code>spiral s = spiral(turns=5, spacing=0.2)
+spiral s = spiral(turns=5, spacing=0.2) as &#123; color purple lineWidth 2 &#125;
+// with transforms
+spiral s = spiral(turns=8, spacing=0.15, cx=2, cy=1, rotate=0.5) as gradient("blue", "red")</code></pre>
+    <table>
+      <thead><tr><th>param</th><th>description</th><th>default</th></tr></thead>
+      <tbody>
+        <tr><td><code>turns</code></td><td>number of full rotations</td><td>required</td></tr>
+        <tr><td><code>spacing</code></td><td>radial distance per radian (controls tightness)</td><td>required</td></tr>
+        <tr><td><code>cx</code></td><td>x offset of spiral center</td><td><code>0</code></td></tr>
+        <tr><td><code>cy</code></td><td>y offset of spiral center</td><td><code>0</code></td></tr>
+        <tr><td><code>rotate</code></td><td>rotation offset in radians</td><td><code>0</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>wave</h3>
+    <p>sine wave rendered as a parametric curve over a configurable x-range.</p>
+    <pre><code>wave w = wave(freq=2, amp=1)
+wave w = wave(freq=3, amp=0.5, phase=1.57) as &#123; color orange lineWidth 2.5 &#125;
+// with domain and offset
+wave w = wave(freq=1, amp=2, xmin=-5, xmax=5, cy=3) as gradient("green", "blue")</code></pre>
+    <table>
+      <thead><tr><th>param</th><th>description</th><th>default</th></tr></thead>
+      <tbody>
+        <tr><td><code>freq</code></td><td>angular frequency (cycles per 2π units)</td><td>required</td></tr>
+        <tr><td><code>amp</code></td><td>amplitude</td><td>required</td></tr>
+        <tr><td><code>phase</code></td><td>phase shift in radians</td><td><code>0</code></td></tr>
+        <tr><td><code>cx</code></td><td>x offset applied to the wave</td><td><code>0</code></td></tr>
+        <tr><td><code>cy</code></td><td>vertical offset</td><td><code>0</code></td></tr>
+        <tr><td><code>xmin</code></td><td>left domain bound</td><td><code>-10</code></td></tr>
+        <tr><td><code>xmax</code></td><td>right domain bound</td><td><code>10</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>grid</h3>
+    <p>cartesian grid of horizontal and vertical lines. emits two desmos expressions using list notation.</p>
+    <pre><code>grid g = grid(10, 10)
+grid g = grid(20, 20) as &#123; color "#888888" opacity 0.3 lineWidth 0.5 &#125;
+// custom bounds
+grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
+    <table>
+      <thead><tr><th>param</th><th>description</th><th>default</th></tr></thead>
+      <tbody>
+        <tr><td><code>cols</code></td><td>number of vertical lines (width of grid)</td><td>required</td></tr>
+        <tr><td><code>rows</code></td><td>number of horizontal lines (height of grid)</td><td>required</td></tr>
+        <tr><td><code>xmin</code></td><td>left bound</td><td><code>-cols/2</code></td></tr>
+        <tr><td><code>xmax</code></td><td>right bound</td><td><code>cols/2</code></td></tr>
+        <tr><td><code>ymin</code></td><td>bottom bound</td><td><code>-rows/2</code></td></tr>
+        <tr><td><code>ymax</code></td><td>top bound</td><td><code>rows/2</code></td></tr>
+      </tbody>
+    </table>
   </section>
 
   <section id="codegen">
