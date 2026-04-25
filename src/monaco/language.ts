@@ -14,6 +14,7 @@ export const BUILTIN_FNS = [
   'ln', 'log', 'sqrt', 'abs', 'floor', 'ceil', 'round',
   'min', 'max', 'mod', 'sign',
   'rgb', 'hsv',
+  'slider', 'time',
 ] as const;
 
 export const languageConfig = {
@@ -59,20 +60,31 @@ export const monarchTokens = {
 
   tokenizer: {
     root: [
-      //whitespace
       [/\s+/, 'white'],
 
-      //line comments
       [/\/\/.*$/, 'comment'],
 
-      //nums
+      [/"/, { token: 'string.quote', next: '@string' }],
+
       [/\d+\.?\d*/, 'number'],
 
-      //ellipsis and dotdot (before single-dot or operator catch-all)
       [/\.\.\./, 'operator.ellipsis'],
       [/\.\./, 'operator.ellipsis'],
+      [/->/, 'operator.arrow'],
 
-      //idents, keywords, builtins
+      // function call sites (ident immediately followed by `(`)
+      [
+        /[a-zA-Z_][a-zA-Z0-9_]*(?=\s*\()/,
+        {
+          cases: {
+            '@keywords': 'keyword',
+            '@builtins': 'function.builtin',
+            '@default':  'function.call',
+          },
+        },
+      ],
+
+      // plain idents / keywords
       [
         /[a-zA-Z_][a-zA-Z0-9_]*/,
         {
@@ -84,33 +96,39 @@ export const monarchTokens = {
         },
       ],
 
-      //ops
-      [/[+\-*/^=<>]/, 'operator'],
+      [/[+\-*/^=<>!]/, 'operator'],
 
-      //brackets
       [/[{}]/, 'delimiter.brace'],
       [/[\[\]]/, 'delimiter.bracket'],
       [/[()]/, 'delimiter.parenthesis'],
 
-      //punctuation
       [/[,:]/, 'delimiter'],
+    ],
+
+    string: [
+      [/[^"]+/, 'string'],
+      [/"/, { token: 'string.quote', next: '@pop' }],
     ],
   },
 };
 
 
 export const themeRules = [
-  { token: 'keyword',              foreground: 'CBA6F7', fontStyle: 'bold'   }, // mauve
-  { token: 'function.builtin',     foreground: 'FAB387'                       }, // peach
-  { token: 'identifier',           foreground: 'CDD6F4'                       }, // text
-  { token: 'number',               foreground: 'FAB387'                       }, // peach
-  { token: 'operator',             foreground: '89DCEB'                       }, // sky
-  { token: 'operator.ellipsis',    foreground: '89B4FA', fontStyle: 'bold'   }, // blue
-  { token: 'comment',              foreground: '6C7086', fontStyle: 'italic' }, // overlay0
-  { token: 'delimiter',            foreground: '9399B2'                       }, // overlay2
-  { token: 'delimiter.brace',      foreground: 'F38BA8'                       }, // red
-  { token: 'delimiter.bracket',    foreground: 'A6E3A1'                       }, // green
-  { token: 'delimiter.parenthesis', foreground: 'F9E2AF'                      }, // yellow
+  { token: 'keyword',               foreground: 'CBA6F7', fontStyle: 'bold'   }, // mauve
+  { token: 'function.builtin',      foreground: 'FAB387'                       }, // peach
+  { token: 'function.call',         foreground: '89B4FA'                       }, // blue — user fn calls
+  { token: 'identifier',            foreground: 'CDD6F4'                       }, // text
+  { token: 'number',                foreground: 'F38BA8'                       }, // red/rose — distinct from builtins
+  { token: 'operator',              foreground: '89DCEB'                       }, // sky
+  { token: 'operator.ellipsis',     foreground: 'A6E3A1', fontStyle: 'bold'   }, // green
+  { token: 'operator.arrow',        foreground: 'A6E3A1'                       }, // green
+  { token: 'string',                foreground: 'A6E3A1'                       }, // green
+  { token: 'string.quote',          foreground: 'A6E3A1'                       }, // green
+  { token: 'comment',               foreground: '6C7086', fontStyle: 'italic' }, // overlay0
+  { token: 'delimiter',             foreground: '9399B2'                       }, // overlay2
+  { token: 'delimiter.brace',       foreground: 'F5C2E7'                       }, // pink
+  { token: 'delimiter.bracket',     foreground: 'A6E3A1'                       }, // green
+  { token: 'delimiter.parenthesis', foreground: 'F9E2AF'                       }, // yellow
 ];
 
 export const themeColors = {
