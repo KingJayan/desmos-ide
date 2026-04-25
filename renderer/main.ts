@@ -79,13 +79,13 @@ const DEFAULT_SRC = `// desmos DSL snippet
 
 a = slider(0, 0, 6.28)
 
-fn wave(x, k) = sin(k * x + a)
+fn osc(x, k) = sin(k * x + a)
 
 curve ripple (t in 0..6.28) { (cos(t), sin(t)) }
 
 point origin (0, 0) as { color blue pointSize 8 }
 
-region upper = y > wave(x, 2) as { color purple opacity 0.15 }
+region upper = y > osc(x, 2) as { color purple opacity 0.15 }
 
 text lbl = "hello, desmos" at (0, 1.5)
 `;

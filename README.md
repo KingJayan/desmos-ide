@@ -77,11 +77,14 @@ curve c (t in 0..6.28) { (cos(t), sin(t)) } as gradient("blue", "red")
 **Gradients:** `as gradient(from, to)` on curves/for-comprehensions.  
 **Errors:** two-phase — phase 1 is syntax errors, phase 2 is semantic (undefined functions, arity mismatches, invalid generator ranges).
 
+[![Documentation](https://img.shields.io/badge/See%20Full%20Docs-blue?style=for-the-badge&logo=readthedocs)](https://desmos-ide.vercel.app)
+
 # architecture
 
 - **Compiler** (`src/`) — pure TS pipeline: `lexer → parser → semantic analysis → optimizer → codegen`; `compile(src)` returns `CompileSuccess | CompileFailure`
 - **Renderer** (`renderer/`) — Monaco editor + Desmos CDN calculator wired in `main.ts`; `DesmosGraph` diffs expressions by ID; `EnhancedPane` for direct expr editing
 - **Electron** (`electron/`) — `BrowserWindow`, native menu, `contextBridge` IPC for file ops
+
 
 # usage
 
