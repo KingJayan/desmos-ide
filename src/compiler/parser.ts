@@ -15,8 +15,16 @@ export class ParseError extends Error {
 
 const KW_AS_FN = new Set(['time', 'project', 'camera', 'circle']);
 
+export interface ParseErrorInfo {
+  error: string;
+  line: number;
+  col: number;
+  tokenLen?: number;
+}
+
 class Parser {
   private pos = 0;
+  readonly collectedErrors: ParseErrorInfo[] = [];
 
   constructor(private readonly tokens: Token[]) {}
 
@@ -54,9 +62,33 @@ class Parser {
   parseProgram(): T.Program {
     const body: T.Statement[] = [];
     while (!this.check('eof')) {
-      body.push(this.parseStatement());
+      try {
+        body.push(this.parseStatement());
+      } catch (e) {
+        if (e instanceof ParseError) {
+          this.collectedErrors.push({
+            error: e.message,
+            line: e.tok.line,
+            col: e.tok.col,
+            tokenLen: e.tok.value.length > 0 ? e.tok.value.length : undefined,
+          });
+          this.recoverToNextStatement();
+        } else {
+          throw e;
+        }
+      }
     }
     return { type: 'Program', body };
+  }
+
+  private recoverToNextStatement(): void {
+    const stmtStartKws = new Set(['fn', 'point', 'circle', 'line', 'curve', 'region', 'polygon', 'segment', 'text', 'group']);
+    while (!this.check('eof')) {
+      const t = this.peek();
+      if (t.type === 'kw' && stmtStartKws.has(t.value)) return;
+      if (t.type === 'ident' && this.checkNext('op', '=')) return;
+      this.advance();
+    }
   }
 
   private parseStatement(): T.Statement {
@@ -535,6 +567,8 @@ class Parser {
   }
 }
 
-export function parse(tokens: Token[]): T.Program {
-  return new Parser(tokens).parseProgram();
+export function parse(tokens: Token[]): { ast: T.Program; parseErrors: ParseErrorInfo[] } {
+  const p = new Parser(tokens);
+  const ast = p.parseProgram();
+  return { ast, parseErrors: p.collectedErrors };
 }

@@ -1,7 +1,7 @@
 // public api — DSL v2
 
 import { tokenize, LexError } from './compiler/lexer';
-import { parse,    ParseError } from './compiler/parser';
+import { parse, ParseError } from './compiler/parser';
 import { optimize } from './compiler/optimizer';
 import { codegen,  DesmosState, DesmosExpr } from './compiler/codegen';
 import type { Program, Statement } from './compiler/types';
@@ -39,12 +39,16 @@ export interface CompileSuccess {
   symbols: SymbolInfo[];
 }
 
-export interface CompileFailure {
-  success: false;
+export interface CompileError {
   error: string;
   line?: number;
   col?: number;
   tokenLen?: number;
+}
+
+export interface CompileFailure {
+  success: false;
+  errors: CompileError[];
 }
 
 export type CompileResult = CompileSuccess | CompileFailure;
@@ -110,17 +114,20 @@ function checkWarnings(ast: Program): WarningMarker[] {
 
 export function compile(src: string): CompileResult {
   try {
-    const tokens    = tokenize(src);
-    const ast       = parse(tokens);
+    const tokens = tokenize(src);
+    const { ast, parseErrors } = parse(tokens);
     const optimized = optimize(ast);
     const state     = codegen(optimized);
     const symbols   = extractSymbols(ast);
     const warnings  = checkWarnings(ast);
+    if (parseErrors.length > 0) {
+      return { success: false, errors: parseErrors };
+    }
     return { success: true, state, warnings, symbols };
   } catch (e) {
-    if (e instanceof LexError)  return { success: false, error: e.message, line: e.line, col: e.col };
-    if (e instanceof ParseError) return { success: false, error: e.message, line: e.tok.line, col: e.tok.col, tokenLen: e.tok.value.length };
-    return { success: false, error: String(e) };
+    if (e instanceof LexError)  return { success: false, errors: [{ error: e.message, line: e.line, col: e.col }] };
+    if (e instanceof ParseError) return { success: false, errors: [{ error: e.message, line: e.tok.line, col: e.tok.col, tokenLen: e.tok.value.length }] };
+    return { success: false, errors: [{ error: String(e) }] };
   }
 }
 

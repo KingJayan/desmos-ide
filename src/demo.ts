@@ -77,7 +77,7 @@ for (const [title, src] of EXAMPLES) {
   const result = compile(src.trim());
 
   if (!result.success) {
-    console.error(`  ✗ Error: ${result.error}`);
+    result.errors.forEach(e => console.error(`  ✗ Error: ${e.error}`));
     continue;
   }
 

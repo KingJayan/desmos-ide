@@ -75,19 +75,19 @@ const aiDivider          = document.getElementById('ai-divider')!;
 const aiContainer        = document.getElementById('ai-sidebar-container')!;
 
 
-const DEFAULT_SRC = `// desmos DSL
-circle guide {
-  center: (0, 0)
-  radius: 4
-}
+const DEFAULT_SRC = `// desmos DSL snippet
 
-point focus {
-  center: (2, 1)
-}
+a = slider(0, 0, 6.28)
 
-points ring = map(i in [0...40]) {
-  (cos(i/6) * 2.8, sin(i/6) * 2.8)
-}
+fn wave(x, k) = sin(k * x + a)
+
+curve ripple (t in 0..6.28) { (cos(t), sin(t)) }
+
+point origin (0, 0) as { color blue pointSize 8 }
+
+region upper = y > wave(x, 2) as { color purple opacity 0.15 }
+
+text lbl = "hello, desmos" at (0, 1.5)
 `;
 
 const initSettings = loadSettings();
@@ -404,12 +404,14 @@ function handleCompileResult(result: CompileResult): void {
     const warnNote = result.warnings.length ? ` · ${result.warnings.length} warning(s)` : '';
     setStatus(`✓ ${result.state.expressions.list.length} expression(s)${warnNote}`, result.warnings.length ? 'info' : 'success');
   } else {
-    const markers =
-      result.line != null && result.col != null
-        ? [errorToMarker(result.error, result.line, result.col, result.tokenLen)]
-        : [];
+    const markers = result.errors
+      .filter(e => e.line != null && e.col != null)
+      .map(e => errorToMarker(e.error, e.line!, e.col!, e.tokenLen));
     monaco.editor.setModelMarkers(model, 'desmos-dsl', markers);
-    setStatus(`✗ ${result.error}`, 'error');
+    const msg = result.errors.length === 1
+      ? `✗ ${result.errors[0].error}`
+      : `✗ ${result.errors.length} errors — first: ${result.errors[0].error}`;
+    setStatus(msg, 'error');
   }
 }
 
