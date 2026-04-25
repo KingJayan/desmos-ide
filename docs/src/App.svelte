@@ -3,6 +3,84 @@
   import pkg from '../package.json';
   import dsl from '../../package.json';
 
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  const route = /^\/docs(?:\/|$)/.test(path)
+    ? 'docs'
+    : /^\/download\/electron(?:\/|$)/.test(path)
+      ? 'download-electron'
+      : /^\/download\/extension(?:\/|$)/.test(path)
+        ? 'download-extension'
+        : 'home';
+
+  const routeTitle = route === 'docs'
+    ? 'docs | desmos dsl'
+    : route === 'download-electron'
+      ? 'electron ide download | desmos ide'
+      : route === 'download-extension'
+        ? 'vscode extension | desmos ide'
+        : 'desmos ide | docs and tools';
+
+  const routeDescription = route === 'docs'
+    ? 'Detailed documentation for the Desmos IDE DSL.'
+    : route === 'download-electron'
+      ? 'Download page placeholder for the Desmos IDE Electron app.'
+      : route === 'download-extension'
+        ? 'Download page placeholder for the Desmos IDE VS Code extension.'
+        : 'Landing page for Desmos IDE tools, docs, and download placeholders.';
+
+  const downloadPage = route === 'download-electron'
+    ? {
+      eyebrow: 'desktop app',
+      title: 'electron ide download',
+      summary: 'The Electron build is not released yet. This page will host installers and release notes once packaging is ready.',
+      chips: ['macOS coming soon', 'windows coming soon', 'linux coming soon'],
+    }
+    : route === 'download-extension'
+      ? {
+        eyebrow: 'vscode extension',
+        title: 'extension download',
+        summary: 'The VS Code extension is not released yet. This page will host the marketplace link and changelog when it ships.',
+        chips: ['marketplace link soon', 'manual .vsix soon', 'docs integration planned'],
+      }
+      : null;
+
+  const homeSignals = [
+    { label: 'docs', value: 'language reference' },
+    { label: 'desktop', value: 'electron ide' },
+    { label: 'extension', value: 'VS Code extension' },
+    { label: 'core', value: 'compiler pipeline' },
+  ];
+
+  const homeProducts = [
+    {
+      kicker: 'desktop app',
+      title: 'Electron IDE',
+      copy: 'interactive graphing with a built-in compiler. edit with Monaco, run the full pipeline locally, and iterate in real time.',
+      href: '/download/electron',
+      links: [
+        { href: '/download/electron', label: 'download' },
+        { href: 'https://github.com/KingJayan/desmos-ide', label: 'view source' },
+        { href: '/docs', label: 'docs' },
+      ],
+      featured: true,
+    },
+    {
+      kicker: 'reference',
+      title: 'DSL docs',
+      copy: 'detailed syntax, semantics, and compiler behavior—with dense examples and section-level navigation.',
+      href: '/docs',
+      links: [{ href: '/docs', label: 'read the docs' }],
+    },
+    {
+      kicker: 'editor slot',
+      title: 'VS Code extension',
+      copy: 'editor-native tooling (in progress).',
+      href: '/download/extension',
+      links: [{ href: '/download/extension', label: 'download' }],
+      muted: true,
+    },
+  ];
+
   const navItems = [
     { id: 'quick-start', label: 'quick start' },
     { id: 'lexical-rules', label: 'lexical rules' },
@@ -77,6 +155,8 @@
   let observers = [];
 
   onMount(() => {
+    if (route !== 'docs') return;
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -102,62 +182,169 @@
   onDestroy(() => observers.forEach(o => o.disconnect()));
 </script>
 
-<div class="progress" style="width: {scrollPct}%"></div>
+<svelte:head>
+  <title>{routeTitle}</title>
+  <meta name="description" content={routeDescription} />
+</svelte:head>
 
-<main class="page">
-  <header class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">desmos ide</p>
-      <h1>dsl documentation</h1>
-      <p class="lede">
-        complete reference for the dsl implemented by the compiler in this repository.
-        covers syntax, semantics, built-ins, geometry statements, codegen output, and known limitations.
-      </p>
-    </div>
-    <div class="hero-meta" aria-label="documentation metadata">
-      <span class="meta-chip">docs v{pkg.version}</span>
-      <span class="meta-chip">dsl v{dsl.version}</span>
-      <span class="meta-chip">{navItems.length} sections</span>
-      <span class="meta-chip">quickstart / full docs / examples</span>
-    </div>
-    <div class="lens-strip" aria-label="reading lenses">
-      <span class="lens-chip">syntax</span>
-      <span class="lens-chip">examples</span>
-      <span class="lens-chip">output</span>
-      <span class="lens-chip">caveats</span>
-    </div>
-  </header>
+{#if route === 'home'}
+  <main class="page landing">
+    <header class="hero home-hero landing-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">product landing</p>
+        <h1>desmos ide</h1>
+        <p class="lede">
+          a focused environment for building, creating, and experimenting with advanced desmos.
 
-  <nav class="toc" aria-label="table of contents">
-    {#each navItems as item}
-      <a href={`#${item.id}`} class:active={activeId === item.id}>{item.label}</a>
-    {/each}
-  </nav>
+          docs define the language, the desktop app runs the graphing pipeline, and the VS Code extension brings tooling directly into your editor
+        </p>
+      </div>
+      <aside class="hero-stage" aria-label="product map">
+        <div class="hero-orbit">
+          <div class="orbit-core">
+            <span>core</span>
+            <strong>compiler pipeline</strong>
+          </div>
+          <div class="orbit-node orbit-docs">
+            <span>docs</span>
+            <strong>lang reference</strong>
+          </div>
+          <div class="orbit-node orbit-desktop">
+            <span>desktop</span>
+            <strong>electron ide</strong>
+          </div>
+          <div class="orbit-node orbit-extension">
+            <span>extension</span>
+            <strong>vscode (wip)</strong>
+          </div>
+        </div>
+        <div class="signal-head">
+          <p class="summary-kicker">surface map</p>
+          <p>docs, desktop app, and extension.</p>
+        </div>
+        <div class="signal-grid">
+          {#each homeSignals as signal}
+            <article>
+              <span>{signal.label}</span>
+              <strong>{signal.value}</strong>
+            </article>
+          {/each}
+        </div>
+      </aside>
+    </header>
 
-  <section class="overview" aria-label="section atlas">
-    <div class="overview-copy">
-      <p class="eyebrow">section atlas</p>
-      <h2>where to read first</h2>
-      <p>
-        four quick paths into the reference. each card clusters related sections so the page stays
-        scannable even when the individual references get dense.
-      </p>
-    </div>
-    <div class="summary-grid">
-      {#each summaryCards as card}
-        <article class="summary-card">
-          <p class="summary-kicker">{card.kicker}</p>
-          <h3>{card.title}</h3>
-          <p>{card.copy}</p>
-          <ul>
-            {#each card.links as link}
-              <li><a href={`#${link.id}`}>{link.label}</a></li>
-            {/each}
-          </ul>
-        </article>
+    <section class="overview launch" aria-label="product atlas">
+      <div class="overview-copy">
+        <p class="eyebrow">products</p>
+        <h2>choose a tool</h2>
+        <p>
+          each surface is designed for a different part of the workflow -- pick where you want to start.        
+        </p>
+      </div>
+      <div class="launch-grid">
+        {#each homeProducts as product}
+          <article class="summary-card launch-card" class:launch-card-feature={product.featured} class:launch-card-muted={product.muted}>
+            <p class="summary-kicker">{product.kicker}</p>
+            <h3>
+              {#if product.href}
+                <a class="card-title-link" href={product.href}>{product.title}</a>
+              {:else}
+                {product.title}
+              {/if}
+            </h3>
+            <p>{product.copy}</p>
+            <ul>
+              {#each product.links as link}
+                <li>
+                  {#if link.href}
+                    <a href={link.href}>{link.label}</a>
+                  {:else}
+                    <span>{link.label}</span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          </article>
+        {/each}
+      </div>
+    </section>
+
+  </main>
+{:else if route === 'download-electron' || route === 'download-extension'}
+  <main class="page coming-page">
+    <section class="coming-card" aria-label="download placeholder">
+      <p class="eyebrow">{downloadPage.eyebrow}</p>
+      <h1>{downloadPage.title}</h1>
+      <p class="lede">{downloadPage.summary}</p>
+      <div class="coming-chips" aria-label="release status">
+        {#each downloadPage.chips as chip}
+          <span class="meta-chip">{chip}</span>
+        {/each}
+      </div>
+      <div class="coming-actions" aria-label="navigation links">
+        <a class="meta-chip" href="/">back to landing</a>
+        <a class="meta-chip" href="/docs">open docs</a>
+        <a class="meta-chip" href="https://github.com/KingJayan/desmos-ide">github</a>
+      </div>
+    </section>
+  </main>
+{:else}
+  <div class="progress" style="width: {scrollPct}%"></div>
+
+  <main class="page">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">desmos ide</p>
+        <h1>dsl documentation</h1>
+        <p class="lede">
+          complete reference for the dsl implemented by the compiler in this repository.
+          covers syntax, semantics, built-ins, geometry statements, codegen output, and known limitations.
+        </p>
+      </div>
+      <div class="hero-meta" aria-label="documentation metadata">
+        <span class="meta-chip">docs v{pkg.version}</span>
+        <span class="meta-chip">dsl v{dsl.version}</span>
+        <span class="meta-chip">{navItems.length} sections</span>
+        <a class="meta-chip" href="/">landing page</a>
+      </div>
+      <div class="lens-strip" aria-label="reading lenses">
+        <span class="lens-chip">syntax</span>
+        <span class="lens-chip">examples</span>
+        <span class="lens-chip">output</span>
+        <span class="lens-chip">caveats</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="table of contents">
+      {#each navItems as item}
+        <a href={`#${item.id}`} class:active={activeId === item.id}>{item.label}</a>
       {/each}
-    </div>
-  </section>
+    </nav>
+
+    <section class="overview" aria-label="section atlas">
+      <div class="overview-copy">
+        <p class="eyebrow">section atlas</p>
+        <h2>where to read first</h2>
+        <p>
+          four quick paths into the reference. each card clusters related sections so the page stays
+          scannable even when the individual references get dense.
+        </p>
+      </div>
+      <div class="summary-grid">
+        {#each summaryCards as card}
+          <article class="summary-card">
+            <p class="summary-kicker">{card.kicker}</p>
+            <h3>{card.title}</h3>
+            <p>{card.copy}</p>
+            <ul>
+              {#each card.links as link}
+                <li><a href={`#${link.id}`}>{link.label}</a></li>
+              {/each}
+            </ul>
+          </article>
+        {/each}
+      </div>
+    </section>
 
   <section id="quick-start">
     <h2>quick start</h2>
@@ -762,4 +949,5 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
     </p>
     <p class="footer-meta">docs v{pkg.version}, dsl v{dsl.version}</p>
   </footer>
-</main>
+  </main>
+{/if}

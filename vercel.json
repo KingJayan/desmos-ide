@@ -20,6 +20,10 @@
     {
       "src": "/docs/(.*)",
       "dest": "/index.html"
+    },
+    {
+      "src": "/download/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
