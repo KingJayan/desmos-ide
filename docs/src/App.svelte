@@ -3,11 +3,73 @@
   import pkg from '../package.json';
   import dsl from '../../package.json';
 
-  const sections = [
-    'quick-start', 'lexical-rules', 'top-level', 'expressions',
-    'conditionals', 'domain', 'geometry', 'curves', 'generators-map',
-    'expr-block', 'debug', 'styling',
-    'animation', 'builtins', 'codegen', 'optimizer', 'errors', 'limitations',
+  const navItems = [
+    { id: 'quick-start', label: 'quick start' },
+    { id: 'lexical-rules', label: 'lexical rules' },
+    { id: 'top-level', label: 'top-level statements' },
+    { id: 'expressions', label: 'expressions' },
+    { id: 'conditionals', label: 'conditionals' },
+    { id: 'domain', label: 'domain restriction' },
+    { id: 'geometry', label: 'geometry' },
+    { id: 'curves', label: 'curves & regions' },
+    { id: 'generators-map', label: 'map generator' },
+    { id: 'expr-block', label: 'expr block' },
+    { id: 'debug', label: 'debug' },
+    { id: 'styling', label: 'styling' },
+    { id: 'animation', label: 'sliders & animation' },
+    { id: 'builtins', label: 'built-ins' },
+    { id: 'codegen', label: 'codegen' },
+    { id: 'optimizer', label: 'optimizer' },
+    { id: 'errors', label: 'errors' },
+    { id: 'limitations', label: 'limitations' },
+  ];
+
+  const summaryCards = [
+    {
+      title: 'Start here',
+      kicker: 'orientation',
+      copy: 'The fastest route into the DSL: syntax shape, statement forms, and the smallest useful examples.',
+      links: [
+        { id: 'quick-start', label: 'quick start' },
+        { id: 'lexical-rules', label: 'lexical rules' },
+        { id: 'top-level', label: 'top-level statements' },
+      ],
+    },
+    {
+      title: 'Language core',
+      kicker: 'syntax',
+      copy: 'Expressions, branching, domains, blocks, and debug-only constructs that shape the AST.',
+      links: [
+        { id: 'expressions', label: 'expressions' },
+        { id: 'conditionals', label: 'conditionals' },
+        { id: 'domain', label: 'domain restriction' },
+        { id: 'expr-block', label: 'expr block' },
+      ],
+    },
+    {
+      title: 'Geometry layer',
+      kicker: 'drawing',
+      copy: 'Point, line, region, curve, and generator statements, plus the styling model that makes them feel alive.',
+      links: [
+        { id: 'geometry', label: 'geometry' },
+        { id: 'curves', label: 'curves & regions' },
+        { id: 'generators-map', label: 'map generator' },
+        { id: 'styling', label: 'styling' },
+        { id: 'animation', label: 'sliders & animation' },
+      ],
+    },
+    {
+      title: 'Compiler surface',
+      kicker: 'runtime',
+      copy: 'Built-ins, code generation, optimizer behavior, error phases, and the remaining sharp edges.',
+      links: [
+        { id: 'builtins', label: 'built-ins' },
+        { id: 'codegen', label: 'codegen' },
+        { id: 'optimizer', label: 'optimizer' },
+        { id: 'errors', label: 'errors' },
+        { id: 'limitations', label: 'limitations' },
+      ],
+    },
   ];
 
   let activeId = '';
@@ -23,7 +85,7 @@
       },
       { rootMargin: '-20% 0px -70% 0px' }
     );
-    sections.forEach(id => {
+    navItems.forEach(({ id }) => {
       const el = document.getElementById(id);
       if (el) io.observe(el);
     });
@@ -44,34 +106,58 @@
 
 <main class="page">
   <header class="hero">
-    <p class="eyebrow">desmos ide</p>
-    <h1>dsl documentation</h1>
-    <p class="lede">
-      complete reference for the dsl implemented by the compiler in this repository.
-      covers syntax, semantics, built-ins, geometry statements, codegen output, and known limitations.
-    </p>
+    <div class="hero-copy">
+      <p class="eyebrow">desmos ide</p>
+      <h1>dsl documentation</h1>
+      <p class="lede">
+        complete reference for the dsl implemented by the compiler in this repository.
+        covers syntax, semantics, built-ins, geometry statements, codegen output, and known limitations.
+      </p>
+    </div>
+    <div class="hero-meta" aria-label="documentation metadata">
+      <span class="meta-chip">docs v{pkg.version}</span>
+      <span class="meta-chip">dsl v{dsl.version}</span>
+      <span class="meta-chip">{navItems.length} sections</span>
+      <span class="meta-chip">quickstart / full docs / examples</span>
+    </div>
+    <div class="lens-strip" aria-label="reading lenses">
+      <span class="lens-chip">syntax</span>
+      <span class="lens-chip">examples</span>
+      <span class="lens-chip">output</span>
+      <span class="lens-chip">caveats</span>
+    </div>
   </header>
 
   <nav class="toc" aria-label="table of contents">
-    <a href="#quick-start"      class:active={activeId === 'quick-start'}>quick start</a>
-    <a href="#lexical-rules"    class:active={activeId === 'lexical-rules'}>lexical rules</a>
-    <a href="#top-level"        class:active={activeId === 'top-level'}>top-level statements</a>
-    <a href="#expressions"      class:active={activeId === 'expressions'}>expressions</a>
-    <a href="#conditionals"     class:active={activeId === 'conditionals'}>conditionals</a>
-    <a href="#domain"           class:active={activeId === 'domain'}>domain restriction</a>
-    <a href="#geometry"         class:active={activeId === 'geometry'}>geometry</a>
-    <a href="#curves"           class:active={activeId === 'curves'}>curves &amp; regions</a>
-    <a href="#generators-map"   class:active={activeId === 'generators-map'}>map generator</a>
-    <a href="#expr-block"       class:active={activeId === 'expr-block'}>expr block</a>
-    <a href="#debug"            class:active={activeId === 'debug'}>debug</a>
-    <a href="#styling"          class:active={activeId === 'styling'}>styling</a>
-    <a href="#animation"        class:active={activeId === 'animation'}>sliders &amp; animation</a>
-    <a href="#builtins"         class:active={activeId === 'builtins'}>built-ins</a>
-    <a href="#codegen"          class:active={activeId === 'codegen'}>codegen</a>
-    <a href="#optimizer"        class:active={activeId === 'optimizer'}>optimizer</a>
-    <a href="#errors"           class:active={activeId === 'errors'}>errors</a>
-    <a href="#limitations"      class:active={activeId === 'limitations'}>limitations</a>
+    {#each navItems as item}
+      <a href={`#${item.id}`} class:active={activeId === item.id}>{item.label}</a>
+    {/each}
   </nav>
+
+  <section class="overview" aria-label="section atlas">
+    <div class="overview-copy">
+      <p class="eyebrow">section atlas</p>
+      <h2>where to read first</h2>
+      <p>
+        four quick paths into the reference. each card clusters related sections so the page stays
+        scannable even when the individual references get dense.
+      </p>
+    </div>
+    <div class="summary-grid">
+      {#each summaryCards as card}
+        <article class="summary-card">
+          <p class="summary-kicker">{card.kicker}</p>
+          <h3>{card.title}</h3>
+          <p>{card.copy}</p>
+          <ul>
+            {#each card.links as link}
+              <li><a href={`#${link.id}`}>{link.label}</a></li>
+            {/each}
+          </ul>
+        </article>
+      {/each}
+    </div>
+  </section>
 
   <section id="quick-start">
     <h2>quick start</h2>
@@ -100,6 +186,11 @@ expr &#123;
   cy = sin(t)
   (2*cx, cy)
 &#125;</code></pre>
+    <div class="output-tags" aria-label="quick start output hints">
+      <span class="output-tag">desmos output</span>
+      <span class="output-tag">fn inlined</span>
+      <span class="output-tag">expr block is compile-time only</span>
+    </div>
   </section>
 
   <section id="lexical-rules">
@@ -192,26 +283,48 @@ expr &#123;
   <section id="conditionals">
     <h2>conditionals</h2>
 
+    <aside class="callout note">
+      <strong>note</strong>
+      <p>all three forms lower to the same piecewise output. the choice here is readability, not behavior.</p>
+    </aside>
+
     <h3>where / else</h3>
     <pre><code>v = x^2 where x > 0 else -x</code></pre>
     <p>compiles to <code>&#123;x&gt;0:x^2,-x&#125;</code>.</p>
+    <div class="output-tags" aria-label="conditional output hints">
+      <span class="output-tag">piecewise</span>
+      <span class="output-tag">same output as if/then/else</span>
+    </div>
 
-    <h3>if / then / else</h3>
-    <pre><code>v = if x > 0 then x^2 else -x</code></pre>
-    <p>identical output to <code>where/else</code> — choose whichever reads more naturally.</p>
+    <details class="example-stack">
+      <summary>alternate forms</summary>
+      <div class="example-stack-body">
+        <h3>if / then / else</h3>
+        <pre><code>v = if x > 0 then x^2 else -x</code></pre>
+        <p>identical output to <code>where/else</code> — choose whichever reads more naturally.</p>
 
-    <h3>piecewise block</h3>
-    <p>multi-branch piecewise with an optional <code>else</code> fallback:</p>
-    <pre><code>z = &#123; x > 0: x^2, x &lt; 0: -x, else: 0 &#125;</code></pre>
-    <p>each <code>cond: val</code> pair maps to a desmos piecewise arm. the <code>else</code> branch is the fallback value.</p>
+        <h3>piecewise block</h3>
+        <p>multi-branch piecewise with an optional <code>else</code> fallback:</p>
+        <pre><code>z = &#123; x > 0: x^2, x &lt; 0: -x, else: 0 &#125;</code></pre>
+        <p>each <code>cond: val</code> pair maps to a desmos piecewise arm. the <code>else</code> branch is the fallback value.</p>
+      </div>
+    </details>
   </section>
 
   <section id="domain">
     <h2>domain restriction</h2>
     <p>append <code>domain cond</code> to any variable binding to restrict where the expression is drawn:</p>
+    <aside class="callout note">
+      <strong>note</strong>
+      <p>this only filters the visible domain. it does not create a new shape or change the underlying expression.</p>
+    </aside>
     <pre><code>y = x^2 domain x > 0       // only draws for x > 0
 w = sin(x) domain x >= -pi  // only draws for x >= -π</code></pre>
     <p>compiles to <code>y=x^{"{"}2{"}"}\left\{"{"}x&gt;0{"\}"}\right\}</code> — desmos domain filter notation.</p>
+    <div class="output-tags" aria-label="domain output hints">
+      <span class="output-tag">desmos domain filter</span>
+      <span class="output-tag">render-only constraint</span>
+    </div>
   </section>
 
   <section id="geometry">
@@ -373,18 +486,27 @@ pts = (cos(i), sin(i)) for i in 0..6.28 step 0.1 as gradient(rgb(123, 33, 22), "
     <h3>named colors</h3>
     <p><code>red</code> <code>blue</code> <code>green</code> <code>orange</code> <code>purple</code> <code>black</code> <code>white</code></p>
 
-    <h3>color formats</h3>
-    <pre><code>color red              // named color
+    <details class="example-stack">
+      <summary>more color formats</summary>
+      <div class="example-stack-body">
+        <h3>color formats</h3>
+        <pre><code>color red              // named color
 color "red"            // named color as string
 color "#e040fb"        // hex string
 color rgb(255, 128, 0) // r g b each 0–255
 color hsv(240, 1, 1)   // h 0–360, s/v 0–1</code></pre>
+      </div>
+    </details>
 
     <h3>gradients</h3>
     <p>gradients interpolate color along the parameter or loop variable. they can be written as a shorthand suffix or inside a style block:</p>
     <pre><code>curve ring (t in 0..6.28) &#123; (cos(t), sin(t)) &#125; as gradient("blue", "red")
 pts = (cos(i), sin(i)) for i in 0..6.28 step 0.1 as gradient(rgb(123, 33, 22), "#33dd33")
 curve c (t in 0..4) &#123; (t, sin(t)) &#125; as &#123; gradient("green", "orange") opacity 0.9 &#125;</code></pre>
+    <div class="output-tags" aria-label="styling output hints">
+      <span class="output-tag">style suffix</span>
+      <span class="output-tag">gradient supported</span>
+    </div>
   </section>
 
   <section id="animation">
@@ -578,6 +700,15 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
   <section id="errors">
     <h2>errors</h2>
     <p>the compiler reports two distinct error phases. both return as <code>CompileFailure</code> with a <code>phase: 1 | 2</code> field on each error.</p>
+    <aside class="callout warning">
+      <strong>warning</strong>
+      <p>phase 1 stops before semantic analysis. phase 2 means the syntax is valid, but the program still cannot compile cleanly.</p>
+    </aside>
+    <div class="output-tags" aria-label="error phase hints">
+      <span class="output-tag">phase 1</span>
+      <span class="output-tag">phase 2</span>
+      <span class="output-tag">warnings only</span>
+    </div>
 
     <h3>phase 1 — syntax errors</h3>
     <p>produced by the lexer or parser before any semantic analysis. the program cannot be parsed further.</p>
@@ -610,6 +741,10 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
 
   <section id="limitations">
     <h2>current limitations</h2>
+    <aside class="callout note">
+      <strong>note</strong>
+      <p>these are deliberate boundaries, not missing polish. the docs keep them visible so the implementation surface stays honest.</p>
+    </aside>
     <ul>
       <li><strong>no implicit multiplication</strong> — write <code>2*x</code>, not <code>2x</code>.</li>
       <li><strong>no bare expressions</strong> — every top-level statement must start with a dsl keyword or an <code>ident =</code> binding.</li>
@@ -620,13 +755,11 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
     </ul>
   </section>
 
-  <section id="footer">
-    <h2 style="font-size: 1em; color: var(--muted); text-decoration: none;">made by jayan patel, 2026</h2>
-    <p style="font-size: 0.9em; color: var(--muted); max-width: none; margin-top: 0.5em;">
-      project is open source on <a style="color: var(--muted);" href="https://github.com/KingJayan/desmos-ide">GitHub</a>
+  <footer class="footer">
+    <p class="footer-kicker">made by jayan patel, 2026</p>
+    <p class="footer-line">
+      project is open source on <a href="https://github.com/KingJayan/desmos-ide">GitHub</a>
     </p>
-    <p style="font-size: 0.9em; color: var(--muted); max-width: none; margin-top: 0.5em;">
-      docs version { pkg.version }, dsl version { dsl.version }
-    </p>
-  </section>
+    <p class="footer-meta">docs v{pkg.version}, dsl v{dsl.version}</p>
+  </footer>
 </main>
