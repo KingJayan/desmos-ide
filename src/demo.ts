@@ -1,72 +1,53 @@
-// ── Compiler demo ──────────────────────────────────────────────────────────────
-// Run:  npx ts-node src/demo.ts
+// compiler demo
+// run:  npm run demo
 
 import { compile } from './index';
 
-// ── Example 1: Animated orbit ─────────────────────────────────────────────────
-
-const ORBIT = `
-// Animated parametric orbit
-let t = time(0, 10)
-
-fn wave(x) = sin(x + t)
-
-circle orbit {
-  center: (0, 0)
-  radius: 3
-}
-
-circle moving {
-  center: (cos(t), sin(t))
-  radius: 1
-}
-
-points trail = map(i in [0...100]) {
-  (cos(t + i/10), sin(t + i/10))
-}
-`;
-
-// ── Example 2: Static geometry ────────────────────────────────────────────────
-
 const GEOMETRY = `
-let r = 5
-
-point origin {
-  center: (0, 0)
+point origin (0, 0) as { color blue pointSize 10 }
+point p (3, 4) as { color red }
+circle c {
+  center (0, 0)
+  radius 5
 }
+segment s = (0,0) -> (3,4) as { color green lineWidth 2 }
+polygon tri = [(0,0),(3,0),(0,4)] as { color orange opacity 0.3 }
+`;
 
-circle big {
-  center: (0, 0)
-  radius: r
-}
+const FUNCTIONS = `
+fn hyp(x, y) = sqrt(x^2 + y^2)
+alias dist = hyp(3, 4)
+a = slider(3, 0, 10, step=0.1, speed=1, loop)
+b = 4
+alias r = hyp(a, b)
+`;
 
-line diagonal {
-  slope: 1
-  intercept: 0
-}
+const GENERATORS = `
+pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)
+curve orbit (t in 0..6.28) { (2*cos(t), sin(t)) }
+`;
 
-line horizontal {
-  y: 2
+const CONDITIONALS = `
+y = x^2 where x > 0 else -x
+v = if x > 0 then x^2 else -x
+z = { x > 0: x^2, x < 0: -x, else: 0 }
+w = x^2 domain x > -3
+`;
+
+const EXPR_BLOCK = `
+expr {
+  cx = cos(t)
+  cy = sin(t)
+  (2*cx, cy)
 }
 `;
 
-// ── Example 3: Function inlining ──────────────────────────────────────────────
-
-const INLINING = `
-// f is inlined at every call site — no function def emitted
-fn f(x) = x^2 + 2*x + 1
-fn g(x) = f(x) * 3
-
-let a = g(4)
-let b = f(0)
-`;
-
-// ── Run ────────────────────────────────────────────────────────────────────────
-
-const EXAMPLES: [string, string][] = [
-  ['Animated orbit',    ORBIT],
-  ['Static geometry',   GEOMETRY],
-  ['Function inlining', INLINING],
+const EXAMPLES: Array<[string, string]> = [
+  ['Geometry',     GEOMETRY],
+  ['Functions',    FUNCTIONS],
+  ['Generators',   GENERATORS],
+  ['Conditionals', CONDITIONALS],
+  ['Expr block',   EXPR_BLOCK],
 ];
 
 for (const [title, src] of EXAMPLES) {
@@ -77,27 +58,22 @@ for (const [title, src] of EXAMPLES) {
   const result = compile(src.trim());
 
   if (!result.success) {
-    result.errors.forEach(e => console.error(`  ✗ Error: ${e.error}`));
+    result.errors.forEach(e => console.error(`  ✗ [phase ${e.phase}] ${e.error}`));
     continue;
   }
 
-  console.log(`  ✓ Compiled to ${result.state.expressions.list.length} expression(s)\n`);
+  if (result.warnings.length) {
+    result.warnings.forEach(w => console.warn(`  ⚠ ${w.message}`));
+  }
+
+  console.log(`  ✓ ${result.state.expressions.list.length} expression(s)\n`);
 
   for (const expr of result.state.expressions.list) {
     const sliderNote = expr.slider
-      ? `  [slider min=${expr.slider.min} max=${expr.slider.max} playing=${expr.slider.isPlaying}]`
+      ? `  [slider min=${expr.slider.min} max=${expr.slider.max} step=${expr.slider.step ?? '-'} loop=${expr.slider.loopMode ?? 'off'}]`
       : '';
-    console.log(`  [${expr.id}] ${expr.latex ?? ''}${sliderNote}`);
-    if (expr.color)       console.log(`       color: ${expr.color}`);
-    if (expr.fill)        console.log(`       fill: true (opacity ${expr.fillOpacity})`);
-    if (expr.points)      console.log(`       points: true`);
+    console.log(`  [${expr.id}] ${expr.latex ?? '(folder)'}${sliderNote}`);
+    if (expr.color)      console.log(`       color: ${expr.color}`);
+    if (expr.fill)       console.log(`       fill: true (opacity ${expr.fillOpacity})`);
   }
-}
-
-console.log(`\n${'═'.repeat(60)}`);
-console.log('  Full Desmos state (example 1)');
-console.log('═'.repeat(60));
-const r = compile(ORBIT.trim());
-if (r.success) {
-  console.log(JSON.stringify(r.state, null, 2));
 }

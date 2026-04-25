@@ -1,4 +1,4 @@
-// optimizer
+// optimizer — shadow-safe (all transforms operate on cloned nodes)
 
 import * as T from './types';
 
@@ -17,13 +17,31 @@ export function optimize(program: T.Program): T.Program {
   const body: T.Statement[] = [];
   for (const stmt of program.body) {
     if (stmt.type === 'FnDecl') continue;
+
+    if (stmt.type === 'DebugDecl') continue;
+
+    if (stmt.type === 'ExprBlockDecl') {
+      body.push(lowerExprBlock(stmt, env));
+      continue;
+    }
+
     body.push(optimizeStmt(stmt, env));
   }
 
   return { type: 'Program', body };
 }
 
-//dispatch
+function lowerExprBlock(stmt: T.ExprBlockDecl, env: Env): T.VarDecl {
+  // binding names are mangled to avoid global namespace pollution
+  const subst = new Map<string, T.Expr>();
+  for (const b of stmt.bindings) {
+    const val = optimizeExpr(substituteExpr(b.value, subst), env);
+    subst.set(b.name, val);
+  }
+  const result = optimizeExpr(substituteExpr(stmt.result, subst), env);
+  // emit as an anonymous expression using a generated identifier
+  return { type: 'VarDecl', name: `__expr_${stmt.pos.line}_${stmt.pos.col}`, value: result, pos: stmt.pos };
+}
 
 function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
   const ox = (e: T.Expr) => optimizeExpr(e, env);
@@ -31,6 +49,9 @@ function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
 
   switch (stmt.type) {
     case 'VarDecl':
+      return { ...stmt, value: ox(stmt.value), domain: oxopt(stmt.domain) };
+
+    case 'AliasDecl':
       return { ...stmt, value: ox(stmt.value) };
 
     case 'PointDecl':
@@ -129,8 +150,6 @@ function optimizeMap(map: T.MapExpr, env: Env): T.MapExpr {
     body: optimizeExpr(map.body, env),
   };
 }
-
-
 
 export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
   const ox = (e: T.Expr) => optimizeExpr(e, env, depth);
@@ -245,8 +264,6 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
   }
 }
 
-//inlining
-
 const MAX_INLINE_DEPTH = 20;
 
 function inlineCall(fn: FnDef, args: T.Expr[], env: Env, depth: number): T.Expr {
@@ -259,7 +276,7 @@ function inlineCall(fn: FnDef, args: T.Expr[], env: Env, depth: number): T.Expr 
   return optimizeExpr(substituted, env, depth + 1);
 }
 
-function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
+export function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
   switch (expr.type) {
     case 'NumLit':
     case 'StringLit':
@@ -316,7 +333,7 @@ function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
 
     case 'MapExpr': {
       const newSubst = new Map(subst);
-      newSubst.delete(expr.var); // loop var shadows outer
+      newSubst.delete(expr.var);
       return {
         ...expr,
         range: substituteExpr(expr.range, newSubst) as T.ListRange,
@@ -326,7 +343,7 @@ function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
 
     case 'ForExpr': {
       const newSubst = new Map(subst);
-      newSubst.delete(expr.var); // loop var shadows outer
+      newSubst.delete(expr.var);
       return {
         ...expr,
         body:  substituteExpr(expr.body,  newSubst),
@@ -337,8 +354,6 @@ function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
     }
   }
 }
-
-//helpers
 
 function foldBinOp(op: string, a: number, b: number): number | null {
   switch (op) {

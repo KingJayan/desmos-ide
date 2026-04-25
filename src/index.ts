@@ -3,7 +3,8 @@
 import { tokenize, LexError } from './compiler/lexer';
 import { parse, ParseError } from './compiler/parser';
 import { optimize } from './compiler/optimizer';
-import { codegen,  DesmosState, DesmosExpr } from './compiler/codegen';
+import { codegen, DesmosState, DesmosExpr } from './compiler/codegen';
+import { analyze } from './compiler/analyze';
 import type { Program, Statement } from './compiler/types';
 
 export { registerLanguage, LANGUAGE_ID, errorToMarker } from './monaco/language';
@@ -11,7 +12,7 @@ export type { DesmosState, DesmosExpr, DesmosSlider } from './compiler/codegen';
 export type { DiagnosticMarker } from './monaco/language';
 
 export type SymbolKind =
-  | 'var' | 'fn'
+  | 'var' | 'fn' | 'alias'
   | 'point' | 'circle' | 'line'
   | 'curve' | 'region' | 'polygon' | 'segment'
   | 'text' | 'group';
@@ -41,6 +42,7 @@ export interface CompileSuccess {
 
 export interface CompileError {
   error: string;
+  phase: 1 | 2;
   line?: number;
   col?: number;
   tokenLen?: number;
@@ -57,6 +59,7 @@ function stmtSymbol(stmt: Statement): SymbolInfo | null {
   const p = stmt.pos;
   switch (stmt.type) {
     case 'VarDecl':    return { name: stmt.name, kind: 'var',     line: p.line, col: p.col };
+    case 'AliasDecl':  return { name: stmt.name, kind: 'alias',   line: p.line, col: p.col };
     case 'FnDecl':     return { name: stmt.name, kind: 'fn',      line: p.line, col: p.col };
     case 'PointDecl':  return { name: stmt.name, kind: 'point',   line: p.line, col: p.col };
     case 'CircleDecl': return { name: stmt.name, kind: 'circle',  line: p.line, col: p.col };
@@ -116,18 +119,45 @@ export function compile(src: string): CompileResult {
   try {
     const tokens = tokenize(src);
     const { ast, parseErrors } = parse(tokens);
+
+    if (parseErrors.length > 0) {
+      return {
+        success: false,
+        errors: parseErrors.map(e => ({
+          error: e.error,
+          phase: 1 as const,
+          line: e.line,
+          col: e.col,
+          tokenLen: e.tokenLen,
+        })),
+      };
+    }
+
+    const semanticErrors = analyze(ast);
+    if (semanticErrors.length > 0) {
+      return {
+        success: false,
+        errors: semanticErrors.map(e => ({
+          error: e.error,
+          phase: 2 as const,
+          line: e.line,
+          col: e.col,
+        })),
+      };
+    }
+
     const optimized = optimize(ast);
     const state     = codegen(optimized);
     const symbols   = extractSymbols(ast);
     const warnings  = checkWarnings(ast);
-    if (parseErrors.length > 0) {
-      return { success: false, errors: parseErrors };
-    }
+
     return { success: true, state, warnings, symbols };
   } catch (e) {
-    if (e instanceof LexError)  return { success: false, errors: [{ error: e.message, line: e.line, col: e.col }] };
-    if (e instanceof ParseError) return { success: false, errors: [{ error: e.message, line: e.tok.line, col: e.tok.col, tokenLen: e.tok.value.length }] };
-    return { success: false, errors: [{ error: String(e) }] };
+    if (e instanceof LexError)
+      return { success: false, errors: [{ error: e.message, phase: 1, line: e.line, col: e.col }] };
+    if (e instanceof ParseError)
+      return { success: false, errors: [{ error: e.message, phase: 1, line: e.tok.line, col: e.tok.col, tokenLen: e.tok.value.length }] };
+    return { success: false, errors: [{ error: String(e), phase: 1 }] };
   }
 }
 

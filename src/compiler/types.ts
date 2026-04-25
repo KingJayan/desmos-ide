@@ -12,6 +12,9 @@ export interface Program {
 
 export type Statement =
   | VarDecl
+  | AliasDecl
+  | DebugDecl
+  | ExprBlockDecl
   | PointDecl
   | CircleDecl
   | LineDecl
@@ -26,13 +29,35 @@ export type Statement =
   | WaveDecl
   | GridDecl;
 
-//stmts
-
-/** a = expr   */
+/** a = expr [domain cond] */
 export interface VarDecl {
   type: 'VarDecl';
   name: string;
   value: Expr;
+  domain?: Expr;
+  pos: Pos;
+}
+
+/** alias r = expr  — named binding, identical semantics to VarDecl */
+export interface AliasDecl {
+  type: 'AliasDecl';
+  name: string;
+  value: Expr;
+  pos: Pos;
+}
+
+/** debug expr  — compile-time only, no output */
+export interface DebugDecl {
+  type: 'DebugDecl';
+  expr: Expr;
+  pos: Pos;
+}
+
+/** expr { x = cos(t)  y = sin(t)  (x, y) } */
+export interface ExprBlockDecl {
+  type: 'ExprBlockDecl';
+  bindings: Array<{ name: string; value: Expr }>;
+  result: Expr;
   pos: Pos;
 }
 
@@ -46,7 +71,8 @@ export interface PointDecl {
   pos: Pos;
 }
 
-/** circle c = circle((cx, cy), r) [as { ... }] */
+/** circle c = circle((cx, cy), r) [as { ... }]
+ *  OR  circle c { center (cx, cy)  radius r } [as { ... }] */
 export interface CircleDecl {
   type: 'CircleDecl';
   name: string;
@@ -288,6 +314,7 @@ export interface ListRange {
   pos: Pos;
 }
 
+/** map(i -> expr, start..end step n) */
 export interface MapExpr {
   type: 'MapExpr';
   var: string;

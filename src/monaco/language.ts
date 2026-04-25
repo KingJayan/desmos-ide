@@ -1,11 +1,12 @@
 export const LANGUAGE_ID = 'desmos-dsl';
 
 export const KEYWORDS = [
-  'fn', 'in', 'map',
+  'fn', 'alias', 'debug', 'in', 'map',
   'point', 'circle', 'line',
   'curve', 'region', 'polygon', 'segment',
   'text', 'group', 'as', 'at',
   'for', 'step', 'where', 'else',
+  'if', 'then', 'domain', 'expr', 'loop',
   'time', 'project', 'camera',
   'spiral', 'wave', 'grid',
 ] as const;

@@ -5,7 +5,8 @@
 
   const sections = [
     'quick-start', 'lexical-rules', 'top-level', 'expressions',
-    'conditionals', 'geometry', 'curves', 'styling',
+    'conditionals', 'domain', 'geometry', 'curves', 'generators-map',
+    'expr-block', 'debug', 'styling',
     'animation', 'builtins', 'codegen', 'optimizer', 'errors', 'limitations',
   ];
 
@@ -52,82 +53,103 @@
   </header>
 
   <nav class="toc" aria-label="table of contents">
-    <a href="#quick-start"    class:active={activeId === 'quick-start'}>quick start</a>
-    <a href="#lexical-rules"  class:active={activeId === 'lexical-rules'}>lexical rules</a>
-    <a href="#top-level"      class:active={activeId === 'top-level'}>top-level statements</a>
-    <a href="#expressions"    class:active={activeId === 'expressions'}>expressions</a>
-    <a href="#conditionals"   class:active={activeId === 'conditionals'}>conditionals</a>
-    <a href="#geometry"       class:active={activeId === 'geometry'}>geometry</a>
-    <a href="#curves"         class:active={activeId === 'curves'}>curves &amp; regions</a>
-    <a href="#generators"     class:active={activeId === 'generators'}>generators</a>
-    <a href="#styling"        class:active={activeId === 'styling'}>styling</a>
-    <a href="#animation"      class:active={activeId === 'animation'}>sliders &amp; animation</a>
-    <a href="#builtins"       class:active={activeId === 'builtins'}>built-ins</a>
-    <a href="#codegen"        class:active={activeId === 'codegen'}>codegen</a>
-    <a href="#optimizer"      class:active={activeId === 'optimizer'}>optimizer</a>
-    <a href="#errors"         class:active={activeId === 'errors'}>errors</a>
-    <a href="#limitations"    class:active={activeId === 'limitations'}>limitations</a>
+    <a href="#quick-start"      class:active={activeId === 'quick-start'}>quick start</a>
+    <a href="#lexical-rules"    class:active={activeId === 'lexical-rules'}>lexical rules</a>
+    <a href="#top-level"        class:active={activeId === 'top-level'}>top-level statements</a>
+    <a href="#expressions"      class:active={activeId === 'expressions'}>expressions</a>
+    <a href="#conditionals"     class:active={activeId === 'conditionals'}>conditionals</a>
+    <a href="#domain"           class:active={activeId === 'domain'}>domain restriction</a>
+    <a href="#geometry"         class:active={activeId === 'geometry'}>geometry</a>
+    <a href="#curves"           class:active={activeId === 'curves'}>curves &amp; regions</a>
+    <a href="#generators-map"   class:active={activeId === 'generators-map'}>map generator</a>
+    <a href="#expr-block"       class:active={activeId === 'expr-block'}>expr block</a>
+    <a href="#debug"            class:active={activeId === 'debug'}>debug</a>
+    <a href="#styling"          class:active={activeId === 'styling'}>styling</a>
+    <a href="#animation"        class:active={activeId === 'animation'}>sliders &amp; animation</a>
+    <a href="#builtins"         class:active={activeId === 'builtins'}>built-ins</a>
+    <a href="#codegen"          class:active={activeId === 'codegen'}>codegen</a>
+    <a href="#optimizer"        class:active={activeId === 'optimizer'}>optimizer</a>
+    <a href="#errors"           class:active={activeId === 'errors'}>errors</a>
+    <a href="#limitations"      class:active={activeId === 'limitations'}>limitations</a>
   </nav>
 
   <section id="quick-start">
     <h2>quick start</h2>
-    <pre><code>a = slider(0, 0, 10)
+    <pre><code>// variables, sliders, aliases
+a = slider(3, 0, 10, step=0.1, speed=1, loop)
 fn hyp(x, y) = sqrt(x^2 + y^2)
+alias dist = hyp(3, 4)
 
+// geometry
 point p (3, 4)
-circle c = circle((0, 0), hyp(3, 4))
+circle c &#123; center (0, 0)  radius 5 &#125;
 line l = slope(1), intercept(0)
+segment s = (0,0) -> (3,4)
 
-curve ring (t in 0..6.28) &#123;
-  (cos(t), sin(t))
-&#125;
+// generators
+pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)
+curve ring (t in 0..6.28) &#123; (cos(t), sin(t)) &#125;
 
-region r = y > x^2</code></pre>
+// conditionals
+v = if x > 0 then x^2 else -x
+y = x^2 domain x > 0
+
+// expr block — inlined at compile time
+expr &#123;
+  cx = cos(t)
+  cy = sin(t)
+  (2*cx, cy)
+&#125;</code></pre>
   </section>
 
   <section id="lexical-rules">
     <h2>lexical rules</h2>
     <ul>
-      <li><strong>comments:</strong> single-line, start with <code>//</code>. everything after <code>//</code> to end-of-line is ignored.</li>
-      <li><strong>whitespace:</strong> spaces, tabs, and newlines are ignored except for line and column tracking.</li>
-      <li><strong>numbers:</strong> integers and decimals. leading-dot decimals like <code>.5</code> are not supported — write <code>0.5</code>.</li>
+      <li><strong>comments:</strong> single-line, start with <code>//</code>.</li>
+      <li><strong>whitespace:</strong> spaces, tabs, and newlines are ignored except for position tracking.</li>
+      <li><strong>numbers:</strong> integers and decimals. write <code>0.5</code>, not <code>.5</code>.</li>
       <li><strong>identifiers:</strong> <code>[A-Za-z_][A-Za-z0-9_]*</code></li>
-      <li><strong>keywords:</strong> <code>fn</code>, <code>in</code>, <code>map</code>, <code>point</code>, <code>circle</code>, <code>line</code>, <code>curve</code>, <code>region</code>, <code>polygon</code>, <code>segment</code>, <code>text</code>, <code>group</code>, <code>as</code>, <code>at</code>, <code>for</code>, <code>step</code>, <code>where</code>, <code>else</code>, <code>time</code>, <code>project</code>, <code>camera</code>, <code>spiral</code>, <code>wave</code>, <code>grid</code></li>
+      <li><strong>keywords:</strong> <code>fn</code> <code>alias</code> <code>debug</code> <code>in</code> <code>map</code> <code>point</code> <code>circle</code> <code>line</code> <code>curve</code> <code>region</code> <code>polygon</code> <code>segment</code> <code>text</code> <code>group</code> <code>as</code> <code>at</code> <code>for</code> <code>step</code> <code>where</code> <code>else</code> <code>if</code> <code>then</code> <code>domain</code> <code>expr</code> <code>loop</code> <code>time</code> <code>project</code> <code>camera</code> <code>spiral</code> <code>wave</code> <code>grid</code></li>
       <li><strong>range tokens:</strong>
         <ul>
-          <li><code>..</code> — domain separator in curve/for ranges (<code>0..6.28</code>)</li>
-          <li><code>-></code> — segment endpoint separator</li>
+          <li><code>..</code> — range separator (<code>0..6.28</code>)</li>
+          <li><code>-></code> — lambda separator in <code>map</code> / segment endpoint separator</li>
         </ul>
       </li>
-      <li><strong>string literals:</strong> double-quoted, single-line only. used in <code>text</code> and <code>group</code> statements.</li>
+      <li><strong>string literals:</strong> double-quoted, single-line only.</li>
     </ul>
-    <h3>comment example</h3>
-    <pre><code>x = 3       // this is a constant
+    <pre><code>x = 3       // constant
 // full-line comment</code></pre>
   </section>
 
   <section id="top-level">
     <h2>top-level statements</h2>
-    <p>every statement must begin with a keyword or an identifier followed by <code>=</code>. bare expressions are not valid.</p>
+    <p>every statement must begin with a keyword or an identifier followed by <code>=</code>. the sole exception is <code>expr &#123;...&#125;</code> which emits a bare expression.</p>
     <table>
       <thead><tr><th>form</th><th>description</th></tr></thead>
       <tbody>
         <tr><td><code>name = expr</code></td><td>variable binding</td></tr>
-        <tr><td><code>name = slider(init, min, max)</code></td><td>slider with domain</td></tr>
+        <tr><td><code>name = expr domain cond</code></td><td>variable with domain restriction</td></tr>
+        <tr><td><code>name = slider(init, min, max, ...)</code></td><td>slider — see animation section</td></tr>
+        <tr><td><code>alias name = expr</code></td><td>named alias (identical output to assignment)</td></tr>
         <tr><td><code>fn name(p1, ...) = expr</code></td><td>user-defined function (inlined by optimizer)</td></tr>
+        <tr><td><code>debug expr</code></td><td>compile-time only — no desmos output</td></tr>
+        <tr><td><code>expr &#123; bindings  result &#125;</code></td><td>inline expression block; bindings substituted into result at compile time</td></tr>
         <tr><td><code>point name (x, y)</code></td><td>named point</td></tr>
-        <tr><td><code>circle name = circle((h, k), r)</code></td><td>circle by center and radius</td></tr>
-        <tr><td><code>line name = slope(m), intercept(b)</code></td><td>line — slope-intercept form</td></tr>
+        <tr><td><code>circle name = circle((h, k), r)</code></td><td>circle — classic form</td></tr>
+        <tr><td><code>circle name &#123; center (h, k)  radius r &#125;</code></td><td>circle — block form</td></tr>
+        <tr><td><code>line name = slope(m), intercept(b)</code></td><td>line — slope-intercept</td></tr>
         <tr><td><code>line name = lhs = rhs</code></td><td>line — standard form</td></tr>
         <tr><td><code>segment name = (x1,y1) -> (x2,y2)</code></td><td>line segment</td></tr>
         <tr><td><code>polygon name = [(x,y), ...]</code></td><td>filled polygon</td></tr>
-        <tr><td><code>curve name (v in start..end) &#123; body &#125;</code></td><td>parametric curve or list comprehension</td></tr>
+        <tr><td><code>curve name (v in start..end) &#123; body &#125;</code></td><td>parametric curve or sampled list</td></tr>
         <tr><td><code>name = body for v in start..end</code></td><td>inline for-comprehension</td></tr>
+        <tr><td><code>name = map(v -> body, start..end step n)</code></td><td>map generator — compiles to list comprehension</td></tr>
         <tr><td><code>region name = inequality</code></td><td>filled inequality region</td></tr>
         <tr><td><code>text name = "label" at (x, y)</code></td><td>text label at position</td></tr>
         <tr><td><code>group name as "Folder label"</code></td><td>desmos folder</td></tr>
-        <tr><td><code>spiral name = spiral(turns, spacing)</code></td><td>archimedean spiral (parametric)</td></tr>
-        <tr><td><code>wave name = wave(freq, amp)</code></td><td>sine wave (parametric)</td></tr>
+        <tr><td><code>spiral name = spiral(turns, spacing)</code></td><td>archimedean spiral</td></tr>
+        <tr><td><code>wave name = wave(freq, amp)</code></td><td>sine wave</td></tr>
         <tr><td><code>grid name = grid(cols, rows)</code></td><td>cartesian grid lines</td></tr>
       </tbody>
     </table>
@@ -155,9 +177,10 @@ region r = y > x^2</code></pre>
         <tr><td>unary minus</td><td><code>-x</code></td></tr>
         <tr><td>function call</td><td><code>sin(x)</code>, <code>f(a, b)</code></td></tr>
         <tr><td>tuple (point)</td><td><code>(x, y)</code></td></tr>
-        <tr><td>list literal</td><td><code>[1, 2, 3]</code></td></tr>
-        <tr><td>map comprehension</td><td><code>map(i in list) &#123; expr &#125;</code></td></tr>
+        <tr><td>list range</td><td><code>[0, 0.1 ... 1]</code></td></tr>
+        <tr><td>map generator</td><td><code>map(i -> expr, 0..6.28 step 0.1)</code></td></tr>
         <tr><td>conditional (where)</td><td><code>expr where cond else alt</code></td></tr>
+        <tr><td>conditional (if)</td><td><code>if cond then a else b</code></td></tr>
         <tr><td>piecewise block</td><td><code>&#123; cond: val, else: val &#125;</code></td></tr>
       </tbody>
     </table>
@@ -170,14 +193,25 @@ region r = y > x^2</code></pre>
     <h2>conditionals</h2>
 
     <h3>where / else</h3>
-    <p>the <code>where</code> form is a two-branch conditional expression:</p>
-    <pre><code>v = x^2 where x > 0 else -x^2</code></pre>
-    <p>compiles to the desmos piecewise <code>&#123;x>0: x^2, -x^2&#125;</code>.</p>
+    <pre><code>v = x^2 where x > 0 else -x</code></pre>
+    <p>compiles to <code>&#123;x&gt;0:x^2,-x&#125;</code>.</p>
+
+    <h3>if / then / else</h3>
+    <pre><code>v = if x > 0 then x^2 else -x</code></pre>
+    <p>identical output to <code>where/else</code> — choose whichever reads more naturally.</p>
 
     <h3>piecewise block</h3>
-    <p>multi-branch piecewise with an optional <code>else</code> default:</p>
+    <p>multi-branch piecewise with an optional <code>else</code> fallback:</p>
     <pre><code>z = &#123; x > 0: x^2, x &lt; 0: -x, else: 0 &#125;</code></pre>
-    <p>branches are evaluated in order. each <code>cond: val</code> pair maps to a desmos piecewise arm. the <code>else</code> branch is the fallback when no condition matches.</p>
+    <p>each <code>cond: val</code> pair maps to a desmos piecewise arm. the <code>else</code> branch is the fallback value.</p>
+  </section>
+
+  <section id="domain">
+    <h2>domain restriction</h2>
+    <p>append <code>domain cond</code> to any variable binding to restrict where the expression is drawn:</p>
+    <pre><code>y = x^2 domain x > 0       // only draws for x > 0
+w = sin(x) domain x >= -pi  // only draws for x >= -π</code></pre>
+    <p>compiles to <code>y=x^{"{"}2{"}"}\left\{"{"}x&gt;0{"\}"}\right\}</code> — desmos domain filter notation.</p>
   </section>
 
   <section id="geometry">
@@ -190,9 +224,10 @@ point q (a, b)   // dynamic coordinates</code></pre>
     <p>renders a labeled point. coordinates can be any expression. compiles to a desmos expression with <code>showLabel: true</code> and <code>label</code> set to the point name.</p>
 
     <h3>circle</h3>
-    <pre><code>circle c = circle((0, 0), 5)
-circle d = circle((a, b), r)</code></pre>
-    <p>compiles to the implicit equation <code>(x-h)²+(y-k)²=r²</code> with fill enabled at opacity <code>0.4</code>.</p>
+    <p>two equivalent forms:</p>
+    <pre><code>circle c &#123; center (0, 0)  radius 5 &#125;    // block form
+circle d = circle((a, b), r)              // classic form</code></pre>
+    <p>compiles to the implicit equation <code>(x-h)²+(y-k)²=r²</code> with fill enabled at opacity <code>0.1</code>.</p>
 
     <h3>line</h3>
     <p>two supported syntactic forms:</p>
@@ -254,6 +289,62 @@ region r2 = y &lt; x as &#123; color blue opacity 0.3 fill &#125;</code></pre>
     <p>compiles to a desmos expression that renders as a shaded region.</p>
   </section>
 
+  <section id="generators-map">
+    <h2>map generator</h2>
+    <p><code>map(variable -> expression, start..end step n)</code> is a list comprehension that compiles to a desmos list expression. no runtime iteration — the range and body are lowered to static desmos notation.</p>
+    <pre><code>// list of points on a unit circle
+pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)
+
+// list of y values
+ys = map(t -> sin(t) * cos(t), 0..3.14 step 0.05)
+
+// as a variable value
+v = map(n -> n^2, 1..10 step 1)</code></pre>
+
+    <h3>compiled output</h3>
+    <p><code>map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)</code> compiles to:</p>
+    <pre><code>\left[\left(\cos\left(i\right),\sin\left(i\right)\right)\operatorname&#123;for&#125;i=\left[0,0.1,...,6.28\right]\right]</code></pre>
+
+    <h3>range syntax</h3>
+    <table>
+      <thead><tr><th>form</th><th>meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>0..6.28</code></td><td>start to end, no explicit step</td></tr>
+        <tr><td><code>0..6.28 step 0.1</code></td><td>start to end, step 0.1</td></tr>
+      </tbody>
+    </table>
+    <p>a non-positive step is a semantic error (phase 2).</p>
+  </section>
+
+  <section id="expr-block">
+    <h2>expr block</h2>
+    <p>an <code>expr &#123;...&#125;</code> block defines local bindings that are substituted into a final result expression at compile time. no runtime scope — all bindings are inlined before codegen.</p>
+    <pre><code>expr &#123;
+  cx = cos(t)
+  cy = sin(t)
+  (2*cx, cy)
+&#125;
+
+// equivalent to writing: (2*cos(t), sin(t))</code></pre>
+    <p>the block emits a bare desmos expression — no variable name is bound. useful for parametric curves and complex inline computations that benefit from named intermediate values.</p>
+
+    <h3>rules</h3>
+    <ul>
+      <li>every line before the last must be <code>name = expr</code></li>
+      <li>the final line is the result expression (any expression, including tuples)</li>
+      <li>bindings are not visible outside the block</li>
+      <li>bindings are substituted in order — later bindings can reference earlier ones</li>
+    </ul>
+  </section>
+
+  <section id="debug">
+    <h2>debug</h2>
+    <p><code>debug expr</code> is a compile-time utility. the expression is parsed and type-checked but <strong>no desmos output is emitted</strong>. use it to verify that an expression parses correctly without cluttering the graph.</p>
+    <pre><code>fn hyp(x, y) = sqrt(x^2 + y^2)
+debug hyp(3, 4)   // compile-time only, emits nothing
+debug r           // same — no output</code></pre>
+  </section>
+
   <section id="styling">
     <h2>styling</h2>
     <p>any geometry statement can be followed by <code>as &#123; ... &#125;</code> with space-separated style properties, or by <code>as gradient(from, to)</code>:</p>
@@ -298,17 +389,23 @@ curve c (t in 0..4) &#123; (t, sin(t)) &#125; as &#123; gradient("green", "orang
 
   <section id="animation">
     <h2>sliders &amp; animation</h2>
-    <p>a slider is created with the <code>slider(initial, min, max)</code> call. the initial value, min, and max can be any numeric expression.</p>
-    <pre><code>a = slider(0, 0, 10)     // slider, initial 0, range [0, 10]
-r = slider(5, 1, 20)     // slider, initial 5, range [1, 20]
-x = 3                    // plain constant, no slider</code></pre>
+    <p>a slider is created with <code>slider(initial, min, max)</code>. all named arguments are optional:</p>
+    <pre><code>a = slider(0, 0, 10)                          // static slider
+a = slider(3, 0, 10, step=0.1)                // with step
+a = slider(3, 0, 10, speed=2)                 // auto-playing at 2× speed
+a = slider(3, 0, 10, step=0.1, speed=1, loop) // step + looping auto-play</code></pre>
 
-    <p>add an optional <code>speed=n</code> keyword argument to auto-play the slider at a given rate:</p>
-    <pre><code>t = slider(0, 0, 10, speed=2)   // auto-playing, 2× speed</code></pre>
-
-    <h3>time() call</h3>
-    <p>the special <code>time(start, end, speed)</code> call creates an auto-playing slider. the <code>animationPeriod</code> is derived as <code>round(1000 / speed)</code>.</p>
-    <pre><code>t = time(0, 10, 0.5)   // slider 0..10 playing at 0.5 Hz (2000 ms period)</code></pre>
+    <table>
+      <thead><tr><th>arg</th><th>type</th><th>description</th></tr></thead>
+      <tbody>
+        <tr><td>positional 1</td><td>number</td><td>initial value</td></tr>
+        <tr><td>positional 2</td><td>number</td><td>minimum</td></tr>
+        <tr><td>positional 3</td><td>number</td><td>maximum</td></tr>
+        <tr><td><code>step=n</code></td><td>kwarg</td><td>increment per step</td></tr>
+        <tr><td><code>speed=n</code></td><td>kwarg</td><td>animation speed (sets <code>animationPeriod = round(1000/n)</code>)</td></tr>
+        <tr><td><code>loop</code></td><td>flag</td><td>enables <code>LOOP_FORWARD</code> and <code>isPlaying: true</code></td></tr>
+      </tbody>
+    </table>
   </section>
 
   <section id="builtins">
@@ -467,37 +564,48 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
 
   <section id="optimizer">
     <h2>optimizer notes</h2>
-    <p>the optimizer runs before codegen and transforms the ast in place.</p>
+    <p>the optimizer runs after semantic analysis and before codegen. all transformations operate on cloned nodes (shadow-safe — no in-place mutation).</p>
     <ul>
-      <li><strong>function inlining</strong> — user-defined <code>fn</code> calls are substituted at every call site; the <code>FnDecl</code> node is removed afterwards.</li>
-      <li><strong>constant folding</strong> — expressions whose operands are all numeric literals are evaluated at compile time.</li>
-      <li><strong>algebraic identities</strong>:
-        <ul>
-          <li><code>x + 0</code> → <code>x</code></li>
-          <li><code>x - 0</code> → <code>x</code></li>
-          <li><code>x * 1</code> → <code>x</code></li>
-          <li><code>x * 0</code> → <code>0</code></li>
-          <li><code>x ^ 1</code> → <code>x</code></li>
-          <li><code>x ^ 0</code> → <code>1</code></li>
-          <li><code>0 / x</code> → <code>0</code></li>
-        </ul>
-      </li>
-      <li><strong>shadow-safe substitution</strong> — when inlining inside a <code>curve</code> or <code>map</code>, avoids substituting the loop variable if it shadows a parameter name.</li>
+      <li><strong>function inlining</strong> — <code>fn</code> calls are substituted at every call site; <code>FnDecl</code> nodes are removed before codegen.</li>
+      <li><strong>expr block inlining</strong> — <code>ExprBlockDecl</code> bindings are substituted into the result expression at compile time; the block emits a bare expression with no name.</li>
+      <li><strong>debug stripping</strong> — <code>DebugDecl</code> nodes are removed entirely; no desmos output is emitted.</li>
+      <li><strong>constant folding</strong> — all-literal operands are evaluated at compile time.</li>
+      <li><strong>algebraic identities</strong>: <code>x+0→x</code>, <code>x*1→x</code>, <code>x*0→0</code>, <code>x^1→x</code>, <code>x^0→1</code>, <code>0/x→0</code>.</li>
+      <li><strong>shadow-safe substitution</strong> — loop variables in <code>map</code>/<code>curve</code>/<code>for</code> shadow outer bindings during substitution; inner scope is never polluted.</li>
     </ul>
-    <p>optimization is applied recursively until the ast stabilizes (fixed-point).</p>
   </section>
 
   <section id="errors">
     <h2>errors</h2>
-    <p>the compiler reports two error phases. both surface as a <code>CompileFailure</code> return value from <code>compile(src)</code>.</p>
+    <p>the compiler reports two distinct error phases. both return as <code>CompileFailure</code> with a <code>phase: 1 | 2</code> field on each error.</p>
+
+    <h3>phase 1 — syntax errors</h3>
+    <p>produced by the lexer or parser before any semantic analysis. the program cannot be parsed further.</p>
     <table>
-      <thead><tr><th>phase</th><th>format</th><th>example</th></tr></thead>
+      <thead><tr><th>source</th><th>example</th></tr></thead>
       <tbody>
-        <tr><td>lexer</td><td><code>[line:col] Lex error: ...</code></td><td><code>[3:5] Lex error: unexpected character '@'</code></td></tr>
-        <tr><td>parser</td><td><code>[line:col] Parse error: ...</code></td><td><code>[7:1] Parse error: expected '='</code></td></tr>
+        <tr><td>lexer</td><td><code>[3:5] Lex error: unexpected character '@'</code></td></tr>
+        <tr><td>parser</td><td><code>[7:1] Parse error: expected '=' (got 'foo')</code></td></tr>
       </tbody>
     </table>
-    <p>in the ide, errors are surfaced as monaco editor markers with precise line and column positioning. warnings (duplicate names, reserved name collisions) are shown as yellow underlines.</p>
+
+    <h3>phase 2 — semantic errors</h3>
+    <p>produced after a successful parse, before optimization. the ast is structurally valid but contains logical errors.</p>
+    <table>
+      <thead><tr><th>check</th><th>example</th></tr></thead>
+      <tbody>
+        <tr><td>undefined function</td><td><code>[1:5] Semantic error: undefined function 'foo'</code></td></tr>
+        <tr><td>arity mismatch</td><td><code>[3:1] Semantic error: 'hyp' expects 2 arguments, got 1</code></td></tr>
+        <tr><td>non-positive generator step</td><td><code>[5:20] Semantic error: generator step must be positive</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>warnings</h3>
+    <p>warnings do not block compilation. they surface in the ide as yellow underlines:</p>
+    <ul>
+      <li>redeclaring a desmos built-in (<code>t</code>, <code>r</code>, <code>theta</code>)</li>
+      <li>duplicate name in the same program</li>
+    </ul>
   </section>
 
   <section id="limitations">

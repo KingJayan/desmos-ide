@@ -2,8 +2,6 @@
 
 import * as T from './types';
 
-//color utils
-
 const DESMOS_NAMED: Record<string, string> = {
   red: '#c74440', blue: '#2d70b3', green: '#388c46',
   orange: '#fa7e19', purple: '#6042a6', black: '#000000', white: '#ffffff',
@@ -66,8 +64,6 @@ function gradientColorLatex(
   return `\\operatorname{rgb}\\left(${ch(r1, r2)},${ch(g1, g2)},${ch(b1, b2)}\\right)`;
 }
 
-// output types
-
 export interface DesmosSlider {
   min?: string;
   max?: string;
@@ -108,7 +104,6 @@ export interface DesmosState {
   expressions: { list: DesmosExpr[] };
 }
 
-
 const COLORS: Record<string, string> = {
   point:   '#2d70b3',
   circle:  '#c74440',
@@ -119,7 +114,6 @@ const COLORS: Record<string, string> = {
   polygon: '#fa7e19',
   segment: '#388c46',
 };
-
 
 const MATH_FNS: Record<string, string> = {
   sin:    '\\sin',    cos:    '\\cos',    tan:    '\\tan',
@@ -133,10 +127,6 @@ const MATH_FNS: Record<string, string> = {
   mod:    '\\operatorname{mod}',
 };
 
-//   single char  →  as-is:  x  t  r
-//   greek name   →  \alpha  \theta  …
-//   multi-char   →  first + subscript:  wave → w_{ave}
-
 const GREEK: Record<string, string> = {
   alpha: '\\alpha', beta: '\\beta', gamma: '\\gamma', delta: '\\delta',
   epsilon: '\\epsilon', zeta: '\\zeta', eta: '\\eta', theta: '\\theta',
@@ -147,6 +137,9 @@ const GREEK: Record<string, string> = {
 };
 
 export function nameToLatex(name: string): string {
+  // internal expr block names pass through as-is (they'll never reach the graph)
+  if (name.startsWith('__expr_')) return name;
+
   const uscore = name.indexOf('_');
   if (uscore !== -1) {
     const prefix = name.slice(0, uscore);
@@ -163,7 +156,6 @@ function fmtNum(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toPrecision(15).replace(/\.?0+$/, '');
 }
 
-//op precedence and parens
 const PREC: Record<string, number> = {
   '+': 1, '-': 1, '*': 2, '/': 2, '^': 3, unary: 4,
 };
@@ -175,7 +167,6 @@ function needsParens(childOp: string, parentOp: string, side: 'left' | 'right'):
   if (cp === pp && side === 'right' && (parentOp === '-' || parentOp === '/')) return true;
   return false;
 }
-
 
 export class Codegen {
   private list: DesmosExpr[] = [];
@@ -196,56 +187,84 @@ export class Codegen {
     return id;
   }
 
-
   private genStmt(stmt: T.Statement): void {
     switch (stmt.type) {
-      case 'VarDecl':    this.genVarDecl(stmt);    break;
-      case 'PointDecl':  this.genPointDecl(stmt);  break;
-      case 'CircleDecl': this.genCircleDecl(stmt); break;
-      case 'LineDecl':   this.genLineDecl(stmt);   break;
-      case 'CurveDecl':  this.genCurveDecl(stmt);  break;
-      case 'RegionDecl': this.genRegionDecl(stmt); break;
-      case 'PolygonDecl':this.genPolygonDecl(stmt);break;
-      case 'SegmentDecl':this.genSegmentDecl(stmt);break;
-      case 'TextDecl':   this.genTextDecl(stmt);   break;
-      case 'GroupDecl':  this.genGroupDecl(stmt);  break;
-      case 'SpiralDecl': this.genSpiralDecl(stmt); break;
-      case 'WaveDecl':   this.genWaveDecl(stmt);   break;
-      case 'GridDecl':   this.genGridDecl(stmt);   break;
+      case 'VarDecl':     this.genVarDecl(stmt);     break;
+      case 'AliasDecl':   this.genAliasDecl(stmt);   break;
+      case 'PointDecl':   this.genPointDecl(stmt);   break;
+      case 'CircleDecl':  this.genCircleDecl(stmt);  break;
+      case 'LineDecl':    this.genLineDecl(stmt);    break;
+      case 'CurveDecl':   this.genCurveDecl(stmt);   break;
+      case 'RegionDecl':  this.genRegionDecl(stmt);  break;
+      case 'PolygonDecl': this.genPolygonDecl(stmt); break;
+      case 'SegmentDecl': this.genSegmentDecl(stmt); break;
+      case 'TextDecl':    this.genTextDecl(stmt);    break;
+      case 'GroupDecl':   this.genGroupDecl(stmt);   break;
+      case 'SpiralDecl':  this.genSpiralDecl(stmt);  break;
+      case 'WaveDecl':    this.genWaveDecl(stmt);    break;
+      case 'GridDecl':    this.genGridDecl(stmt);    break;
+      // DebugDecl and ExprBlockDecl are stripped in optimizer; VarDecl handles ExprBlock lowered form
     }
   }
-
 
   private genVarDecl(stmt: T.VarDecl): void {
     const varName = nameToLatex(stmt.name);
 
+    // slider
     if (stmt.value.type === 'Call' && stmt.value.fn === 'slider') {
-      const [valArg, minArg, maxArg, speedArg] = stmt.value.args;
-      const speedKwarg = stmt.value.kwargs?.['speed'];
-      const speedExpr = speedKwarg ?? speedArg;
+      const [valArg, minArg, maxArg] = stmt.value.args;
+      const kw = stmt.value.kwargs ?? {};
+
+      const speedExpr = kw['speed'] ?? stmt.value.args[3];
       const period = (speedExpr?.type === 'NumLit' && speedExpr.value !== 0)
         ? Math.round(1000 / speedExpr.value)
         : undefined;
+
+      const looping = kw['loop'] !== undefined;
+
       const slider: DesmosSlider = {
         min: minArg ? this.toLaTeX(minArg) : undefined,
         max: maxArg ? this.toLaTeX(maxArg) : undefined,
         hardMin: minArg !== undefined,
         hardMax: maxArg !== undefined,
       };
-      if (period !== undefined) {
+
+      if (kw['step']) slider.step = this.toLaTeX(kw['step']);
+
+      if (period !== undefined || looping) {
         slider.isPlaying = true;
         slider.loopMode = 'LOOP_FORWARD';
-        slider.animationPeriod = period;
+        if (period !== undefined) slider.animationPeriod = period;
       }
+
       const initVal = valArg ? this.toLaTeX(valArg) : '0';
       this.emit({ type: 'expression', latex: `${varName}=${initVal}`, slider });
+      return;
+    }
+
+    // expr block lowered form — emit bare expression without name binding
+    if (stmt.name.startsWith('__expr_')) {
+      this.emit({ type: 'expression', latex: this.toLaTeX(stmt.value) });
+      return;
+    }
+
+    // domain restriction: y = x^2 domain x > 0  →  y=x^{2}\left\{x>0\right\}
+    if (stmt.domain) {
+      const exprLatex   = this.toLaTeX(stmt.value);
+      const domainLatex = this.toLaTeX(stmt.domain);
+      this.emit({ type: 'expression', latex: `${varName}=${exprLatex}\\left\\{${domainLatex}\\right\\}` });
       return;
     }
 
     this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` });
   }
 
-  /** point p (x, y) */
+  /** alias r = expr — identical output to VarDecl */
+  private genAliasDecl(stmt: T.AliasDecl): void {
+    const varName = nameToLatex(stmt.name);
+    this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` });
+  }
+
   private genPointDecl(stmt: T.PointDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.point;
     const varName = nameToLatex(stmt.name);
@@ -260,7 +279,6 @@ export class Codegen {
     this.emit(partial);
   }
 
-  /** circle c = circle((cx, cy), r) */
   private genCircleDecl(stmt: T.CircleDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.circle;
     const cx = this.toLaTeX(stmt.cx);
@@ -274,7 +292,6 @@ export class Codegen {
     });
   }
 
-  /** line l = slope(m), intercept(b)  |  standard  |  expr */
   private genLineDecl(stmt: T.LineDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.line;
     let latex: string;
@@ -297,7 +314,6 @@ export class Codegen {
     this.emit(partial);
   }
 
-  /** curve / for-comprehension -> parametric or sampled list */
   private genCurveDecl(stmt: T.CurveDecl): void {
     const grad = stmt.style?.gradient;
     const color = grad
@@ -345,7 +361,6 @@ export class Codegen {
     this.emit(partial);
   }
 
-  /** region r = y > x^2 → inequality expression */
   private genRegionDecl(stmt: T.RegionDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.region;
     const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.4';
@@ -357,7 +372,6 @@ export class Codegen {
     });
   }
 
-  /** polygon p = [(0,0), (2,0), (1,2)] */
   private genPolygonDecl(stmt: T.PolygonDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.polygon;
     const pts = stmt.points.map(p => `\\left(${this.toLaTeX(p.x)},${this.toLaTeX(p.y)}\\right)`).join(',');
@@ -366,7 +380,6 @@ export class Codegen {
     this.emit({ type: 'expression', latex, color, fill: true, fillOpacity });
   }
 
-  /** segment s = (0,0) -> (2,3) → 2-point list with lines */
   private genSegmentDecl(stmt: T.SegmentDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.segment;
     const x1 = this.toLaTeX(stmt.p1.x), y1 = this.toLaTeX(stmt.p1.y);
@@ -377,7 +390,6 @@ export class Codegen {
     this.emit(partial);
   }
 
-  /** text t = "hello" at (x, y) → labeled point */
   private genTextDecl(stmt: T.TextDecl): void {
     const tx = this.toLaTeX(stmt.x);
     const ty = this.toLaTeX(stmt.y);
@@ -391,7 +403,6 @@ export class Codegen {
     });
   }
 
-  /** group orbit as "Motion" → Desmos folder */
   private genGroupDecl(stmt: T.GroupDecl): void {
     this.emit({ type: 'folder', title: stmt.label });
   }
@@ -476,7 +487,6 @@ export class Codegen {
     this.emit({ type: 'expression', latex: `x=${xList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw });
   }
 
-//helpers
   private circleLatex(cx: string, cy: string, r: string): string {
     const hPart = cx === '0' ? 'x^{2}' : `\\left(x-\\left(${cx}\\right)\\right)^{2}`;
     const kPart = cy === '0' ? 'y^{2}' : `\\left(y-\\left(${cy}\\right)\\right)^{2}`;
@@ -485,9 +495,10 @@ export class Codegen {
   }
 
   private mapToLatex(map: T.MapExpr): string {
-    const body  = this.toLaTeX(map.body);
-    const range = this.rangeToLatex(map.range);
-    return `\\left[${body}\\operatorname{for}${map.var}=${range}\\right]`;
+    const varLtx = nameToLatex(map.var);
+    const body   = this.toLaTeX(map.body);
+    const range  = this.rangeToLatex(map.range);
+    return `\\left[${body}\\operatorname{for}${varLtx}=${range}\\right]`;
   }
 
   private rangeToLatex(range: T.ListRange): string {
@@ -499,7 +510,6 @@ export class Codegen {
     }
     return `\\left[${start},...,${end}\\right]`;
   }
-
 
   toLaTeX(expr: T.Expr): string {
     switch (expr.type) {
@@ -547,7 +557,7 @@ export class Codegen {
 
       case 'PiecewiseExpr': {
         const parts = expr.branches.map(b => {
-          if (b.cond === null) return this.toLaTeX(b.body); // else branch: value only
+          if (b.cond === null) return this.toLaTeX(b.body);
           return `${this.toLaTeX(b.cond)}:${this.toLaTeX(b.body)}`;
         });
         return `\\left\\{${parts.join(',')}\\right\\}`;

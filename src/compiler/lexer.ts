@@ -8,6 +8,8 @@ export const KEYWORDS = new Set([
   'curve', 'group', 'text', 'as', 'at',
 
   'spiral', 'wave', 'grid',
+
+  'alias', 'debug', 'domain', 'if', 'then', 'expr', 'loop',
 ]);
 
 export type TT =
