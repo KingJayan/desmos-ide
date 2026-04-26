@@ -170,7 +170,7 @@ function needsParens(childOp: string, parentOp: string, side: 'left' | 'right'):
 
 export class Codegen {
   private list: DesmosExpr[] = [];
-  private idCounter = 1;
+  private idCounts = new Map<string, number>();
 
   generate(program: T.Program): DesmosState {
     for (const stmt of program.body) this.genStmt(stmt);
@@ -181,8 +181,15 @@ export class Codegen {
     };
   }
 
-  private emit(partial: Omit<DesmosExpr, 'id'>): string {
-    const id = String(this.idCounter++);
+  // stable id derived from a logical name
+  private stableId(base: string): string {
+    const n = (this.idCounts.get(base) ?? 0) + 1;
+    this.idCounts.set(base, n);
+    return n === 1 ? base : `${base}_${n}`;
+  }
+
+  private emit(partial: Omit<DesmosExpr, 'id'>, idBase?: string): string {
+    const id = idBase ? this.stableId(idBase) : this.stableId(`__anon_${this.list.length}`);
     this.list.push({ ...partial, id });
     return id;
   }
@@ -238,13 +245,13 @@ export class Codegen {
       }
 
       const initVal = valArg ? this.toLaTeX(valArg) : '0';
-      this.emit({ type: 'expression', latex: `${varName}=${initVal}`, slider });
+      this.emit({ type: 'expression', latex: `${varName}=${initVal}`, slider }, stmt.name);
       return;
     }
 
     // expr block lowered form — emit bare expression without name binding
     if (stmt.name.startsWith('__expr_')) {
-      this.emit({ type: 'expression', latex: this.toLaTeX(stmt.value) });
+      this.emit({ type: 'expression', latex: this.toLaTeX(stmt.value) }, stmt.name);
       return;
     }
 
@@ -252,17 +259,17 @@ export class Codegen {
     if (stmt.domain) {
       const exprLatex   = this.toLaTeX(stmt.value);
       const domainLatex = this.toLaTeX(stmt.domain);
-      this.emit({ type: 'expression', latex: `${varName}=${exprLatex}\\left\\{${domainLatex}\\right\\}` });
+      this.emit({ type: 'expression', latex: `${varName}=${exprLatex}\\left\\{${domainLatex}\\right\\}` }, stmt.name);
       return;
     }
 
-    this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` });
+    this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` }, stmt.name);
   }
 
   /** alias r = expr — identical output to VarDecl */
   private genAliasDecl(stmt: T.AliasDecl): void {
     const varName = nameToLatex(stmt.name);
-    this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` });
+    this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` }, stmt.name);
   }
 
   private genPointDecl(stmt: T.PointDecl): void {
@@ -276,7 +283,7 @@ export class Codegen {
       color, showLabel: true, label: stmt.name,
     };
     if (stmt.style?.pointSize) partial.pointSize = String(stmt.style.pointSize);
-    this.emit(partial);
+    this.emit(partial, stmt.name);
   }
 
   private genCircleDecl(stmt: T.CircleDecl): void {
@@ -289,7 +296,7 @@ export class Codegen {
       type: 'expression',
       latex: this.circleLatex(cx, cy, r),
       color, fill: true, fillOpacity,
-    });
+    }, stmt.name);
   }
 
   private genLineDecl(stmt: T.LineDecl): void {
@@ -311,7 +318,7 @@ export class Codegen {
 
     const partial: Omit<DesmosExpr, 'id'> = { type: 'expression', latex, color };
     this.applyLineStyle(partial, stmt.style);
-    this.emit(partial);
+    this.emit(partial, stmt.name);
   }
 
   private genCurveDecl(stmt: T.CurveDecl): void {
@@ -340,7 +347,7 @@ export class Codegen {
       }
       if (fillOpacity) { partial.fill = true; partial.fillOpacity = fillOpacity; }
       this.applyLineStyle(partial, stmt.style);
-      this.emit(partial);
+      this.emit(partial, stmt.name);
       return;
     }
 
@@ -358,7 +365,7 @@ export class Codegen {
       partial.colorLatex = gradListLatex;
     }
     this.applyLineStyle(partial, stmt.style);
-    this.emit(partial);
+    this.emit(partial, stmt.name);
   }
 
   private genRegionDecl(stmt: T.RegionDecl): void {
@@ -369,7 +376,7 @@ export class Codegen {
       latex: this.toLaTeX(stmt.expr),
       color, fill: stmt.style?.fill !== false,
       fillOpacity,
-    });
+    }, stmt.name);
   }
 
   private genPolygonDecl(stmt: T.PolygonDecl): void {
@@ -377,7 +384,7 @@ export class Codegen {
     const pts = stmt.points.map(p => `\\left(${this.toLaTeX(p.x)},${this.toLaTeX(p.y)}\\right)`).join(',');
     const latex = `\\operatorname{polygon}\\left(${pts}\\right)`;
     const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.2';
-    this.emit({ type: 'expression', latex, color, fill: true, fillOpacity });
+    this.emit({ type: 'expression', latex, color, fill: true, fillOpacity }, stmt.name);
   }
 
   private genSegmentDecl(stmt: T.SegmentDecl): void {
@@ -387,7 +394,7 @@ export class Codegen {
     const latex = `\\left[\\left(${x1},${y1}\\right),\\left(${x2},${y2}\\right)\\right]`;
     const partial: Omit<DesmosExpr, 'id'> = { type: 'expression', latex, color, lines: true, points: false };
     this.applyLineStyle(partial, stmt.style);
-    this.emit(partial);
+    this.emit(partial, stmt.name);
   }
 
   private genTextDecl(stmt: T.TextDecl): void {
@@ -400,11 +407,11 @@ export class Codegen {
       label: stmt.content,
       showLabel: true,
       points: false,
-    });
+    }, stmt.name);
   }
 
   private genGroupDecl(stmt: T.GroupDecl): void {
-    this.emit({ type: 'folder', title: stmt.label });
+    this.emit({ type: 'folder', title: stmt.label }, `grp_${stmt.name}`);
   }
 
   private applyLineStyle(partial: Omit<DesmosExpr, 'id'>, style?: T.StyleBlock): void {
@@ -436,7 +443,7 @@ export class Codegen {
       if (cl) partial.colorLatex = cl;
     }
     this.applyLineStyle(partial, stmt.style);
-    this.emit(partial);
+    this.emit(partial, stmt.name);
   }
 
   private genWaveDecl(stmt: T.WaveDecl): void {
@@ -463,7 +470,7 @@ export class Codegen {
       if (cl) partial.colorLatex = cl;
     }
     this.applyLineStyle(partial, stmt.style);
-    this.emit(partial);
+    this.emit(partial, stmt.name);
   }
 
   private genGridDecl(stmt: T.GridDecl): void {
@@ -483,8 +490,8 @@ export class Codegen {
     const xList = buildList(Math.ceil(xmin), Math.floor(xmax));
     const yList = buildList(Math.ceil(ymin), Math.floor(ymax));
     const lw = stmt.style?.lineWidth !== undefined ? String(stmt.style.lineWidth) : '1';
-    this.emit({ type: 'expression', latex: `y=${yList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw });
-    this.emit({ type: 'expression', latex: `x=${xList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw });
+    this.emit({ type: 'expression', latex: `y=${yList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw }, `${stmt.name}_h`);
+    this.emit({ type: 'expression', latex: `x=${xList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw }, `${stmt.name}_v`);
   }
 
   private circleLatex(cx: string, cy: string, r: string): string {

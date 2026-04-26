@@ -156,6 +156,11 @@ export interface CompletionItem {
   documentation?: string;
 }
 
+const STATEMENT_KEYWORDS = new Set([
+  'fn', 'alias', 'point', 'circle', 'line', 'curve', 'region',
+  'polygon', 'segment', 'text', 'group', 'spiral', 'wave', 'grid', 'debug', 'expr',
+]);
+
 export function buildCompletions(kinds: {
   Keyword: number;
   Snippet: number;
@@ -401,8 +406,20 @@ export function registerLanguage(monaco: {
         startColumn:     word.startColumn,
         endColumn:       word.endColumn,
       };
+
+      // determine context: statement-start = nothing non-whitespace before word on line
+      const linePrefix = (model as unknown as { getValueInRange(r: unknown): string }).getValueInRange({
+        startLineNumber: position.lineNumber, startColumn: 1,
+        endLineNumber: position.lineNumber, endColumn: word.startColumn,
+      });
+      const atStatementStart = /^\s*$/.test(linePrefix);
+
       const completions = buildCompletions({ Keyword, Snippet, Function });
-      const suggestions = completions.map(item => ({
+      const filtered = atStatementStart
+        ? completions  // show everything at statement start
+        : completions.filter(c => c.kind === Function || (c.kind === Keyword && !STATEMENT_KEYWORDS.has(c.label)));
+
+      const suggestions = filtered.map(item => ({
         ...item,
         insertTextRules: item.insertTextRules === 4 ? InsertAsSnippet : undefined,
         range,
@@ -442,7 +459,31 @@ export function registerLanguage(monaco: {
 
 // util: map compile errors to Monaco markers
 
-export function errorToMarker(
+export interface CompileErrorLike {
+  message: string;
+  error: string;
+  phase: 1 | 2;
+  line?: number;
+  col?: number;
+  endCol?: number;
+  fix?: string;
+}
+
+export function errorToMarker(e: CompileErrorLike): DiagnosticMarker | null {
+  if (e.line == null || e.col == null) return null;
+  const msg = e.fix ? `${e.message}\nFix: ${e.fix}` : e.message;
+  return {
+    startLineNumber: e.line,
+    startColumn:     e.col,
+    endLineNumber:   e.line,
+    endColumn:       e.endCol ?? e.col + 1,
+    message:         msg,
+    severity:        8,
+  };
+}
+
+/** @deprecated pass a CompileErrorLike obj instead */
+export function errorToMarkerLegacy(
   message: string,
   line: number,
   col: number,

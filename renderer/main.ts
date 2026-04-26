@@ -392,6 +392,8 @@ const sliderManager = new InlineSliderManager(editor);
 function handleCompileResult(result: CompileResult): void {
   lastCompileResult = result;
   if (result.success) {
+    monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', []);
+    monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', []);
     monaco.editor.setModelMarkers(model, 'desmos-dsl', result.warnings);
     if (mode !== 'enhanced') {
       graph.update(result.state.expressions.list);
@@ -404,38 +406,79 @@ function handleCompileResult(result: CompileResult): void {
     const warnNote = result.warnings.length ? ` · ${result.warnings.length} warning(s)` : '';
     setStatus(`✓ ${result.state.expressions.list.length} expression(s)${warnNote}`, result.warnings.length ? 'info' : 'success');
   } else {
-    const markers = result.errors
-      .filter(e => e.line != null && e.col != null)
-      .map(e => errorToMarker(e.error, e.line!, e.col!, e.tokenLen));
-    monaco.editor.setModelMarkers(model, 'desmos-dsl', markers);
+    const syntaxMarkers = result.errors.filter(e => e.phase === 1).flatMap(e => { const m = errorToMarker(e); return m ? [m] : []; });
+    const semanticMarkers = result.errors.filter(e => e.phase === 2).flatMap(e => { const m = errorToMarker(e); return m ? [m] : []; });
+    monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', syntaxMarkers);
+    monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', semanticMarkers);
+    const first = result.errors[0];
     const msg = result.errors.length === 1
-      ? `✗ ${result.errors[0].error}`
-      : `✗ ${result.errors.length} errors — first: ${result.errors[0].error}`;
+      ? `✗ ${first.message}`
+      : `✗ ${result.errors.length} errors — ${first.message}`;
     setStatus(msg, 'error');
   }
 }
 
+const BUILTIN_SIGS: Record<string, string> = {
+  sin: 'sin(x) → number', cos: 'cos(x) → number', tan: 'tan(x) → number',
+  arcsin: 'arcsin(x) → number', arccos: 'arccos(x) → number', arctan: 'arctan(x) → number',
+  ln: 'ln(x) → number', log: 'log(x) → number', sqrt: 'sqrt(x) → number',
+  abs: 'abs(x) → number', floor: 'floor(x) → number', ceil: 'ceil(x) → number',
+  round: 'round(x) → number', min: 'min(a, b, ...) → number', max: 'max(a, b, ...) → number',
+  mod: 'mod(a, b) → number', sign: 'sign(x) → number',
+  rgb: 'rgb(r, g, b) → color  (0–255 each)',
+  hsv: 'hsv(h, s, v) → color  (h: 0–360, s/v: 0–1)',
+  gradient: 'gradient(from, to) → color',
+  slider: 'slider(value, min, max, speed?) → number',
+};
+
 monaco.languages.registerHoverProvider(LANGUAGE_ID, {
   provideHover(model, position) {
-    if (!lastCompileResult?.success) return null;
     const word = model.getWordAtPosition(position);
     if (!word) return null;
+    const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
 
+    const sig = BUILTIN_SIGS[word.word];
+    if (sig) {
+      return { range, contents: [{ value: `\`\`\`\n${sig}\n\`\`\``, isTrusted: true }] };
+    }
+
+    if (!lastCompileResult?.success) return null;
     const sym = lastCompileResult.symbols.find(s => s.name === word.word);
     if (!sym) return null;
 
-    const expr = lastCompileResult.state.expressions.list.find(
-      e => e.type === 'expression' && e.id && e.id.includes(sym.name),
-    );
-    const latex = expr && 'latex' in expr ? expr.latex : null;
+    const list = lastCompileResult.state.expressions.list;
+    const expr = list.find(e => e.id === sym.name) ?? list.find(e => e.id.startsWith(sym.name));
 
     const kindLabel = sym.kind.charAt(0).toUpperCase() + sym.kind.slice(1);
-    const lines: string[] = [`**${kindLabel}** \`${sym.name}\``];
-    if (latex) lines.push(`\`\`\`latex\n${latex}\n\`\`\``);
+    const contents: { value: string; isTrusted: boolean }[] = [
+      { value: `**${kindLabel}** \`${sym.name}\` — line ${sym.line}`, isTrusted: true },
+    ];
 
+    if (expr?.latex) {
+      // strip leading "name=" binding to show just the value when it's an assignment
+      const rhs = expr.latex.replace(/^[^=]+=/, '');
+      contents.push({ value: `\`\`\`latex\n${rhs}\n\`\`\``, isTrusted: true });
+    }
+
+    if (sym.kind === 'fn') {
+      const srcLine = model.getLineContent(sym.line).trim();
+      contents.push({ value: `\`\`\`\n${srcLine}\n\`\`\``, isTrusted: true });
+    }
+
+    return { range, contents };
+  },
+});
+
+monaco.languages.registerDefinitionProvider(LANGUAGE_ID, {
+  provideDefinition(model, position) {
+    if (!lastCompileResult?.success) return null;
+    const word = model.getWordAtPosition(position);
+    if (!word) return null;
+    const sym = lastCompileResult.symbols.find(s => s.name === word.word);
+    if (!sym) return null;
     return {
-      range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
-      contents: lines.map(value => ({ value, isTrusted: true })),
+      uri: model.uri,
+      range: new monaco.Range(sym.line, sym.col, sym.line, sym.col + sym.name.length),
     };
   },
 });

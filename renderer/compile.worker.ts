@@ -10,9 +10,17 @@ type CompileWorkerResponse = {
   result: CompileResult;
 };
 
+let lastSrc: string | null = null;
+let lastResult: CompileResult | null = null;
+
 self.addEventListener('message', (event: MessageEvent<CompileWorkerRequest>) => {
   const { id, src } = event.data;
+  if (src === lastSrc && lastResult !== null) {
+    self.postMessage({ id, result: lastResult } satisfies CompileWorkerResponse);
+    return;
+  }
   const result = compile(src);
-  const response: CompileWorkerResponse = { id, result };
-  self.postMessage(response);
+  lastSrc = src;
+  lastResult = result;
+  self.postMessage({ id, result } satisfies CompileWorkerResponse);
 });

@@ -1,11 +1,11 @@
-// public api — DSL v2
+// public api
 
 import { tokenize, LexError } from './compiler/lexer';
 import { parse, ParseError } from './compiler/parser';
 import { optimize } from './compiler/optimizer';
 import { codegen, DesmosState, DesmosExpr } from './compiler/codegen';
 import { analyze } from './compiler/analyze';
-import type { Program, Statement } from './compiler/types';
+import type { Program, Statement, Expr } from './compiler/types';
 
 export { registerLanguage, LANGUAGE_ID, errorToMarker } from './monaco/language';
 export type { DesmosState, DesmosExpr, DesmosSlider } from './compiler/codegen';
@@ -41,11 +41,13 @@ export interface CompileSuccess {
 }
 
 export interface CompileError {
-  error: string;
+  message: string;
   phase: 1 | 2;
   line?: number;
   col?: number;
-  tokenLen?: number;
+  endCol?: number;
+  fix?: string;
+  error: string;
 }
 
 export interface CompileFailure {
@@ -83,9 +85,51 @@ function extractSymbols(ast: Program): SymbolInfo[] {
 
 const RESERVED = new Set(['t', 'r', 'theta']);
 
+function collectRefs(expr: Expr, out: Set<string>): void {
+  switch (expr.type) {
+    case 'Ident': out.add(expr.name); break;
+    case 'BinOp': collectRefs(expr.left, out); collectRefs(expr.right, out); break;
+    case 'UnaryOp': collectRefs(expr.operand, out); break;
+    case 'CompareExpr': collectRefs(expr.left, out); collectRefs(expr.right, out); break;
+    case 'ConditionalExpr': collectRefs(expr.cond, out); collectRefs(expr.then, out); collectRefs(expr.else_, out); break;
+    case 'PiecewiseExpr': expr.branches.forEach(b => { if (b.cond) collectRefs(b.cond, out); collectRefs(b.body, out); }); break;
+    case 'Call': out.add(expr.fn); expr.args.forEach(a => collectRefs(a, out)); if (expr.kwargs) Object.values(expr.kwargs).forEach(v => collectRefs(v, out)); break;
+    case 'Tuple': collectRefs(expr.x, out); collectRefs(expr.y, out); break;
+    case 'ListRange': collectRefs(expr.start, out); collectRefs(expr.end, out); if (expr.step) collectRefs(expr.step, out); break;
+    case 'MapExpr': collectRefs(expr.range, out); collectRefs(expr.body, out); break;
+    case 'ForExpr': collectRefs(expr.start, out); collectRefs(expr.end, out); if (expr.step) collectRefs(expr.step, out); collectRefs(expr.body, out); break;
+  }
+}
+
+function allRefs(ast: Program): Set<string> {
+  const refs = new Set<string>();
+  for (const stmt of ast.body) {
+    switch (stmt.type) {
+      case 'VarDecl':     collectRefs(stmt.value, refs); if (stmt.domain) collectRefs(stmt.domain, refs); break;
+      case 'AliasDecl':   collectRefs(stmt.value, refs); break;
+      case 'FnDecl':      collectRefs(stmt.body, refs); break;
+      case 'DebugDecl':   collectRefs(stmt.expr, refs); break;
+      case 'ExprBlockDecl': stmt.bindings.forEach(b => collectRefs(b.value, refs)); collectRefs(stmt.result, refs); break;
+      case 'PointDecl':   collectRefs(stmt.x, refs); collectRefs(stmt.y, refs); break;
+      case 'CircleDecl':  collectRefs(stmt.cx, refs); collectRefs(stmt.cy, refs); collectRefs(stmt.r, refs); break;
+      case 'LineDecl':    [stmt.slope, stmt.intercept, stmt.lhs, stmt.rhs, stmt.expr].forEach(e => e && collectRefs(e, refs)); break;
+      case 'CurveDecl':   collectRefs(stmt.start, refs); collectRefs(stmt.end, refs); if (stmt.step) collectRefs(stmt.step, refs); collectRefs(stmt.body, refs); break;
+      case 'RegionDecl':  collectRefs(stmt.expr, refs); break;
+      case 'PolygonDecl': stmt.points.forEach(p => { collectRefs(p.x, refs); collectRefs(p.y, refs); }); break;
+      case 'SegmentDecl': collectRefs(stmt.p1.x, refs); collectRefs(stmt.p1.y, refs); collectRefs(stmt.p2.x, refs); collectRefs(stmt.p2.y, refs); break;
+      case 'TextDecl':    collectRefs(stmt.x, refs); collectRefs(stmt.y, refs); break;
+      case 'SpiralDecl':  collectRefs(stmt.turns, refs); collectRefs(stmt.spacing, refs); [stmt.cx, stmt.cy, stmt.rotate].forEach(e => e && collectRefs(e, refs)); break;
+      case 'WaveDecl':    [stmt.freq, stmt.amp, stmt.phase, stmt.cx, stmt.cy, stmt.xmin, stmt.xmax].forEach(e => e && collectRefs(e, refs)); break;
+      case 'GridDecl':    [stmt.cols, stmt.rows, stmt.xmin, stmt.xmax, stmt.ymin, stmt.ymax].forEach(e => e && collectRefs(e, refs)); break;
+    }
+  }
+  return refs;
+}
+
 function checkWarnings(ast: Program): WarningMarker[] {
   const seen = new Map<string, number>();
   const markers: WarningMarker[] = [];
+  const refs = allRefs(ast);
 
   for (const stmt of ast.body) {
     const sym = stmtSymbol(stmt);
@@ -111,8 +155,27 @@ function checkWarnings(ast: Program): WarningMarker[] {
     } else {
       seen.set(name, line);
     }
+
+    if ((kind === 'alias' || kind === 'fn') && !refs.has(name)) {
+      markers.push({
+        startLineNumber: line, startColumn: col,
+        endLineNumber: line,   endColumn: col + kwLen + 1 + name.length,
+        message: `'${name}' is declared but never used`,
+        severity: 4,
+      });
+    }
   }
   return markers;
+}
+
+function stripPrefix(raw: string): string {
+  // strip "[line:col] Foo error: " prefix
+  return raw.replace(/^\[\d+:\d+\] \w[\w ]+:\s*/, '');
+}
+
+function mkError(raw: string, phase: 1 | 2, line?: number, col?: number, tokenLen?: number, fix?: string): CompileError {
+  const message = stripPrefix(raw);
+  return { error: raw, message, phase, line, col, endCol: (col != null && tokenLen) ? col + tokenLen : undefined, fix };
 }
 
 export function compile(src: string): CompileResult {
@@ -123,13 +186,7 @@ export function compile(src: string): CompileResult {
     if (parseErrors.length > 0) {
       return {
         success: false,
-        errors: parseErrors.map(e => ({
-          error: e.error,
-          phase: 1 as const,
-          line: e.line,
-          col: e.col,
-          tokenLen: e.tokenLen,
-        })),
+        errors: parseErrors.map(e => mkError(e.error, 1, e.line, e.col, e.tokenLen)),
       };
     }
 
@@ -137,12 +194,7 @@ export function compile(src: string): CompileResult {
     if (semanticErrors.length > 0) {
       return {
         success: false,
-        errors: semanticErrors.map(e => ({
-          error: e.error,
-          phase: 2 as const,
-          line: e.line,
-          col: e.col,
-        })),
+        errors: semanticErrors.map(e => mkError(e.error, 2, e.line, e.col)),
       };
     }
 
@@ -154,10 +206,10 @@ export function compile(src: string): CompileResult {
     return { success: true, state, warnings, symbols };
   } catch (e) {
     if (e instanceof LexError)
-      return { success: false, errors: [{ error: e.message, phase: 1, line: e.line, col: e.col }] };
+      return { success: false, errors: [mkError(e.message, 1, e.line, e.col)] };
     if (e instanceof ParseError)
-      return { success: false, errors: [{ error: e.message, phase: 1, line: e.tok.line, col: e.tok.col, tokenLen: e.tok.value.length }] };
-    return { success: false, errors: [{ error: String(e), phase: 1 }] };
+      return { success: false, errors: [mkError(e.message, 1, e.tok.line, e.tok.col, e.tok.value.length)] };
+    return { success: false, errors: [{ error: String(e), message: String(e), phase: 1 }] };
   }
 }
 

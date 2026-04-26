@@ -5,6 +5,50 @@ import * as T from './types';
 interface FnDef { params: string[]; body: T.Expr; }
 interface Env { fns: Map<string, FnDef>; }
 
+function collectAllRefs(program: T.Program): Set<string> {
+  const refs = new Set<string>();
+  const walk = (e: T.Expr): void => {
+    switch (e.type) {
+      case 'Ident': refs.add(e.name); break;
+      case 'BinOp': walk(e.left); walk(e.right); break;
+      case 'UnaryOp': walk(e.operand); break;
+      case 'CompareExpr': walk(e.left); walk(e.right); break;
+      case 'ConditionalExpr': walk(e.cond); walk(e.then); walk(e.else_); break;
+      case 'PiecewiseExpr': e.branches.forEach(b => { if (b.cond) walk(b.cond); walk(b.body); }); break;
+      case 'Call': refs.add(e.fn); e.args.forEach(walk); if (e.kwargs) Object.values(e.kwargs).forEach(walk); break;
+      case 'Tuple': walk(e.x); walk(e.y); break;
+      case 'ListRange': walk(e.start); walk(e.end); if (e.step) walk(e.step); break;
+      case 'MapExpr': walk(e.range); walk(e.body); break;
+      case 'ForExpr': walk(e.start); walk(e.end); if (e.step) walk(e.step); walk(e.body); break;
+    }
+  };
+  for (const stmt of program.body) {
+    if (stmt.type === 'AliasDecl' || stmt.type === 'FnDecl') continue;
+    switch (stmt.type) {
+      case 'VarDecl': walk(stmt.value); if (stmt.domain) walk(stmt.domain); break;
+      case 'DebugDecl': walk(stmt.expr); break;
+      case 'ExprBlockDecl': stmt.bindings.forEach(b => walk(b.value)); walk(stmt.result); break;
+      case 'PointDecl': walk(stmt.x); walk(stmt.y); break;
+      case 'CircleDecl': walk(stmt.cx); walk(stmt.cy); walk(stmt.r); break;
+      case 'LineDecl': [stmt.slope, stmt.intercept, stmt.lhs, stmt.rhs, stmt.expr].forEach(e => e && walk(e)); break;
+      case 'CurveDecl': walk(stmt.start); walk(stmt.end); if (stmt.step) walk(stmt.step); walk(stmt.body); break;
+      case 'RegionDecl': walk(stmt.expr); break;
+      case 'PolygonDecl': stmt.points.forEach(p => { walk(p.x); walk(p.y); }); break;
+      case 'SegmentDecl': walk(stmt.p1.x); walk(stmt.p1.y); walk(stmt.p2.x); walk(stmt.p2.y); break;
+      case 'TextDecl': walk(stmt.x); walk(stmt.y); break;
+      case 'SpiralDecl': walk(stmt.turns); walk(stmt.spacing); [stmt.cx, stmt.cy, stmt.rotate].forEach(e => e && walk(e)); break;
+      case 'WaveDecl': [stmt.freq, stmt.amp, stmt.phase, stmt.cx, stmt.cy, stmt.xmin, stmt.xmax].forEach(e => e && walk(e)); break;
+      case 'GridDecl': [stmt.cols, stmt.rows, stmt.xmin, stmt.xmax, stmt.ymin, stmt.ymax].forEach(e => e && walk(e)); break;
+    }
+  }
+  // also collect refs inside alias bodies (aliases can reference other aliases)
+  for (const stmt of program.body) {
+    if (stmt.type === 'AliasDecl') walk(stmt.value);
+    if (stmt.type === 'FnDecl') walk(stmt.body);
+  }
+  return refs;
+}
+
 export function optimize(program: T.Program): T.Program {
   const env: Env = { fns: new Map() };
 
@@ -14,11 +58,15 @@ export function optimize(program: T.Program): T.Program {
     }
   }
 
+  const usedRefs = collectAllRefs(program);
+
   const body: T.Statement[] = [];
   for (const stmt of program.body) {
     if (stmt.type === 'FnDecl') continue;
-
     if (stmt.type === 'DebugDecl') continue;
+
+    // strip unreferenced aliases — they produce no graph output when unused
+    if (stmt.type === 'AliasDecl' && !usedRefs.has(stmt.name)) continue;
 
     if (stmt.type === 'ExprBlockDecl') {
       body.push(lowerExprBlock(stmt, env));
