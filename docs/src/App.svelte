@@ -191,7 +191,7 @@
   <main class="page landing">
     <header class="hero home-hero landing-hero">
       <div class="hero-copy">
-        <p class="eyebrow">product landing</p>
+        <p class="eyebrow">let's get started</p>
         <h1>desmos ide</h1>
         <p class="lede">
           a focused environment for building, creating, and experimenting with advanced desmos.
