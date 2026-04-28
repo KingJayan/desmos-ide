@@ -9,21 +9,10 @@
       }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/docs",
-      "dest": "/index.html"
-    },
-    {
-      "src": "/docs/(.*)",
-      "dest": "/index.html"
-    },
-    {
-      "src": "/download/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
