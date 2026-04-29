@@ -4,7 +4,7 @@ type ConvMessage = { role: 'user' | 'assistant'; content: string };
 type ApplyAction = { type: 'insert' | 'replace'; code: string };
 type Chat = { id: string; title: string; history: ConvMessage[] };
 
-type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama';
+type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot';
 
 type ProviderConfig = {
   model: string;
@@ -18,24 +18,117 @@ const PROVIDERS: Array<{ id: AIProvider; label: string }> = [
   { id: 'openai-compatible', label: 'OpenAI-compatible' },
   { id: 'openrouter', label: 'OpenRouter' },
   { id: 'ollama', label: 'Ollama' },
+  { id: 'github-copilot', label: 'GitHub Copilot' },
 ];
 
 const PROVIDER_DEFAULTS: ProviderConfigMap = {
   'openai-compatible': {
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.3-mini',
     baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
   },
   openrouter: {
-    model: 'openai/gpt-4o-mini',
+    model: 'openai/gpt-5.3-mini',
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: '',
   },
   ollama: {
-    model: 'llama3.2',
+    model: 'llama3.3',
     baseUrl: 'http://127.0.0.1:11434/v1',
     apiKey: '',
   },
+  'github-copilot': {
+    model: 'gpt-5.3',
+    baseUrl: 'https://api.githubcopilot.com',
+    apiKey: '',
+  },
+};
+
+const PROVIDER_MODELS: Record<AIProvider, string[]> = {
+  'openai-compatible': [
+    'gpt-5.3', 'gpt-5.3-mini',
+    'gpt-5.2', 'gpt-5.2-mini',
+    'gpt-5.1',
+    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+
+    'o3', 'o3-mini',
+    'o4', 'o4-mini',
+  ],
+
+  openrouter: [
+    'openai/gpt-5.3', 'openai/gpt-5.3-mini',
+    'openai/gpt-5.2', 'openai/gpt-5.2-mini',
+    'openai/gpt-4.1', 'openai/gpt-4.1-mini', 'openai/gpt-4.1-nano',
+    'openai/o3', 'openai/o3-mini',
+    'openai/o4', 'openai/o4-mini',
+
+    'anthropic/claude-opus-4.1',
+    'anthropic/claude-sonnet-4.5',
+    'anthropic/claude-haiku-4.5',
+
+    'google/gemini-2.5-pro',
+    'google/gemini-2.5-flash',
+    'google/gemini-2.0-flash',
+
+    'meta-llama/llama-4',
+    'meta-llama/llama-4-scout',
+    'meta-llama/llama-3.3-70b-instruct',
+
+    'mistralai/mistral-large',
+    'mistralai/mistral-small',
+    'mistralai/codestral',
+
+    'deepseek/deepseek-r1',
+    'deepseek/deepseek-v3',
+    'deepseek/deepseek-coder-v2',
+
+    'x-ai/grok-3',
+    'x-ai/grok-3-mini',
+
+    'cohere/command-r-plus',
+    'cohere/command-r',
+
+    'qwen/qwen-2.5-72b-instruct',
+    'qwen/qwen-2.5-coder-32b-instruct',
+
+    'microsoft/phi-4',
+    'microsoft/phi-4-mini',
+  ],
+
+  ollama: [
+    'llama3.3', 'llama3.2',
+
+    'mistral', 'mixtral', 'mistral-nemo',
+
+    'qwen2.5', 'qwen2.5-coder',
+
+    'phi4', 'phi4-mini',
+
+    'gemma3', 'gemma2',
+
+    'deepseek-r1', 'deepseek-v3', 'deepseek-coder-v2',
+
+    'codellama', 'codegemma', 'starcoder2',
+
+    'nomic-embed-text', 'mxbai-embed-large',
+  ],
+
+  'github-copilot': [
+    'gpt-5.4', 'gpt-5.4-mini',
+    'gpt-4.1',
+
+    'gpt-5.2-codex',
+    'gpt-5.3-codex',
+
+    'o3-mini',
+
+    'claude-sonnet-4.6',
+    'claude-haiku-4.5',
+    'claude-opus-4.7',
+
+    'gemini-3.1-pro',
+    'gemini-2.5-flash',
+  ],
 };
 
 const MAX_HISTORY        = 20;
@@ -53,6 +146,42 @@ const SLASH_COMMANDS = [
   { cmd: '/memory clear', desc: 'Clear all memories',                arg: '' },
 ];
 
+interface CopilotAuthState {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  pollTimer: ReturnType<typeof setInterval> | null;
+  interval: number;
+}
+
+// compute line-level diff for diff preview
+type DiffLine = { op: '=' | '+' | '-'; line: string };
+function lineDiff(before: string, after: string): DiffLine[] {
+  const a = before.split('\n');
+  const b = after.split('\n');
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j]
+        ? dp[i + 1][j + 1] + 1
+        : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const result: DiffLine[] = [];
+  let i = 0, j = 0;
+  while (i < m || j < n) {
+    if (i < m && j < n && a[i] === b[j]) {
+      result.push({ op: '=', line: a[i] }); i++; j++;
+    } else if (j < n && (i >= m || dp[i][j + 1] >= (i < m ? dp[i + 1][j] : 0))) {
+      result.push({ op: '+', line: b[j] }); j++;
+    } else {
+      result.push({ op: '-', line: a[i] }); i++;
+    }
+  }
+  return result;
+}
+
 export class AISidebar {
   private chats: Chat[] = [];
   private activeChat!: Chat;
@@ -60,8 +189,11 @@ export class AISidebar {
   private providerConfigs: ProviderConfigMap;
   private memories: string[] = [];
   private sendContext: boolean;
+  private autoApprove: boolean;
   private streaming = false;
   private streamMap = new Map<string, { chat: Chat; accum: string; textEl: HTMLElement | null; bubble: HTMLElement | null }>();
+  private copilotAuth: CopilotAuthState | null = null;
+  private activeReqId: string | null = null;
 
   private onApply: (action: ApplyAction) => void;
   private getContext: () => { dsl: string; selection: string };
@@ -71,18 +203,20 @@ export class AISidebar {
   private inputEl!: HTMLTextAreaElement;
   private sendBtn!: HTMLButtonElement;
   private chatSelectEl!: HTMLSelectElement;
-  private providerEl!: HTMLSelectElement;
   private providerLabelEl!: HTMLElement;
   private providerStateEl!: HTMLElement;
   private configBtnEl!: HTMLButtonElement;
   private configEl!: HTMLElement;
   private cfgModelEl!: HTMLInputElement;
+  private cfgModelListEl!: HTMLElement;
   private cfgBaseUrlEl!: HTMLInputElement;
   private cfgApiKeyEl!: HTMLInputElement;
   private cfgSaveEl!: HTMLButtonElement;
+  private cfgCopilotEl!: HTMLElement;
   private acEl!: HTMLElement;
   private acIndex = -1;
   private acItems: typeof SLASH_COMMANDS = [];
+  private autoApproveBtn!: HTMLButtonElement;
 
   constructor(
     container: HTMLElement,
@@ -95,6 +229,7 @@ export class AISidebar {
     this.provider = this.loadProvider();
     this.providerConfigs = this.loadProviderConfigs();
     this.sendContext = localStorage.getItem('ai-send-context') !== 'false';
+    this.autoApprove = localStorage.getItem('ai-auto-approve') === 'true';
     this.loadState();
     this.render();
     this.registerIpc();
@@ -103,7 +238,7 @@ export class AISidebar {
 
   private loadProvider(): AIProvider {
     const v = localStorage.getItem('ai-provider');
-    if (v === 'openai-compatible' || v === 'openrouter' || v === 'ollama') return v;
+    if (v === 'openai-compatible' || v === 'openrouter' || v === 'ollama' || v === 'github-copilot') return v;
     return 'openai-compatible';
   }
 
@@ -112,6 +247,7 @@ export class AISidebar {
       'openai-compatible': { ...PROVIDER_DEFAULTS['openai-compatible'] },
       openrouter: { ...PROVIDER_DEFAULTS.openrouter },
       ollama: { ...PROVIDER_DEFAULTS.ollama },
+      'github-copilot': { ...PROVIDER_DEFAULTS['github-copilot'] },
     };
     try {
       const raw = localStorage.getItem('ai-provider-configs');
@@ -206,43 +342,64 @@ export class AISidebar {
         <button class="ai-icon-btn ai-icon-btn--danger" id="ai-del-btn" title="Delete/Clear Chat" aria-label="Delete or Clear Chat"><i data-lucide="trash-2" aria-hidden="true"></i></button>
       </div>
       <div class="ai-messages"></div>
+      <div class="ai-status-strip">
+        <div class="ai-status-left">
+          <button class="ai-provider-chip" id="ai-provider-chip" title="Provider settings"><span class="ai-status-provider-label"></span></button>
+          <span class="ai-status-model"></span>
+          <span class="ai-status-context"></span>
+          <span class="ai-status-memory"></span>
+        </div>
+        <div class="ai-status-right">
+          <button class="ai-ctx-btn${this.sendContext ? ' ai-ctx-btn--on' : ''}" id="ai-ctx-btn" title="Send code context with each message. Toggle off to protect sensitive code.">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>ctx</span>
+          </button>
+          <button class="ai-ctx-btn${this.autoApprove ? ' ai-ctx-btn--on' : ''}" id="ai-autoapprove-btn" title="${this.autoApprove ? 'Auto-approve ON — code applied without diff preview' : 'Auto-approve OFF — shows diff before applying'}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>auto</span>
+          </button>
+        </div>
+      </div>
       <div class="ai-compose">
         <div class="ai-autocomplete"></div>
         <div class="ai-compose-wrap">
           <textarea class="ai-input" rows="1" placeholder="Ask about your DSL…"></textarea>
           <div class="ai-compose-bar">
-            <div class="ai-compose-bar-left">
-              <button class="ai-ctx-btn${this.sendContext ? ' ai-ctx-btn--on' : ''}" id="ai-ctx-btn" title="Send code context with each message. Toggle off to protect sensitive code.">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <span>ctx</span>
-              </button>
-              <select class="ai-provider-select">
-                ${PROVIDERS.map(p => `<option value="${p.id}"${p.id === this.provider ? ' selected' : ''}>${p.label}</option>`).join('')}
-              </select>
-              <span class="ai-provider-label"></span>
-              <span class="ai-provider-state"></span>
-              <button class="ai-config-btn" id="ai-config-btn" title="Provider settings" aria-label="Provider settings"><i data-lucide="sliders-horizontal" aria-hidden="true"></i></button>
-              <span class="ai-memory-badge"></span>
-            </div>
             <button class="ai-send-btn" title="Send (Enter)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
         </div>
         <div class="ai-config-popover" hidden>
-          <div class="ai-config-title">provider config</div>
-          <label class="ai-config-row">
-            <span>model</span>
-            <input class="ai-config-input ai-config-model" type="text" spellcheck="false" />
-          </label>
-          <label class="ai-config-row">
-            <span>base url</span>
-            <input class="ai-config-input ai-config-baseurl" type="text" spellcheck="false" />
-          </label>
-          <label class="ai-config-row">
-            <span>api key</span>
-            <input class="ai-config-input ai-config-key" type="password" spellcheck="false" />
-          </label>
+          <div class="ai-config-copilot" hidden>
+            <div class="ai-copilot-row">
+              <span class="ai-copilot-status"></span>
+              <button class="ai-copilot-connect" type="button">Sign in</button>
+              <button class="ai-copilot-cancel" type="button" hidden>Cancel</button>
+              <button class="ai-copilot-disconnect" type="button" hidden>Disconnect</button>
+            </div>
+            <div class="ai-copilot-code-wrap" hidden>
+              <p class="ai-copilot-instructions">Open <a class="ai-copilot-link" href="#" id="ai-copilot-verif-link">github.com/login/device</a> and enter:</p>
+              <code class="ai-copilot-user-code"></code>
+            </div>
+          </div>
+          <div class="ai-config-standard">
+            <label class="ai-config-row">
+              <span>model</span>
+              <div class="ai-model-picker">
+                <input class="ai-config-input ai-config-model" type="text" placeholder="search models…" spellcheck="false" autocomplete="off" />
+                <div class="ai-model-list"></div>
+              </div>
+            </label>
+            <label class="ai-config-row">
+              <span>base url</span>
+              <input class="ai-config-input ai-config-baseurl" type="text" spellcheck="false" />
+            </label>
+            <label class="ai-config-row">
+              <span>api key</span>
+              <input class="ai-config-input ai-config-key" type="password" spellcheck="false" />
+            </label>
+          </div>
           <button class="ai-config-save" type="button">save</button>
         </div>
       </div>
@@ -252,16 +409,18 @@ export class AISidebar {
     this.inputEl      = this.el.querySelector('.ai-input')!;
     this.sendBtn      = this.el.querySelector('.ai-send-btn')!;
     this.chatSelectEl = this.el.querySelector('.ai-chat-select')!;
-    this.providerEl = this.el.querySelector('.ai-provider-select')!;
-    this.providerLabelEl = this.el.querySelector('.ai-provider-label')!;
-    this.providerStateEl = this.el.querySelector('.ai-provider-state')!;
-    this.configBtnEl = this.el.querySelector('#ai-config-btn')!;
+    this.configBtnEl = this.el.querySelector('#ai-provider-chip')!;
+    this.providerLabelEl = this.el.querySelector('.ai-status-provider-label')!;
+    this.providerStateEl = this.el.querySelector('.ai-status-model')!;
     this.configEl = this.el.querySelector('.ai-config-popover')!;
-    this.cfgModelEl = this.el.querySelector('.ai-config-model')!;
+    this.cfgModelEl = this.el.querySelector('.ai-config-model')!
+    this.cfgModelListEl = this.el.querySelector('.ai-model-list')!;
     this.cfgBaseUrlEl = this.el.querySelector('.ai-config-baseurl')!;
     this.cfgApiKeyEl = this.el.querySelector('.ai-config-key')!;
     this.cfgSaveEl = this.el.querySelector('.ai-config-save')!;
+    this.cfgCopilotEl = this.el.querySelector('.ai-config-copilot')!;
     this.acEl         = this.el.querySelector('.ai-autocomplete')!;
+    this.autoApproveBtn = this.el.querySelector('#ai-autoapprove-btn') as HTMLButtonElement;
     const ctxBtn      = this.el.querySelector('#ai-ctx-btn') as HTMLButtonElement;
 
     createIcons({
@@ -273,7 +432,13 @@ export class AISidebar {
     this.syncMemoryBadge();
     this.syncProviderUi();
 
-    this.sendBtn.addEventListener('click', () => this.submit());
+    this.sendBtn.addEventListener('click', () => {
+      if (this.streaming && this.activeReqId) {
+        this.stopGeneration();
+      } else {
+        this.submit();
+      }
+    });
     this.inputEl.addEventListener('input', () => { this.autoResize(); this.updateAc(); });
     this.inputEl.addEventListener('keydown', e => {
       if (this.acItems.length) {
@@ -322,15 +487,6 @@ export class AISidebar {
       if (chat) { this.activeChat = chat; this.renderMessages(); }
     });
 
-    this.providerEl.addEventListener('change', () => {
-      const next = this.providerEl.value as AIProvider;
-      if (next === 'openai-compatible' || next === 'openrouter' || next === 'ollama') {
-        this.provider = next;
-        this.saveProviderConfigs();
-        this.syncProviderUi();
-      }
-    });
-
     this.configBtnEl.addEventListener('click', e => {
       e.stopPropagation();
       if (this.configEl.hidden) {
@@ -338,6 +494,33 @@ export class AISidebar {
         this.configEl.hidden = false;
       } else {
         this.configEl.hidden = true;
+      }
+    });
+
+    this.cfgModelEl.addEventListener('focus', () => this.showModelList());
+    this.cfgModelEl.addEventListener('input', () => this.filterModelList(this.cfgModelEl.value));
+    this.cfgModelEl.addEventListener('blur', () => setTimeout(() => this.hideModelList(), 150));
+    this.cfgModelEl.addEventListener('keydown', e => {
+      const items = this.cfgModelListEl.querySelectorAll<HTMLElement>('.ai-model-item');
+      const active = this.cfgModelListEl.querySelector<HTMLElement>('.ai-model-item--active');
+      const idx = active ? Array.from(items).indexOf(active) : -1;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = items[idx + 1] ?? items[0];
+        active?.classList.remove('ai-model-item--active');
+        next?.classList.add('ai-model-item--active');
+        next?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = items[idx - 1] ?? items[items.length - 1];
+        active?.classList.remove('ai-model-item--active');
+        prev?.classList.add('ai-model-item--active');
+        prev?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && active) {
+        e.preventDefault();
+        this.selectModel(active.dataset.model!);
+      } else if (e.key === 'Escape') {
+        this.hideModelList();
       }
     });
 
@@ -354,6 +537,10 @@ export class AISidebar {
       this.appendSystemMsg('Provider config saved.');
     });
 
+    // Copilot auth buttons
+    this.el.querySelector('.ai-copilot-connect')!.addEventListener('click', () => this.startCopilotAuth());
+    this.el.querySelector('.ai-copilot-disconnect')!.addEventListener('click', () => this.revokeCopilotAuth());
+
     this.configEl.addEventListener('click', e => e.stopPropagation());
     this.el.addEventListener('click', () => {
       this.configEl.hidden = true;
@@ -367,6 +554,21 @@ export class AISidebar {
         ? 'Code context ON — toggle off to protect sensitive code.'
         : 'Code context OFF — AI will not see your file.';
     });
+
+    this.autoApproveBtn.addEventListener('click', () => {
+      this.autoApprove = !this.autoApprove;
+      localStorage.setItem('ai-auto-approve', String(this.autoApprove));
+      this.autoApproveBtn.classList.toggle('ai-ctx-btn--on', this.autoApprove);
+      this.autoApproveBtn.title = this.autoApprove
+        ? 'Auto-approve ON — code applied without diff preview'
+        : 'Auto-approve OFF — shows diff before applying';
+    });
+
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width ?? this.el.offsetWidth;
+      this.el.classList.toggle('ai-sidebar--compact', w < 260);
+    });
+    ro.observe(this.el);
   }
 
   private syncChatSelect(): void {
@@ -419,26 +621,190 @@ export class AISidebar {
   private syncProviderUi(): void {
     const cfg = this.getProviderConfig();
     const p = PROVIDERS.find(x => x.id === this.provider);
-    this.providerEl.value = this.provider;
-    this.providerLabelEl.textContent = cfg.model;
-    this.providerLabelEl.title = cfg.model;
-    this.providerStateEl.textContent = cfg.apiKey.trim() ? 'key' : 'env';
-    this.providerStateEl.classList.toggle('ai-provider-state--key', !!cfg.apiKey.trim());
-    this.providerStateEl.classList.toggle('ai-provider-state--env', !cfg.apiKey.trim());
+
+    const providerChip = this.el.querySelector('.ai-provider-chip') as HTMLElement;
+    if (this.provider === 'github-copilot') {
+      const connected = !!cfg.apiKey;
+      this.providerLabelEl.textContent = connected ? '●' : '○';
+      this.providerLabelEl.title = connected ? 'GitHub Copilot connected' : 'Not connected';
+      providerChip.textContent = 'Copilot';
+    } else {
+      this.providerLabelEl.textContent = p?.label.split('-')[0] || this.provider;
+      providerChip.textContent = p?.label || this.provider;
+    }
+    this.providerStateEl.textContent = cfg.model;
+    this.providerStateEl.title = `Model: ${cfg.model}`;
     this.configBtnEl.title = `${p?.label || this.provider} settings`;
   }
 
   private syncConfigFields(): void {
+    const isCopilot = this.provider === 'github-copilot';
     const cfg = this.getProviderConfig();
-    this.cfgModelEl.value = cfg.model;
-    this.cfgBaseUrlEl.value = cfg.baseUrl;
-    this.cfgApiKeyEl.value = cfg.apiKey;
+    const standard = this.configEl.querySelector('.ai-config-standard') as HTMLElement;
+    const saveBtn = this.cfgSaveEl;
+
+    this.cfgCopilotEl.hidden = !isCopilot;
+    standard.hidden = isCopilot;
+    saveBtn.hidden = isCopilot;
+
+    if (isCopilot) {
+      this.renderCopilotStatus();
+    } else {
+      this.cfgModelEl.value = cfg.model;
+      this.cfgBaseUrlEl.value = cfg.baseUrl;
+      this.cfgApiKeyEl.value = cfg.apiKey;
+    }
+  }
+
+  private showModelList(): void {
+    this.filterModelList(this.cfgModelEl.value);
+    this.cfgModelListEl.classList.add('ai-model-list--open');
+  }
+
+  private hideModelList(): void {
+    this.cfgModelListEl.classList.remove('ai-model-list--open');
+  }
+
+  private filterModelList(query: string): void {
+    const all = PROVIDER_MODELS[this.provider] ?? [];
+    const q = query.trim().toLowerCase();
+    const matches = q ? all.filter(m => m.toLowerCase().includes(q)) : all;
+    this.cfgModelListEl.innerHTML = matches
+      .map(m => `<div class="ai-model-item" data-model="${escapeHtml(m)}">${escapeHtml(m)}</div>`)
+      .join('');
+    this.cfgModelListEl.querySelectorAll<HTMLElement>('.ai-model-item').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault();
+        this.selectModel(el.dataset.model!);
+      });
+    });
+    if (matches.length === 0) {
+      this.cfgModelListEl.innerHTML = '<div class="ai-model-empty">no matches</div>';
+    }
+  }
+
+  private selectModel(model: string): void {
+    this.cfgModelEl.value = model;
+    this.hideModelList();
+    this.cfgModelEl.focus();
+  }
+
+  private renderCopilotStatus(): void {
+    const statusEl = this.cfgCopilotEl.querySelector('.ai-copilot-status') as HTMLElement;
+    const connectBtn = this.cfgCopilotEl.querySelector('.ai-copilot-connect') as HTMLButtonElement;
+    const disconnectBtn = this.cfgCopilotEl.querySelector('.ai-copilot-disconnect') as HTMLButtonElement;
+    const codeWrap = this.cfgCopilotEl.querySelector('.ai-copilot-code-wrap') as HTMLElement;
+    const cfg = this.getProviderConfig('github-copilot');
+
+    if (cfg.apiKey) {
+      statusEl.textContent = 'Connected';
+      statusEl.className = 'ai-copilot-status ai-copilot-status--connected';
+      connectBtn.hidden = true;
+      disconnectBtn.hidden = false;
+      codeWrap.hidden = true;
+    } else if (this.copilotAuth) {
+      statusEl.textContent = 'Waiting for authorization…';
+      statusEl.className = 'ai-copilot-status ai-copilot-status--pending';
+      connectBtn.hidden = true;
+      disconnectBtn.hidden = true;
+      const codeEl = codeWrap.querySelector('.ai-copilot-user-code') as HTMLElement;
+      codeEl.textContent = this.copilotAuth.userCode;
+      const link = codeWrap.querySelector('#ai-copilot-verif-link') as HTMLAnchorElement;
+      link.href = this.copilotAuth.verificationUri;
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        window.electronAPI?.openExternal(this.copilotAuth!.verificationUri);
+      });
+      codeWrap.hidden = false;
+    } else {
+      statusEl.textContent = 'Not connected';
+      statusEl.className = 'ai-copilot-status';
+      connectBtn.hidden = false;
+      disconnectBtn.hidden = true;
+      codeWrap.hidden = true;
+    }
+  }
+
+  private async startCopilotAuth(): Promise<void> {
+    // cancel any in-progress auth before starting fresh
+    if (this.copilotAuth?.pollTimer) clearInterval(this.copilotAuth.pollTimer);
+    this.copilotAuth = null;
+    try {
+      const result = await window.electronAPI?.copilotStartDeviceFlow();
+      if (!result) return;
+      this.copilotAuth = {
+        deviceCode: result.device_code,
+        userCode: result.user_code,
+        verificationUri: result.verification_uri,
+        interval: Math.max(result.interval ?? 5, 5),
+        pollTimer: null,
+      };
+      this.renderCopilotStatus();
+      window.electronAPI?.openExternal(result.verification_uri);
+      this.copilotAuth.pollTimer = setInterval(() => this.pollCopilotAuth(), this.copilotAuth!.interval * 1000);
+    } catch (e) {
+      this.appendSystemMsg(`Copilot auth failed: ${e}`);
+    }
+  }
+
+  private async pollCopilotAuth(): Promise<void> {
+    if (!this.copilotAuth) return;
+    try {
+      const result = await window.electronAPI?.copilotPollDeviceFlow(this.copilotAuth.deviceCode);
+      if (!result) {
+        this.stopCopilotPoll('Poll returned no response — check network.');
+        return;
+      }
+      if (result.ok) {
+        clearInterval(this.copilotAuth.pollTimer!);
+        this.copilotAuth = null;
+        this.providerConfigs['github-copilot'].apiKey = result.githubToken;
+        this.saveProviderConfigs();
+        this.syncProviderUi();
+        this.renderCopilotStatus();
+        this.appendSystemMsg('GitHub Copilot connected successfully.');
+      } else if (result.error === 'slow_down' && this.copilotAuth) {
+        // GitHub asked us to back off — increase interval by 5s
+        clearInterval(this.copilotAuth.pollTimer!);
+        this.copilotAuth.interval += 5;
+        this.copilotAuth.pollTimer = setInterval(() => this.pollCopilotAuth(), this.copilotAuth!.interval * 1000);
+      } else if (result.error === 'expired_token') {
+        this.stopCopilotPoll('Device code expired. Click Sign in to try again.');
+      } else if (result.error === 'access_denied') {
+        this.stopCopilotPoll('Authorization denied on GitHub.');
+      } else if (!result.pending) {
+        this.stopCopilotPoll(`Copilot auth error: ${result.error}`);
+      }
+      // authorization_pending → keep polling silently
+    } catch (e) {
+      this.stopCopilotPoll(`Copilot poll failed: ${e}`);
+    }
+  }
+
+  private stopCopilotPoll(msg: string): void {
+    if (this.copilotAuth?.pollTimer) clearInterval(this.copilotAuth.pollTimer);
+    this.copilotAuth = null;
+    this.renderCopilotStatus();
+    this.appendSystemMsg(msg);
+  }
+
+  private async revokeCopilotAuth(): Promise<void> {
+    if (this.copilotAuth?.pollTimer) clearInterval(this.copilotAuth.pollTimer);
+    this.copilotAuth = null;
+    this.providerConfigs['github-copilot'].apiKey = '';
+    this.saveProviderConfigs();
+    await window.electronAPI?.copilotRevoke();
+    this.syncProviderUi();
+    this.renderCopilotStatus();
+    this.appendSystemMsg('GitHub Copilot disconnected.');
   }
 
   private renderMessages(): void {
     this.messagesEl.innerHTML = '';
     if (!this.activeChat.history.length) { this.appendWelcome(); return; }
-    for (const msg of this.activeChat.history) {
+    const history = this.activeChat.history;
+    for (let idx = 0; idx < history.length; idx++) {
+      const msg = history[idx];
       if (msg.role === 'user') {
         this.appendUserBubble(msg.content, false);
       } else {
@@ -448,6 +814,16 @@ export class AISidebar {
         bubble.className = 'ai-bubble';
         this.renderAssistantContent(bubble, msg.content);
         row.appendChild(bubble);
+
+        if (idx === history.length - 1) {
+          const meta = document.createElement('div');
+          meta.className = 'ai-msg-meta';
+          meta.textContent = '●';
+          row.appendChild(meta);
+          row.addEventListener('mouseenter', () => meta.classList.add('ai-msg-meta--visible'));
+          row.addEventListener('mouseleave', () => meta.classList.remove('ai-msg-meta--visible'));
+        }
+
         this.messagesEl.appendChild(row);
       }
     }
@@ -476,6 +852,12 @@ export class AISidebar {
     this.inputEl.style.height = 'auto';
     if (text.startsWith('/')) { this.handleCommand(text); return; }
     this.send(text);
+  }
+
+  // public: send a message programmatically (used by inline AI actions)
+  sendMessage(prompt: string): void {
+    if (this.streaming) return;
+    this.send(prompt);
   }
 
   private handleCommand(cmd: string): void {
@@ -563,8 +945,9 @@ export class AISidebar {
 
   private setLoading(on: boolean): void {
     this.streaming = on;
-    this.sendBtn.disabled = on;
+    this.sendBtn.disabled = false;
     this.inputEl.disabled = on;
+    this.updateSendBtn();
   }
 
   async send(prompt: string): Promise<void> {
@@ -581,12 +964,40 @@ export class AISidebar {
     this.appendUserBubble(prompt, true);
 
     const reqId = Math.random().toString(36).slice(2);
+    this.activeReqId = reqId;
     this.setLoading(true);
+    this.updateSendBtn();
 
     const { bubble, textEl } = this.appendAssistantBubble();
     this.streamMap.set(reqId, { chat: this.activeChat, accum: '', textEl, bubble });
 
     window.electronAPI?.aiChat(reqId, this.activeChat.history.slice(-MAX_HISTORY), this.getAiConfig(), this.memories);
+  }
+
+  private stopGeneration(): void {
+    if (!this.activeReqId) return;
+    const s = this.streamMap.get(this.activeReqId);
+    if (!s) return;
+    const reqId = this.activeReqId;
+    const full = s.accum;
+    this.streamMap.delete(reqId);
+    this.activeReqId = null;
+    s.chat.history.push({ role: 'assistant', content: full });
+    this.saveState();
+    if (s.bubble) this.renderAssistantContent(s.bubble, full);
+    this.setLoading(false);
+    this.updateSendBtn();
+    this.scrollToBottom();
+  }
+
+  private updateSendBtn(): void {
+    if (this.streaming && this.activeReqId) {
+      this.sendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18"/></svg>';
+      this.sendBtn.title = 'Stop generation';
+    } else {
+      this.sendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+      this.sendBtn.title = 'Send (Enter)';
+    }
   }
 
   private registerIpc(): void {
@@ -603,6 +1014,7 @@ export class AISidebar {
       if (!s) return;
       const full = s.accum;
       this.streamMap.delete(reqId);
+      if (this.activeReqId === reqId) this.activeReqId = null;
       s.chat.history.push({ role: 'assistant', content: full });
       this.saveState();
       if (s.bubble) this.renderAssistantContent(s.bubble, full);
@@ -614,6 +1026,7 @@ export class AISidebar {
       const s = this.streamMap.get(reqId);
       if (!s) return;
       this.streamMap.delete(reqId);
+      if (this.activeReqId === reqId) this.activeReqId = null;
       if (s.textEl) {
         s.textEl.textContent = `Error: ${error}`;
         s.textEl.classList.add('ai-error-text');
@@ -625,7 +1038,43 @@ export class AISidebar {
   private appendUserBubble(text: string, scroll: boolean): void {
     const el = document.createElement('div');
     el.className = 'ai-msg ai-msg--user';
-    el.innerHTML = `<div class="ai-bubble"><p>${escapeHtml(text)}</p></div>`;
+    const bubble = document.createElement('div');
+    bubble.className = 'ai-bubble';
+    bubble.innerHTML = `<p>${escapeHtml(text)}</p>`;
+    el.appendChild(bubble);
+
+    // add toolbar
+    const toolbar = document.createElement('div');
+    toolbar.className = 'ai-msg-toolbar';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'ai-toolbar-btn';
+    copyBtn.title = 'Copy message';
+    copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/></svg>';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(text);
+      const orig = copyBtn.innerHTML;
+      copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => { copyBtn.innerHTML = orig; }, 1500);
+    });
+    toolbar.appendChild(copyBtn);
+
+    // edit
+    const editBtn = document.createElement('button');
+    editBtn.className = 'ai-toolbar-btn';
+    editBtn.title = 'Edit and resend';
+    editBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    editBtn.addEventListener('click', () => {
+      this.inputEl.value = text;
+      this.autoResize();
+      this.inputEl.focus();
+    });
+    toolbar.appendChild(editBtn);
+
+    el.appendChild(toolbar);
+    el.addEventListener('mouseenter', () => toolbar.classList.add('ai-msg-toolbar--visible'));
+    el.addEventListener('mouseleave', () => toolbar.classList.remove('ai-msg-toolbar--visible'));
+
     this.messagesEl.appendChild(el);
     if (scroll) this.scrollToBottom();
   }
@@ -649,18 +1098,37 @@ export class AISidebar {
     bubble.innerHTML = '';
     for (const part of parseResponse(full)) {
       if (part.type === 'text') {
-        const p = document.createElement('p');
-        p.textContent = part.content;
-        bubble.appendChild(p);
+        bubble.appendChild(renderMarkdown(part.content));
       } else {
-        bubble.appendChild(this.buildCodeBlock(part.content));
+        bubble.appendChild(this.buildCodeBlock(part.content, part.lang));
       }
     }
   }
 
-  private buildCodeBlock(code: string): HTMLElement {
+  private buildCodeBlock(code: string, lang: string = 'dsmx'): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'ai-code-block';
+
+    const header = document.createElement('div');
+    header.className = 'ai-code-header';
+    const langLabel = document.createElement('span');
+    langLabel.className = 'ai-code-lang';
+    langLabel.textContent = lang;
+    header.appendChild(langLabel);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'ai-code-copy-btn';
+    copyBtn.title = 'Copy code';
+    copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/></svg>';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(code);
+      const orig = copyBtn.textContent;
+      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => { copyBtn.innerHTML = orig || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/></svg>'; }, 1500);
+    });
+    header.appendChild(copyBtn);
+    wrap.appendChild(header);
+
     const pre = document.createElement('pre');
     const codeEl = document.createElement('code');
     codeEl.textContent = code;
@@ -673,16 +1141,33 @@ export class AISidebar {
     const insertBtn = document.createElement('button');
     insertBtn.className = 'ai-action-btn ai-action-btn--insert';
     insertBtn.textContent = 'Insert';
-    insertBtn.addEventListener('click', () => { this.onApply({ type: 'insert', code }); this.flashAccepted(insertBtn); });
 
     const replaceBtn = document.createElement('button');
     replaceBtn.className = 'ai-action-btn ai-action-btn--replace';
     replaceBtn.textContent = 'Replace';
-    replaceBtn.addEventListener('click', () => { this.onApply({ type: 'replace', code }); this.flashAccepted(replaceBtn); });
 
     const denyBtn = document.createElement('button');
     denyBtn.className = 'ai-action-btn ai-action-btn--deny';
     denyBtn.textContent = 'Dismiss';
+
+    if (this.autoApprove) {
+      insertBtn.addEventListener('click', () => {
+        this.onApply({ type: 'insert', code });
+        this.flashAccepted(insertBtn);
+      });
+      replaceBtn.addEventListener('click', () => {
+        this.onApply({ type: 'replace', code });
+        this.flashAccepted(replaceBtn);
+      });
+    } else {
+      insertBtn.addEventListener('click', () => {
+        this.showDiffPreview(wrap, actions, code, 'insert');
+      });
+      replaceBtn.addEventListener('click', () => {
+        this.showDiffPreview(wrap, actions, code, 'replace');
+      });
+    }
+
     denyBtn.addEventListener('click', () => { actions.innerHTML = '<span class="ai-dismissed">Dismissed</span>'; });
 
     actions.appendChild(insertBtn);
@@ -692,7 +1177,80 @@ export class AISidebar {
     return wrap;
   }
 
-  private flashAccepted(btn: HTMLButtonElement): void {
+  private showDiffPreview(
+    wrap: HTMLElement,
+    actions: HTMLElement,
+    code: string,
+    type: 'insert' | 'replace',
+  ): void {
+    const { dsl, selection } = this.getContext();
+    const before = type === 'replace' ? (selection || dsl) : '';
+
+    // hide action buttons and show diff preview
+    actions.hidden = true;
+
+    const preview = document.createElement('div');
+    preview.className = 'ai-diff-preview';
+
+    if (type === 'replace' && before) {
+      const diff = lineDiff(before, code);
+      const hasDiff = diff.some(d => d.op !== '=');
+      if (hasDiff) {
+        const diffEl = document.createElement('div');
+        diffEl.className = 'ai-diff-lines';
+        for (const d of diff) {
+          if (d.op === '=') continue; // skip unchanged lines in collapsed view
+          const line = document.createElement('div');
+          line.className = d.op === '+' ? 'ai-diff-add' : 'ai-diff-del';
+          line.textContent = (d.op === '+' ? '+ ' : '− ') + d.line;
+          diffEl.appendChild(line);
+        }
+        preview.appendChild(diffEl);
+      } else {
+        const note = document.createElement('p');
+        note.className = 'ai-diff-no-change';
+        note.textContent = 'No changes detected';
+        preview.appendChild(note);
+      }
+    } else {
+      const note = document.createElement('p');
+      note.className = 'ai-diff-insert-note';
+      note.textContent = type === 'insert' ? 'Will insert at cursor position' : 'Will replace entire file';
+      preview.appendChild(note);
+    }
+
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className = 'ai-action-btn ai-action-btn--insert';
+    acceptBtn.textContent = '✓ Accept';
+    acceptBtn.addEventListener('click', () => {
+      this.onApply({ type, code });
+      preview.remove();
+      actions.hidden = false;
+      this.flashAccepted(type === 'insert'
+        ? (actions.querySelector('.ai-action-btn--insert') as HTMLButtonElement)
+        : (actions.querySelector('.ai-action-btn--replace') as HTMLButtonElement));
+    });
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'ai-action-btn ai-action-btn--deny';
+    rejectBtn.textContent = '✕ Reject';
+    rejectBtn.addEventListener('click', () => {
+      preview.remove();
+      actions.hidden = false;
+    });
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'ai-diff-btns';
+    btnRow.appendChild(acceptBtn);
+    btnRow.appendChild(rejectBtn);
+    preview.appendChild(btnRow);
+
+    wrap.appendChild(preview);
+    preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  private flashAccepted(btn: HTMLButtonElement | null): void {
+    if (!btn) return;
     const orig = btn.textContent;
     btn.textContent = 'Applied!';
     btn.disabled = true;
@@ -711,21 +1269,93 @@ export class AISidebar {
   focus(): void { this.inputEl.focus(); }
 }
 
-type Part = { type: 'text'; content: string } | { type: 'code'; content: string };
+type Part = { type: 'text'; content: string } | { type: 'code'; content: string; lang: string };
 
 function parseResponse(text: string): Part[] {
   const parts: Part[] = [];
-  const re = /```(?:dsmx)?\n?([\s\S]*?)```/g;
+  const re = /```(\w+)?\n?([\s\S]*?)```/g;
   let last = 0, m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const before = text.slice(last, m.index).trim();
     if (before) parts.push({ type: 'text', content: before });
-    parts.push({ type: 'code', content: m[1].trim() });
+    parts.push({ type: 'code', content: m[2].trim(), lang: m[1] || 'dsmx' });
     last = m.index + m[0].length;
   }
   const after = text.slice(last).trim();
   if (after) parts.push({ type: 'text', content: after });
   return parts;
+}
+
+function renderMarkdown(text: string): HTMLElement {
+  const el = document.createElement('div');
+  const lines = text.split('\n');
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed) { i++; continue; }
+
+    // horizontal rule
+    if (/^---+$/.test(trimmed)) {
+      const hr = document.createElement('div');
+      hr.className = 'ai-hr';
+      el.appendChild(hr);
+      i++;
+      continue;
+    }
+
+    // heading
+    const headingMatch = trimmed.match(/^##\s+(.+)$/);
+    if (headingMatch) {
+      const h = document.createElement('h3');
+      h.className = 'ai-heading';
+      h.textContent = headingMatch[1];
+      el.appendChild(h);
+      i++;
+      continue;
+    }
+
+    // bullet list or numbered list
+    if (/^[-*]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed)) {
+      const list = /^[-*]\s+/.test(trimmed)
+        ? document.createElement('ul')
+        : document.createElement('ol');
+      list.className = 'ai-list';
+      while (i < lines.length) {
+        const l = lines[i].trim();
+        if (!l) break;
+        const isBullet = /^[-*]\s+(.+)$/.test(l);
+        const isNum = /^\d+\.\s+(.+)$/.test(l);
+        if (!isBullet && !isNum) break;
+        const content = l.replace(/^(?:[-*]|\d+\.)\s+/, '');
+        const li = document.createElement('li');
+        li.className = 'ai-list-item';
+        li.innerHTML = formatInlineMarkdown(content);
+        list.appendChild(li);
+        i++;
+      }
+      el.appendChild(list);
+      continue;
+    }
+
+    // paragraph
+    const p = document.createElement('p');
+    p.innerHTML = formatInlineMarkdown(trimmed);
+    el.appendChild(p);
+    i++;
+  }
+
+  return el;
+}
+
+function formatInlineMarkdown(text: string): string {
+  let html = escapeHtml(text);
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>');
+  return html;
 }
 
 function escapeHtml(s: string): string {

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama';
+type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot';
 type AIConfig = { provider: AIProvider; model: string; baseUrl: string; apiKey: string };
 type GitStatusResult =
   | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }
@@ -65,6 +65,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:pull', { remote, branch }) as Promise<GitActionResult>,
   gitPush: (remote?: string, branch?: string, setUpstream = false) =>
     ipcRenderer.invoke('git:push', { remote, branch, setUpstream }) as Promise<GitActionResult>,
+  copilotStartDeviceFlow: () =>
+    ipcRenderer.invoke('copilot:start-device-flow') as Promise<{
+      device_code: string; user_code: string; verification_uri: string;
+      expires_in: number; interval: number;
+    }>,
+  copilotPollDeviceFlow: (deviceCode: string) =>
+    ipcRenderer.invoke('copilot:poll-device-flow', { deviceCode }) as Promise<
+      | { ok: true; githubToken: string }
+      | { ok: false; pending: boolean; error: string }
+    >,
+  copilotRevoke: () =>
+    ipcRenderer.invoke('copilot:revoke') as Promise<{ ok: true }>,
+  openExternal: (url: string) =>
+    ipcRenderer.invoke('shell:open-external', url) as Promise<void>,
   onAiChunk: (cb: (reqId: string, text: string) => void) =>
     ipcRenderer.on('ai:chunk', (_e, data: { reqId: string; text: string }) => cb(data.reqId, data.text)),
   onAiDone:  (cb: (reqId: string) => void) =>

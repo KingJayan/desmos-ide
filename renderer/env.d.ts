@@ -15,14 +15,24 @@ interface Window {
     aiChat(
       reqId: string,
       messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-      config: { provider: 'openai-compatible' | 'openrouter' | 'ollama'; model: string; baseUrl: string; apiKey: string },
+      config: { provider: 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot'; model: string; baseUrl: string; apiKey: string },
       memories: string[],
     ): void;
     aiCompact(
       messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-      config: { provider: 'openai-compatible' | 'openrouter' | 'ollama'; model: string; baseUrl: string; apiKey: string },
+      config: { provider: 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot'; model: string; baseUrl: string; apiKey: string },
       memories: string[],
     ): Promise<string>;
+    copilotStartDeviceFlow(): Promise<{
+      device_code: string; user_code: string; verification_uri: string;
+      expires_in: number; interval: number;
+    }>;
+    copilotPollDeviceFlow(deviceCode: string): Promise<
+      | { ok: true; githubToken: string }
+      | { ok: false; pending: boolean; error: string }
+    >;
+    copilotRevoke(): Promise<{ ok: true }>;
+    openExternal(url: string): Promise<void>;
     gitStatus(): Promise<
       | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }
       | { ok: false; errorCode: string; message: string }

@@ -1262,6 +1262,61 @@ function setSidebarView(next: SidebarView): void {
   editor.layout();
 }
 
+function openAiWith(prompt: string): void {
+  if (sidebarView !== 'ai') setSidebarView('ai');
+  ensureAiSidebar().sendMessage(prompt);
+}
+
+// "Fix error" code lens on error lines
+const fixErrCmdId = editor.addCommand(0, (_ctx: unknown, message: string, lineContent: string) => {
+  openAiWith(`Fix this DSL error: ${message}\n\nLine:\n\`\`\`dsmx\n${(lineContent as string).trim()}\n\`\`\``);
+});
+
+const codeLensEmitter = new monaco.Emitter<monaco.languages.CodeLensProvider>();
+monaco.languages.registerCodeLensProvider(LANGUAGE_ID, {
+  onDidChange: codeLensEmitter.event,
+  provideCodeLenses(model) {
+    const markers = (['desmos-dsl-syntax', 'desmos-dsl-semantic'] as const)
+      .flatMap(o => monaco.editor.getModelMarkers({ owner: o }));
+    const seen = new Set<number>();
+    const lenses: monaco.languages.CodeLens[] = [];
+    for (const m of markers) {
+      if (seen.has(m.startLineNumber)) continue;
+      seen.add(m.startLineNumber);
+      lenses.push({
+        range: new monaco.Range(m.startLineNumber, 1, m.startLineNumber, 1),
+        command: {
+          id: fixErrCmdId!,
+          title: '⚡ Fix error',
+          arguments: [m.message, model.getLineContent(m.startLineNumber)],
+        },
+      });
+    }
+    return { lenses, dispose: () => {} };
+  },
+  resolveCodeLens(_model, codeLens) { return codeLens; },
+});
+
+editor.onDidChangeModelDecorations(() => {
+  codeLensEmitter.fire(undefined as unknown as monaco.languages.CodeLensProvider);
+});
+
+// "Optimize expression" context menu action (requires selection)
+editor.addAction({
+  id: 'ai.optimize',
+  label: 'AI: Optimize expression',
+  contextMenuGroupId: 'ai',
+  contextMenuOrder: 1,
+  precondition: 'editorHasSelection',
+  run(ed) {
+    const sel = ed.getSelection();
+    if (!sel || sel.isEmpty()) return;
+    const code = ed.getModel()?.getValueInRange(sel) ?? '';
+    if (!code.trim()) return;
+    openAiWith(`Optimize this DSL expression:\n\`\`\`dsmx\n${code}\n\`\`\``);
+  },
+});
+
 btnSidebarGit.addEventListener('click', () => {
   setSidebarView(sidebarView === 'git' ? null : 'git');
 });
