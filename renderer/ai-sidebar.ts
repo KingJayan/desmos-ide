@@ -359,7 +359,7 @@ export class AISidebar {
       <div class="ai-status-strip">
         <div class="ai-status-left">
           <button class="ai-provider-chip" id="ai-provider-chip" title="Provider settings"><span class="ai-status-provider-label"></span></button>
-          <span class="ai-status-model"></span>
+          <button class="ai-status-model" title="Change model"></button>
           <span class="ai-status-context"></span>
           <span class="ai-status-memory"></span>
         </div>
@@ -423,6 +423,16 @@ export class AISidebar {
           <button class="ai-config-save" type="button">save</button>
         </div>
       </div>
+      <div class="ai-confirm-overlay" hidden>
+        <div class="ai-confirm-modal">
+          <div class="ai-confirm-header">Disconnect GitHub Copilot?</div>
+          <div class="ai-confirm-body">This will disconnect your GitHub Copilot authentication. You can reconnect anytime.</div>
+          <div class="ai-confirm-actions">
+            <button class="ai-confirm-cancel" type="button">Cancel</button>
+            <button class="ai-confirm-btn" type="button">Disconnect</button>
+          </div>
+        </div>
+      </div>
     `;
 
     this.messagesEl   = this.el.querySelector('.ai-messages')!;
@@ -444,6 +454,10 @@ export class AISidebar {
     this.ctxPillEl = this.el.querySelector('.ai-ctx-pill')!;
     this.ctxPillCloseBtn = this.el.querySelector('.ai-ctx-pill-close')!;
     const ctxBtn      = this.el.querySelector('#ai-ctx-btn') as HTMLButtonElement;
+
+    const confirmOverlay = this.el.querySelector('.ai-confirm-overlay') as HTMLElement;
+    const confirmCancelBtn = this.el.querySelector('.ai-confirm-cancel') as HTMLButtonElement;
+    const confirmBtn = this.el.querySelector('.ai-confirm-btn') as HTMLButtonElement;
 
     createIcons({
       icons: { Plus, Trash2, SlidersHorizontal },
@@ -510,7 +524,7 @@ export class AISidebar {
       if (chat) { this.activeChat = chat; this.renderMessages(); }
     });
 
-    this.configBtnEl.addEventListener('click', e => {
+    const openConfig = (e: Event) => {
       e.stopPropagation();
       if (this.configEl.hidden) {
         this.syncConfigFields();
@@ -518,7 +532,9 @@ export class AISidebar {
       } else {
         this.configEl.hidden = true;
       }
-    });
+    };
+    this.configBtnEl.addEventListener('click', openConfig);
+    this.providerStateEl.addEventListener('click', openConfig);
 
     this.cfgModelEl.addEventListener('focus', () => this.showModelList());
     this.cfgModelEl.addEventListener('input', () => this.filterModelList(this.cfgModelEl.value));
@@ -560,9 +576,23 @@ export class AISidebar {
       this.appendSystemMsg('Provider config saved.');
     });
 
-    // Copilot auth buttons
     this.el.querySelector('.ai-copilot-connect')!.addEventListener('click', () => this.startCopilotAuth());
-    this.el.querySelector('.ai-copilot-disconnect')!.addEventListener('click', () => this.revokeCopilotAuth());
+    this.el.querySelector('.ai-copilot-disconnect')!.addEventListener('click', () => {
+      confirmOverlay.hidden = false;
+    });
+
+    confirmOverlay.addEventListener('click', (e) => {
+      if (e.target === confirmOverlay) confirmOverlay.hidden = true;
+    });
+
+    confirmCancelBtn.addEventListener('click', () => {
+      confirmOverlay.hidden = true;
+    });
+
+    confirmBtn.addEventListener('click', async () => {
+      confirmOverlay.hidden = true;
+      await this.revokeCopilotAuth();
+    });
 
     this.configEl.addEventListener('click', e => e.stopPropagation());
     this.el.addEventListener('click', () => {

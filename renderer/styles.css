@@ -1088,7 +1088,12 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
+.ai-status-model:hover { color: var(--mauve); }
 
 .ai-status-context {
   font-size: 10px;
@@ -1663,6 +1668,82 @@ html, body {
   padding: 6px 8px;
   background: var(--mantle);
   border-top: 1px solid var(--surface0);
+}
+
+.ai-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: overlay-in 0.15s ease;
+}
+.ai-confirm-overlay[hidden] { display: none; }
+
+.ai-confirm-modal {
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-radius: 8px;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1);
+  font-family: var(--font-ui);
+}
+
+.ai-confirm-header {
+  padding: 16px 16px 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.ai-confirm-body {
+  padding: 0 16px 16px;
+  font-size: 13px;
+  color: var(--overlay1);
+  line-height: 1.4;
+}
+
+.ai-confirm-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--surface0);
+  background: var(--crust);
+  justify-content: flex-end;
+}
+
+.ai-confirm-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  background: var(--surface0);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-ui);
+}
+
+.ai-confirm-actions button:hover {
+  background: var(--surface1);
+  border-color: var(--surface2);
+}
+
+.ai-confirm-btn {
+  background: var(--red) !important;
+  border-color: var(--red) !important;
+  color: var(--crust) !important;
+}
+
+.ai-confirm-btn:hover {
+  background: color-mix(in srgb, var(--red) 90%, black) !important;
 }
 
 .settings-overlay {
