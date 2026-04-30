@@ -1208,6 +1208,7 @@ document.addEventListener('mouseup', () => {
 type SidebarView = 'git' | 'ai' | 'outline' | null;
 let sidebarView: SidebarView = null;
 let aiSidebar: AISidebar | null = null;
+let aiSelectionListener: { dispose(): void } | null = null;
 
 function ensureAiSidebar(): AISidebar {
   if (aiSidebar) return aiSidebar;
@@ -1235,6 +1236,12 @@ function ensureAiSidebar(): AISidebar {
       editor.focus();
     },
   );
+  // Hook editor selection changes to update the context pill
+  if (!aiSelectionListener) {
+    aiSelectionListener = editor.onDidChangeCursorSelection(() => {
+      aiSidebar?.refreshCtxPill();
+    });
+  }
   return aiSidebar;
 }
 
@@ -1254,6 +1261,9 @@ function setSidebarView(next: SidebarView): void {
 
   if (next === 'ai') {
     ensureAiSidebar();
+  } else if (aiSelectionListener) {
+    aiSelectionListener.dispose();
+    aiSelectionListener = null;
   }
   if (next === 'git') {
     void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory(), refreshGitRemotes()]);

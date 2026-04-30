@@ -6,6 +6,15 @@ type Chat = { id: string; title: string; history: ConvMessage[] };
 
 type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot';
 
+const PROMPT_SUGGESTIONS = [
+  'Explain what my file does',
+  'Add a slider from 0 to 10',
+  'Draw a unit circle',
+  'What DSL syntax is available?',
+  'What is the purpose of my code?',
+  'Complete the missing functionality',
+];
+
 type ProviderConfig = {
   model: string;
   baseUrl: string;
@@ -217,6 +226,11 @@ export class AISidebar {
   private acIndex = -1;
   private acItems: typeof SLASH_COMMANDS = [];
   private autoApproveBtn!: HTMLButtonElement;
+  private ctxPillEl!: HTMLElement;
+  private ctxPillCloseBtn!: HTMLButtonElement;
+  private contextDisabledForMsg = false;
+  private promptChipIndex = 0;
+  private promptChipInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     container: HTMLElement,
@@ -315,7 +329,7 @@ export class AISidebar {
   }
 
   private buildUserContent(prompt: string): string {
-    if (!this.sendContext) return prompt;
+    if (!this.sendContext || this.contextDisabledForMsg) return prompt;
     const { dsl, selection } = this.getContext();
     const src = selection || dsl;
     if (!src) return prompt;
@@ -362,6 +376,12 @@ export class AISidebar {
       </div>
       <div class="ai-compose">
         <div class="ai-autocomplete"></div>
+        <div class="ai-ctx-pill" hidden>
+          <span class="ai-ctx-pill-text"></span>
+          <button class="ai-ctx-pill-close" type="button" title="Disable context for this message">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
         <div class="ai-compose-wrap">
           <textarea class="ai-input" rows="1" placeholder="Ask about your DSL…"></textarea>
           <div class="ai-compose-bar">
@@ -421,6 +441,8 @@ export class AISidebar {
     this.cfgCopilotEl = this.el.querySelector('.ai-config-copilot')!;
     this.acEl         = this.el.querySelector('.ai-autocomplete')!;
     this.autoApproveBtn = this.el.querySelector('#ai-autoapprove-btn') as HTMLButtonElement;
+    this.ctxPillEl = this.el.querySelector('.ai-ctx-pill')!;
+    this.ctxPillCloseBtn = this.el.querySelector('.ai-ctx-pill-close')!;
     const ctxBtn      = this.el.querySelector('#ai-ctx-btn') as HTMLButtonElement;
 
     createIcons({
@@ -439,7 +461,8 @@ export class AISidebar {
         this.submit();
       }
     });
-    this.inputEl.addEventListener('input', () => { this.autoResize(); this.updateAc(); });
+    this.inputEl.addEventListener('input', () => { this.autoResize(); this.updateAc(); this.updateCtxPill(); });
+    this.inputEl.addEventListener('focus', () => { this.updateCtxPill(); });
     this.inputEl.addEventListener('keydown', e => {
       if (this.acItems.length) {
         if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveAc(-1); return; }
@@ -550,9 +573,15 @@ export class AISidebar {
       this.sendContext = !this.sendContext;
       localStorage.setItem('ai-send-context', String(this.sendContext));
       ctxBtn.classList.toggle('ai-ctx-btn--on', this.sendContext);
+      this.updateCtxPill();
       ctxBtn.title = this.sendContext
         ? 'Code context ON — toggle off to protect sensitive code.'
         : 'Code context OFF — AI will not see your file.';
+    });
+
+    this.ctxPillCloseBtn.addEventListener('click', () => {
+      this.contextDisabledForMsg = true;
+      this.ctxPillEl.hidden = true;
     });
 
     this.autoApproveBtn.addEventListener('click', () => {
@@ -841,8 +870,10 @@ export class AISidebar {
         <circle cx="44" cy="32" r="2.5" fill="currentColor" opacity="0.6"/>
       </svg>
       <p class="ai-empty-hint">Type <kbd>/help</kbd> to see all commands</p>
+      <div class="ai-prompt-chips"></div>
     `;
     this.messagesEl.appendChild(el);
+    this.initPromptChips();
   }
 
   private submit(): void {
@@ -850,6 +881,8 @@ export class AISidebar {
     if (!text || this.streaming) return;
     this.inputEl.value = '';
     this.inputEl.style.height = 'auto';
+    this.contextDisabledForMsg = false;
+    this.ctxPillEl.hidden = true;
     if (text.startsWith('/')) { this.handleCommand(text); return; }
     this.send(text);
   }
@@ -1267,6 +1300,88 @@ export class AISidebar {
   }
 
   focus(): void { this.inputEl.focus(); }
+
+  private updateCtxPill(): void {
+    if (!this.sendContext || this.contextDisabledForMsg) {
+      this.ctxPillEl.hidden = true;
+      return;
+    }
+    const { dsl, selection } = this.getContext();
+    const src = selection || dsl;
+    if (!src) {
+      this.ctxPillEl.hidden = true;
+      return;
+    }
+    const textEl = this.ctxPillEl.querySelector('.ai-ctx-pill-text')!;
+    if (selection) {
+      const selStart = dsl.indexOf(selection);
+      const lines = dsl.slice(0, selStart).split('\n').length;
+      const startLine = lines;
+      const endLine = startLine + selection.split('\n').length - 1;
+      textEl.textContent = startLine === endLine ? `line ${startLine}` : `lines ${startLine}–${endLine}`;
+    } else {
+      const lineCount = dsl.split('\n').length;
+      textEl.textContent = `${lineCount} ${lineCount === 1 ? 'line' : 'lines'}`;
+    }
+    this.ctxPillEl.hidden = false;
+  }
+
+  refreshCtxPill(): void {
+    this.updateCtxPill();
+  }
+
+  private initPromptChips(): void {
+    const container = this.messagesEl.querySelector('.ai-prompt-chips') as HTMLElement;
+    if (!container) return;
+
+    const chipsEl = document.createElement('div');
+    chipsEl.className = 'ai-chips-container';
+
+    const createChip = (text: string) => {
+      const chip = document.createElement('button');
+      chip.className = 'ai-prompt-chip';
+      chip.type = 'button';
+      chip.textContent = text;
+      chip.addEventListener('click', () => {
+        this.inputEl.value = text;
+        this.autoResize();
+        this.inputEl.focus();
+      });
+      return chip;
+    };
+
+    for (let i = 0; i < 3; i++) {
+      chipsEl.appendChild(createChip(PROMPT_SUGGESTIONS[i]));
+    }
+    container.appendChild(chipsEl);
+
+    let currentIndex = 3;
+    this.promptChipInterval = setInterval(() => {
+      const chips = chipsEl.querySelectorAll<HTMLElement>('.ai-prompt-chip');
+
+      for (let i = 0; i < chips.length; i++) {
+        chips[i].classList.remove('ai-prompt-chip--active');
+        chips[i].classList.add('ai-prompt-chip--exit');
+      }
+
+      setTimeout(() => {
+        for (let i = 0; i < chips.length; i++) {
+          chips[i].classList.remove('ai-prompt-chip--exit');
+          chips[i].textContent = PROMPT_SUGGESTIONS[(currentIndex + i) % PROMPT_SUGGESTIONS.length];
+          chips[i].classList.add('ai-prompt-chip--enter');
+        }
+        chips[0].classList.add('ai-prompt-chip--active');
+
+        setTimeout(() => {
+          for (let i = 0; i < chips.length; i++) {
+            chips[i].classList.remove('ai-prompt-chip--enter');
+          }
+        }, 400);
+      }, 400);
+
+      currentIndex = (currentIndex + 1) % PROMPT_SUGGESTIONS.length;
+    }, 4000);
+  }
 }
 
 type Part = { type: 'text'; content: string } | { type: 'code'; content: string; lang: string };
