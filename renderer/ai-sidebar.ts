@@ -216,8 +216,7 @@ export class AISidebar {
   private providerStateEl!: HTMLElement;
   private configBtnEl!: HTMLButtonElement;
   private configEl!: HTMLElement;
-  private cfgModelEl!: HTMLInputElement;
-  private cfgModelListEl!: HTMLElement;
+  private cfgModelEl!: HTMLSelectElement;
   private cfgBaseUrlEl!: HTMLInputElement;
   private cfgApiKeyEl!: HTMLInputElement;
   private cfgSaveEl!: HTMLButtonElement;
@@ -406,10 +405,7 @@ export class AISidebar {
           <div class="ai-config-standard">
             <label class="ai-config-row">
               <span>model</span>
-              <div class="ai-model-picker">
-                <input class="ai-config-input ai-config-model" type="text" placeholder="search models…" spellcheck="false" autocomplete="off" />
-                <div class="ai-model-list"></div>
-              </div>
+              <select class="ai-config-input ai-config-model ai-model-select"></select>
             </label>
             <label class="ai-config-row">
               <span>base url</span>
@@ -443,8 +439,7 @@ export class AISidebar {
     this.providerLabelEl = this.el.querySelector('.ai-status-provider-label')!;
     this.providerStateEl = this.el.querySelector('.ai-status-model')!;
     this.configEl = this.el.querySelector('.ai-config-popover')!;
-    this.cfgModelEl = this.el.querySelector('.ai-config-model')!
-    this.cfgModelListEl = this.el.querySelector('.ai-model-list')!;
+    this.cfgModelEl = this.el.querySelector('.ai-config-model')!;
     this.cfgBaseUrlEl = this.el.querySelector('.ai-config-baseurl')!;
     this.cfgApiKeyEl = this.el.querySelector('.ai-config-key')!;
     this.cfgSaveEl = this.el.querySelector('.ai-config-save')!;
@@ -524,7 +519,7 @@ export class AISidebar {
       if (chat) { this.activeChat = chat; this.renderMessages(); }
     });
 
-    const openConfig = (e: Event) => {
+    this.configBtnEl.addEventListener('click', (e: Event) => {
       e.stopPropagation();
       if (this.configEl.hidden) {
         this.syncConfigFields();
@@ -532,36 +527,21 @@ export class AISidebar {
       } else {
         this.configEl.hidden = true;
       }
-    };
-    this.configBtnEl.addEventListener('click', openConfig);
-    this.providerStateEl.addEventListener('click', openConfig);
-
-    this.cfgModelEl.addEventListener('focus', () => this.showModelList());
-    this.cfgModelEl.addEventListener('input', () => this.filterModelList(this.cfgModelEl.value));
-    this.cfgModelEl.addEventListener('blur', () => setTimeout(() => this.hideModelList(), 150));
-    this.cfgModelEl.addEventListener('keydown', e => {
-      const items = this.cfgModelListEl.querySelectorAll<HTMLElement>('.ai-model-item');
-      const active = this.cfgModelListEl.querySelector<HTMLElement>('.ai-model-item--active');
-      const idx = active ? Array.from(items).indexOf(active) : -1;
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const next = items[idx + 1] ?? items[0];
-        active?.classList.remove('ai-model-item--active');
-        next?.classList.add('ai-model-item--active');
-        next?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prev = items[idx - 1] ?? items[items.length - 1];
-        active?.classList.remove('ai-model-item--active');
-        prev?.classList.add('ai-model-item--active');
-        prev?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'Enter' && active) {
-        e.preventDefault();
-        this.selectModel(active.dataset.model!);
-      } else if (e.key === 'Escape') {
-        this.hideModelList();
-      }
     });
+    this.providerStateEl.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      const cfg = this.getProviderConfig();
+      const standard = this.configEl.querySelector('.ai-config-standard') as HTMLElement;
+      this.cfgCopilotEl.hidden = true;
+      standard.hidden = false;
+      this.cfgSaveEl.hidden = false;
+      this.populateModelSelect(this.provider, cfg.model);
+      this.cfgBaseUrlEl.value = cfg.baseUrl;
+      this.cfgApiKeyEl.value = cfg.apiKey;
+      this.configEl.hidden = false;
+      setTimeout(() => { this.cfgModelEl.focus(); }, 0);
+    });
+
 
     this.cfgSaveEl.addEventListener('click', () => {
       const current = this.getProviderConfig();
@@ -709,43 +689,20 @@ export class AISidebar {
     if (isCopilot) {
       this.renderCopilotStatus();
     } else {
-      this.cfgModelEl.value = cfg.model;
+      this.populateModelSelect(this.provider, cfg.model);
       this.cfgBaseUrlEl.value = cfg.baseUrl;
       this.cfgApiKeyEl.value = cfg.apiKey;
     }
   }
 
-  private showModelList(): void {
-    this.filterModelList(this.cfgModelEl.value);
-    this.cfgModelListEl.classList.add('ai-model-list--open');
-  }
-
-  private hideModelList(): void {
-    this.cfgModelListEl.classList.remove('ai-model-list--open');
-  }
-
-  private filterModelList(query: string): void {
-    const all = PROVIDER_MODELS[this.provider] ?? [];
-    const q = query.trim().toLowerCase();
-    const matches = q ? all.filter(m => m.toLowerCase().includes(q)) : all;
-    this.cfgModelListEl.innerHTML = matches
-      .map(m => `<div class="ai-model-item" data-model="${escapeHtml(m)}">${escapeHtml(m)}</div>`)
+  private populateModelSelect(provider: AIProvider, current: string): void {
+    const models = PROVIDER_MODELS[provider] ?? [];
+    this.cfgModelEl.innerHTML = models
+      .map(m => `<option value="${escapeHtml(m)}"${m === current ? ' selected' : ''}>${escapeHtml(m)}</option>`)
       .join('');
-    this.cfgModelListEl.querySelectorAll<HTMLElement>('.ai-model-item').forEach(el => {
-      el.addEventListener('mousedown', e => {
-        e.preventDefault();
-        this.selectModel(el.dataset.model!);
-      });
-    });
-    if (matches.length === 0) {
-      this.cfgModelListEl.innerHTML = '<div class="ai-model-empty">no matches</div>';
+    if (!models.includes(current) && current) {
+      this.cfgModelEl.innerHTML = `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>` + this.cfgModelEl.innerHTML;
     }
-  }
-
-  private selectModel(model: string): void {
-    this.cfgModelEl.value = model;
-    this.hideModelList();
-    this.cfgModelEl.focus();
   }
 
   private renderCopilotStatus(): void {
