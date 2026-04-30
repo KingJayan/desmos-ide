@@ -62,7 +62,10 @@ export function optimize(program: T.Program): T.Program {
 
   const body: T.Statement[] = [];
   for (const stmt of program.body) {
-    if (stmt.type === 'FnDecl') continue;
+    if (stmt.type === 'FnDecl') {
+      body.push({ ...stmt, body: optimizeExpr(stmt.body, env) });
+      continue;
+    }
     if (stmt.type === 'DebugDecl') continue;
 
     // strip unreferenced aliases — they produce no graph output when unused

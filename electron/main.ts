@@ -919,6 +919,32 @@ ipcMain.handle('copilot:revoke', async () => {
   return { ok: true };
 });
 
+ipcMain.handle('copilot:get-models', async (_event, payload: unknown) => {
+  const obj = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const githubToken = typeof obj.githubToken === 'string' ? obj.githubToken : '';
+  if (!githubToken) return { ok: false as const, error: 'no token' };
+  try {
+    const copilotToken = await getCopilotApiToken(githubToken);
+    const resp = await net.fetch('https://api.githubcopilot.com/models', {
+      headers: {
+        Authorization: `Bearer ${copilotToken}`,
+        'Copilot-Integration-Id': 'vscode-chat',
+        'Editor-Version': 'vscode/1.85.0',
+        'Editor-Plugin-Version': 'desmos-ide/1.0',
+        Accept: 'application/json',
+      },
+    });
+    if (!resp.ok) return { ok: false as const, error: `HTTP ${resp.status}` };
+    const data = await resp.json() as { data?: Array<{ id: string; capabilities?: { type?: string } }> };
+    const models = (data.data ?? [])
+      .filter(m => !m.capabilities?.type || m.capabilities.type === 'chat')
+      .map(m => m.id);
+    return { ok: true as const, models };
+  } catch (e) {
+    return { ok: false as const, error: String(e) };
+  }
+});
+
 ipcMain.handle('shell:open-external', async (_event, url: unknown) => {
   if (typeof url !== 'string') return;
   await shell.openExternal(url);

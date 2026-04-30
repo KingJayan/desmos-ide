@@ -210,6 +210,7 @@ export class Codegen {
       case 'SpiralDecl':  this.genSpiralDecl(stmt);  break;
       case 'WaveDecl':    this.genWaveDecl(stmt);    break;
       case 'GridDecl':    this.genGridDecl(stmt);    break;
+      case 'FnDecl':      this.genFnDecl(stmt);      break;
       // DebugDecl and ExprBlockDecl are stripped in optimizer; VarDecl handles ExprBlock lowered form
     }
   }
@@ -408,6 +409,13 @@ export class Codegen {
       showLabel: true,
       points: false,
     }, stmt.name);
+  }
+
+  private genFnDecl(stmt: T.FnDecl): void {
+    const name = nameToLatex(stmt.name);
+    const params = stmt.params.map(nameToLatex).join(',');
+    const body = this.toLaTeX(stmt.body);
+    this.emit({ type: 'expression', latex: `${name}\\left(${params}\\right)=${body}` }, stmt.name);
   }
 
   private genGroupDecl(stmt: T.GroupDecl): void {

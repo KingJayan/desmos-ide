@@ -32,6 +32,7 @@ interface Window {
       | { ok: false; pending: boolean; error: string }
     >;
     copilotRevoke(): Promise<{ ok: true }>;
+    copilotGetModels(githubToken: string): Promise<{ ok: true; models: string[] } | { ok: false; error: string }>;
     openExternal(url: string): Promise<void>;
     gitStatus(): Promise<
       | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }

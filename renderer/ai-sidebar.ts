@@ -123,20 +123,11 @@ const PROVIDER_MODELS: Record<AIProvider, string[]> = {
   ],
 
   'github-copilot': [
-    'gpt-5.4', 'gpt-5.4-mini',
-    'gpt-4.1',
-
-    'gpt-5.2-codex',
-    'gpt-5.3-codex',
-
+    'gpt-4o', 'gpt-4o-mini',
+    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
     'o3-mini',
-
-    'claude-sonnet-4.6',
-    'claude-haiku-4.5',
-    'claude-opus-4.7',
-
-    'gemini-3.1-pro',
-    'gemini-2.5-flash',
+    'claude-3.5-sonnet', 'claude-3.7-sonnet',
+    'gemini-2.0-flash',
   ],
 };
 
@@ -202,6 +193,7 @@ export class AISidebar {
   private streaming = false;
   private streamMap = new Map<string, { chat: Chat; accum: string; textEl: HTMLElement | null; bubble: HTMLElement | null }>();
   private copilotAuth: CopilotAuthState | null = null;
+  private copilotModels: string[] | null = null;
   private activeReqId: string | null = null;
 
   private onApply: (action: ApplyAction) => void;
@@ -247,6 +239,8 @@ export class AISidebar {
     this.render();
     this.registerIpc();
     this.renderMessages();
+    const copilotToken = this.getProviderConfig('github-copilot').apiKey;
+    if (copilotToken) this.fetchCopilotModels(copilotToken);
   }
 
   private loadProvider(): AIProvider {
@@ -540,6 +534,11 @@ export class AISidebar {
       this.cfgApiKeyEl.value = cfg.apiKey;
       this.configEl.hidden = false;
       setTimeout(() => { this.cfgModelEl.focus(); }, 0);
+      if (this.provider === 'github-copilot' && cfg.apiKey && !this.copilotModels) {
+        this.fetchCopilotModels(cfg.apiKey).then(() => {
+          if (!this.configEl.hidden) this.populateModelSelect(this.provider, this.cfgModelEl.value);
+        });
+      }
     });
 
 
@@ -695,13 +694,27 @@ export class AISidebar {
     }
   }
 
-  private populateModelSelect(provider: AIProvider, current: string): void {
-    const models = PROVIDER_MODELS[provider] ?? [];
+  private populateModelSelect(provider: AIProvider, current: string, dynamicModels?: string[]): void {
+    const models = dynamicModels ?? (provider === 'github-copilot' && this.copilotModels ? this.copilotModels : PROVIDER_MODELS[provider] ?? []);
     this.cfgModelEl.innerHTML = models
       .map(m => `<option value="${escapeHtml(m)}"${m === current ? ' selected' : ''}>${escapeHtml(m)}</option>`)
       .join('');
     if (!models.includes(current) && current) {
       this.cfgModelEl.innerHTML = `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>` + this.cfgModelEl.innerHTML;
+    }
+  }
+
+  private async fetchCopilotModels(githubToken: string): Promise<void> {
+    try {
+      const result = await window.electronAPI?.copilotGetModels(githubToken);
+      if (result?.ok && result.models.length) {
+        result.models = result.models;
+        this.copilotModels = result.models;
+      } else if (result && !result.ok) {
+        this.appendSystemMsg(`Could not fetch Copilot models: ${result.error}. Using default list.`);
+      }
+    } catch (e) {
+      this.appendSystemMsg(`Could not fetch Copilot models: ${e}. Using default list.`);
     }
   }
 
@@ -719,7 +732,7 @@ export class AISidebar {
       disconnectBtn.hidden = false;
       codeWrap.hidden = true;
     } else if (this.copilotAuth) {
-      statusEl.textContent = 'Waiting for authorization…';
+      statusEl.textContent = 'Waiting for auth...';
       statusEl.className = 'ai-copilot-status ai-copilot-status--pending';
       connectBtn.hidden = true;
       disconnectBtn.hidden = true;
@@ -778,6 +791,7 @@ export class AISidebar {
         this.saveProviderConfigs();
         this.syncProviderUi();
         this.renderCopilotStatus();
+        this.fetchCopilotModels(result.githubToken);
         this.appendSystemMsg('GitHub Copilot connected successfully.');
       } else if (result.error === 'slow_down' && this.copilotAuth) {
         // GitHub asked us to back off — increase interval by 5s
@@ -807,6 +821,7 @@ export class AISidebar {
   private async revokeCopilotAuth(): Promise<void> {
     if (this.copilotAuth?.pollTimer) clearInterval(this.copilotAuth.pollTimer);
     this.copilotAuth = null;
+    this.copilotModels = null;
     this.providerConfigs['github-copilot'].apiKey = '';
     this.saveProviderConfigs();
     await window.electronAPI?.copilotRevoke();

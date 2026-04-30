@@ -77,6 +77,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     >,
   copilotRevoke: () =>
     ipcRenderer.invoke('copilot:revoke') as Promise<{ ok: true }>,
+  copilotGetModels: (githubToken: string) =>
+    ipcRenderer.invoke('copilot:get-models', { githubToken }) as Promise<
+      { ok: true; models: string[] } | { ok: false; error: string }
+    >,
   openExternal: (url: string) =>
     ipcRenderer.invoke('shell:open-external', url) as Promise<void>,
   onAiChunk: (cb: (reqId: string, text: string) => void) =>
