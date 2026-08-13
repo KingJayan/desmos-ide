@@ -9,3 +9,6 @@ docs/node_modules
 CLAUDE.md
 todo.txt
 docs/src/App.svelte.bak
+.claude
+build
+dist

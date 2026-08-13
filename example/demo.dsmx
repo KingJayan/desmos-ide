@@ -1,0 +1,53 @@
+// variables, sliders, aliases
+x = 3
+a = slider(3, 0, 10, step=0.1, speed=1, loop)   // step=, speed= kwargs; loop flag auto-plays
+fn hyp(x, y) = sqrt(x^2 + y^2)                  // inlined at every call site
+alias r = hyp(a, b)                              // named alias — identical to assignment
+
+// geometry
+point p (1, 2)
+circle c { center (0, 0)  radius 3 }            // block form
+circle c2 = circle((0, 0), 3)                   // classic form
+line l = slope(2), intercept(1)
+line l2 = 2*x + y = 4                           // standard form
+segment s = (0,0) -> (1,1)
+polygon tri = [(0,0),(1,0),(0,1)]
+
+// generators and curves
+pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)  // list comprehension
+curve ring (t in 0..6.28) { (cos(t), sin(t)) }      // parametric
+pts2 = (cos(t), sin(t)) for t in 0..6.28            // for-comprehension
+region r = y > x^2
+
+// conditionals
+v = x^2 where x > 0 else -x                    // where/else
+v2 = if x > 0 then x^2 else -x                 // if/then/else (identical output)
+z = { x > 0: x^2, x < 0: -x, else: 0 }        // piecewise block
+
+// domain restriction
+y = x^2 domain x > 0                           // adds {x>0} filter in Desmos
+
+// expr block — local bindings, inlined at compile time
+expr {
+  cx = cos(t)
+  cy = sin(t)
+  (2*cx, cy)
+}
+
+// debug — compile-time only, no output emitted
+debug r
+debug hyp(a, b)
+
+// text and folders
+text lbl = "hello" at (1, 2)
+group g as "My Folder"
+
+// built-in generators
+spiral s = spiral(turns=5, spacing=0.2)
+wave w = wave(freq=2, amp=1, phase=0)
+grid g = grid(10, 10)
+
+// optional styling
+point p2 (0, 0) as { color red pointSize 12 }
+region r2 = y < x as { color blue opacity 0.3 fill }
+curve c (t in 0..6.28) { (cos(t), sin(t)) } as gradient("blue", "red")
