@@ -3,7 +3,7 @@
 <p>a minimalist Desmos IDE - integrated DSL, and live graph</p>
 </div>
 
-# features
+## features
 
 - **DSL editor** — write math in a clean language; the compiler outputs Desmos expressions in real time
 - **live graph** — Desmos graph updates as you type, diffed by expression ID to avoid flicker
@@ -12,7 +12,7 @@
 - **file operations** — open/save `.desmos` files via native dialogs (Electron)
 - **AI sidebar** — chat with Claude to generate or modify expressions (streamed)
 
-# DSL syntax
+## syntax
 
 see an [example file](example/demo.dsmx)
 
@@ -24,14 +24,14 @@ see an [example file](example/demo.dsmx)
 
 [![Documentation](https://img.shields.io/badge/See%20Full%20Docs-blue?style=for-the-badge&logo=readthedocs)](https://desmos-ide.vercel.app)
 
-# architecture
+## architecture
 
 - **compiler** (`src/`) — full typescript `lexer → parser → semantic analysis → optimizer → codegen`; `compile(src)` returns `CompileSuccess | CompileFailure`
 - **renderer** (`renderer/`) — Monaco editor + Desmos CDN calculator wired in `main.ts`; `DesmosGraph` diffs expressions by ID; `EnhancedPane` for direct expr editing
 - **electron** (`electron/`) — `BrowserWindow`, native menu, `contextBridge` IPC for file ops
 
 
-# usage
+## usage
 
 ```bash
 npm i
@@ -42,7 +42,7 @@ npm run demo       # run compiler demo in terminal (no Electron)
 
 > **Note:** if your shell has `ELECTRON_RUN_AS_NODE=1` set (e.g. inside a Claude Code session), prefix with `unset ELECTRON_RUN_AS_NODE &&`.
 
-# troubleshooting
+## troubleshooting
 
 | symptom | fix |
 |---|---|
