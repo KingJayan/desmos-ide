@@ -949,9 +949,15 @@ btnEnhanced.addEventListener('click', () => setMode('enhanced'));
 let currentPath: string | null = null;
 let watchedPath: string | null = null;
 
-function setFilename(p: string | null): void {
+// the git panel follows the open file, so point the main process at it before refreshing
+function setFilename(p: string | null): Promise<unknown> {
   currentPath = p;
   filenameEl.textContent = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
+  return Promise.resolve(window.electronAPI?.setGitContext(p)).then(refreshGitPanels);
+}
+
+function refreshGitPanels(): Promise<unknown> {
+  return Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory(), refreshGitRemotes()]);
 }
 
 function startWatching(path: string): void {
@@ -988,11 +994,10 @@ async function cmdNew(): Promise<void> {
   if (!enhancedDirtyGuard()) return;
   stopWatching();
   editor.setValue(DEFAULT_SRC);
-  setFilename(null);
+  void setFilename(null);
   setStatus('New file', 'info');
   applyMode('dsl');
   runCompile();
-  void refreshGitStatus();
 }
 
 async function cmdOpen(): Promise<void> {
@@ -1004,11 +1009,10 @@ async function cmdOpen(): Promise<void> {
     return;
   }
   editor.setValue(result.content);
-  setFilename(result.path);
+  void setFilename(result.path);
   startWatching(result.path);
   applyMode(mode === 'enhanced' ? 'dsl' : mode);
   runCompile();
-  void refreshGitStatus();
 }
 
 async function cmdSave(saveAs = false): Promise<void> {
@@ -1022,10 +1026,9 @@ async function cmdSave(saveAs = false): Promise<void> {
   );
   if (!result) return;
   if (result.ok) {
-    setFilename(result.path);
+    void setFilename(result.path);
     startWatching(result.path);
     setStatus('Saved', 'success');
-    void refreshGitStatus();
   } else if (!result.canceled) {
     setStatus(result.message, 'error');
   }
@@ -1125,7 +1128,7 @@ window.addEventListener('focus', () => {
 });
 
 gitRefreshStatusBtn.addEventListener('click', () => {
-  void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory(), refreshGitRemotes()]);
+  void refreshGitPanels();
 });
 
 gitBranchRefreshBtn.addEventListener('click', e => {
@@ -1267,7 +1270,7 @@ function setSidebarView(next: SidebarView): void {
     aiSelectionListener = null;
   }
   if (next === 'git') {
-    void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory(), refreshGitRemotes()]);
+    void refreshGitPanels();
   }
 
   editor.layout();
@@ -1509,10 +1512,7 @@ palette.register([
   },
 ]);
 
-setFilename(null);
+void setFilename(null);
 applyMode('dsl');
 startGitStatusRefresh();
-void refreshGitBranches();
-void refreshGitHistory();
-void refreshGitRemotes();
 editor.focus();

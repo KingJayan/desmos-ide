@@ -4,7 +4,7 @@ import { exportJson, openFile, saveFile, unwatchAll, unwatchFile, watchFile } fr
 import {
   getGitBranches, getGitHistory, getGitRemotes, getGitStatus,
   gitCheckoutBranch, gitCreateBranch, gitFetch, gitPull, gitPush,
-  gitRemoteAdd, gitRemoteRemove,
+  gitRemoteAdd, gitRemoteRemove, setGitContext,
 } from './git';
 import {
   buildSystemText, compactConversation, copilotGetModels, copilotPollDeviceFlow,
@@ -31,6 +31,7 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       aiCompact: ({ messages, config, memories }) =>
         compactConversation(sanitizeMessages(messages), sanitizeConfig(config), sanitizeMemories(memories)),
 
+      setGitContext: ({ path }) => setGitContext(path),
       gitStatus: () => getGitStatus(),
       gitBranches: () => getGitBranches(),
       gitHistory: ({ limit }) => getGitHistory(limit),
