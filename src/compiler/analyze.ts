@@ -1,6 +1,7 @@
 // phase 2 semantic analysis
 
 import * as T from './types';
+import { isBuiltin } from './builtins';
 
 export interface SemanticError {
   error: string;
@@ -8,15 +9,6 @@ export interface SemanticError {
   col: number;
   phase: 2;
 }
-
-const MATH_BUILTINS = new Set([
-  'sin', 'cos', 'tan', 'arcsin', 'arccos', 'arctan',
-  'ln', 'log', 'exp', 'sqrt', 'abs', 'floor', 'ceil', 'round',
-  'min', 'max', 'mod', 'sign',
-  'rgb', 'hsv',
-  'slider', 'time', 'project', 'camera',
-  'polygon',
-]);
 
 const DESMOS_IMPLICIT = new Set([
   'x', 'y', 't', 'r', 'theta', 'e', 'pi',
@@ -190,7 +182,7 @@ function checkExpr(
       break;
 
     case 'Call': {
-      const isMath = MATH_BUILTINS.has(expr.fn);
+      const isMath = isBuiltin(expr.fn);
       const isUserFn = fns.has(expr.fn);
 
       if (!isMath && !isUserFn) {
