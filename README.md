@@ -3,9 +3,9 @@
 <p>a minimalist Desmos IDE - integrated DSL, and live graph</p>
 </div>
 
-<img src="https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="ts" />
-<img src="https://img.shields.io/badge/Bun-F9F1E1?style=for-the-badge&logo=electrobun&logoColor=000000" alt="Bun" />
-
+<p align="center">
+<img src="https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="ts" /> <img src="https://img.shields.io/badge/electrobun-F9F1E1?style=for-the-badge&logo=bun&logoColor=000000" alt="Bun" />
+</p>
 
 ## features
 
