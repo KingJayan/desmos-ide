@@ -7,7 +7,7 @@ docs/node_modules
 */.DS_Store
 **/.DS_Store
 CLAUDE.md
-todo.txt
+todo.md
 docs/src/App.svelte.bak
 .claude
 build
