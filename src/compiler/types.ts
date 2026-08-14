@@ -147,6 +147,7 @@ export interface TextDecl {
   content: string;
   x: Expr;
   y: Expr;
+  style?: StyleBlock;
   pos: Pos;
 }
 
@@ -256,6 +257,8 @@ export interface BinOp {
   op: '+' | '-' | '*' | '/' | '^';
   left: Expr;
   right: Expr;
+  /** written as juxtaposition (`2x`), so it renders without a product dot */
+  implicit?: boolean;
   pos: Pos;
 }
 

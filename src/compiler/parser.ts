@@ -420,7 +420,8 @@ class Parser {
     this.eat('comma');
     const y = this.parseExpr();
     this.eat('rparen');
-    return { type: 'TextDecl', name, content: contentTok.value, x, y, pos };
+    const style = this.parseStyleBlock();
+    return { type: 'TextDecl', name, content: contentTok.value, x, y, style, pos };
   }
 
   private parseGroupDecl(): T.GroupDecl {
@@ -635,13 +636,28 @@ class Parser {
 
   private parseMultiplicative(): T.Expr {
     let left = this.parseUnary();
-    while (this.check('op', '*') || this.check('op', '/')) {
-      const op = this.advance().value as '*' | '/';
-      const pos = this.curPos();
-      const right = this.parseUnary();
-      left = { type: 'BinOp', op, left, right, pos };
+    while (true) {
+      if (this.check('op', '*') || this.check('op', '/')) {
+        const op = this.advance().value as '*' | '/';
+        const pos = this.curPos();
+        const right = this.parseUnary();
+        left = { type: 'BinOp', op, left, right, pos };
+      } else if (this.startsImplicitFactor()) {
+        const pos = this.curPos();
+        const right = this.parseUnary();
+        left = { type: 'BinOp', op: '*', left, right, implicit: true, pos };
+      } else {
+        return left;
+      }
     }
-    return left;
+  }
+
+  // `2x`, `3sin(t)` and `2(x+1)` multiply the way they do in desmos. the factors must
+  // be adjacent: a space means separate things, which is what keeps the newline-separated
+  // bindings of an `expr { }` block from merging into one expression.
+  private startsImplicitFactor(): boolean {
+    if (this.peek().spaceBefore) return false;
+    return this.check('num') || this.check('ident') || this.check('lparen');
   }
 
   private parseUnary(): T.Expr {
