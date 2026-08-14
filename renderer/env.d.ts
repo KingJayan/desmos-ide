@@ -23,6 +23,10 @@ interface Window {
       config: { provider: 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot'; model: string; baseUrl: string; apiKey: string },
       memories: string[],
     ): Promise<string>;
+    aiTitle(
+      messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+      config: { provider: 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot'; model: string; baseUrl: string; apiKey: string },
+    ): Promise<string>;
     copilotStartDeviceFlow(): Promise<{
       device_code: string; user_code: string; verification_uri: string;
       expires_in: number; interval: number;

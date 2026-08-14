@@ -1,4 +1,4 @@
-import { createIcons, Plus, Trash2, SlidersHorizontal } from 'lucide';
+import { createIcons, ArrowDown, Plus, Trash2, SlidersHorizontal } from 'lucide';
 
 type ConvMessage = { role: 'user' | 'assistant'; content: string };
 type ApplyAction = { type: 'insert' | 'replace'; code: string };
@@ -131,6 +131,7 @@ const PROVIDER_MODELS: Record<AIProvider, string[]> = {
   ],
 };
 
+const SCROLL_AWAY_RATIO  = 0.25;
 const MAX_HISTORY        = 20;
 const MAX_CHATS          = 10;
 const MAX_CHAT_BYTES     = 40_000;
@@ -214,6 +215,10 @@ export class AISidebar {
   private cfgApiKeyEl!: HTMLInputElement;
   private cfgSaveEl!: HTMLButtonElement;
   private cfgCopilotEl!: HTMLElement;
+  private scrollFabEl!: HTMLButtonElement;
+  private scrollFabDotEl!: HTMLElement;
+  private unread = false;
+  private pendingTitles = new Map<string, string>();
   private acEl!: HTMLElement;
   private acIndex = -1;
   private acItems: typeof SLASH_COMMANDS = [];
@@ -351,6 +356,10 @@ export class AISidebar {
       </div>
       <div class="ai-messages"></div>
       <div class="ai-status-strip">
+        <button class="ai-scroll-fab" type="button" title="Scroll to latest" aria-label="Scroll to latest" hidden>
+          <i data-lucide="arrow-down" aria-hidden="true"></i>
+          <span class="ai-scroll-fab-dot" hidden></span>
+        </button>
         <div class="ai-status-left">
           <button class="ai-provider-chip" id="ai-provider-chip" title="Provider settings"><span class="ai-status-provider-label"></span></button>
           <button class="ai-status-model" title="Change model"></button>
@@ -404,7 +413,7 @@ export class AISidebar {
           <div class="ai-config-standard">
             <label class="ai-config-row">
               <span>model</span>
-              <select class="ai-config-input ai-config-model ai-model-select"></select>
+              <select class="ai-config-input ai-config-model"></select>
             </label>
             <label class="ai-config-row">
               <span>base url</span>
@@ -444,6 +453,8 @@ export class AISidebar {
     this.cfgApiKeyEl = this.el.querySelector('.ai-config-key')!;
     this.cfgSaveEl = this.el.querySelector('.ai-config-save')!;
     this.cfgCopilotEl = this.el.querySelector('.ai-config-copilot')!;
+    this.scrollFabEl  = this.el.querySelector('.ai-scroll-fab')!;
+    this.scrollFabDotEl = this.el.querySelector('.ai-scroll-fab-dot')!;
     this.acEl         = this.el.querySelector('.ai-autocomplete')!;
     this.autoApproveBtn = this.el.querySelector('#ai-autoapprove-btn') as HTMLButtonElement;
     this.ctxPillEl = this.el.querySelector('.ai-ctx-pill')!;
@@ -455,7 +466,7 @@ export class AISidebar {
     const confirmBtn = this.el.querySelector('.ai-confirm-btn') as HTMLButtonElement;
 
     createIcons({
-      icons: { Plus, Trash2, SlidersHorizontal },
+      icons: { ArrowDown, Plus, Trash2, SlidersHorizontal },
       attrs: { 'stroke-width': '2' },
     });
 
@@ -500,12 +511,14 @@ export class AISidebar {
       if (this.chats.length === 1) {
         this.activeChat.history = [];
         this.activeChat.title = 'New Chat';
+        this.pendingTitles.delete(this.activeChat.id);
         this.saveState();
         this.syncChatSelect();
         this.renderMessages();
         return;
       }
       const idx = this.chats.indexOf(this.activeChat);
+      this.pendingTitles.delete(this.activeChat.id);
       this.chats.splice(idx, 1);
       this.activeChat = this.chats[Math.max(0, idx - 1)];
       this.saveState();
@@ -620,6 +633,13 @@ export class AISidebar {
         : 'Auto-approve OFF — shows diff before applying';
     });
 
+    this.messagesEl.addEventListener('scroll', () => {
+      if (this.isPinnedToBottom()) this.unread = false;
+      this.syncScrollFab();
+    }, { passive: true });
+
+    this.scrollFabEl.addEventListener('click', () => this.scrollToBottom(true));
+
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width ?? this.el.offsetWidth;
       this.el.classList.toggle('ai-sidebar--compact', w < 260);
@@ -629,8 +649,28 @@ export class AISidebar {
 
   private syncChatSelect(): void {
     this.chatSelectEl.innerHTML = this.chats
-      .map(c => `<option value="${c.id}"${c.id === this.activeChat.id ? ' selected' : ''}>${escapeHtml(c.title)}</option>`)
+      .map(c => {
+        const label = this.pendingTitles.has(c.id) ? 'Naming chat…' : c.title;
+        return `<option value="${c.id}"${c.id === this.activeChat.id ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+      })
       .join('');
+    this.chatSelectEl.classList.toggle('ai-chat-select--pending', this.pendingTitles.has(this.activeChat.id));
+  }
+
+  // the first prompt truncated mid-word reads badly, so the model names the chat once it answers
+  private async resolveTitle(chat: Chat, ask = true): Promise<void> {
+    const fallback = this.pendingTitles.get(chat.id);
+    if (fallback === undefined) return;
+    let title = '';
+    if (ask) {
+      try {
+        title = (await window.electronAPI?.aiTitle(chat.history.slice(0, 2), this.getAiConfig())) ?? '';
+      } catch {}
+    }
+    chat.title = cleanTitle(title) || truncateAtWord(fallback);
+    this.pendingTitles.delete(chat.id);
+    this.saveState();
+    this.syncChatSelect();
   }
 
   private updateAc(): void {
@@ -883,7 +923,7 @@ export class AISidebar {
         this.messagesEl.appendChild(row);
       }
     }
-    this.scrollToBottom();
+    this.scrollToBottom(true);
   }
 
   private appendWelcome(): void {
@@ -933,6 +973,7 @@ export class AISidebar {
     if (name === '/clear') {
       this.activeChat.history = [];
       this.activeChat.title = 'New Chat';
+      this.pendingTitles.delete(this.activeChat.id);
       this.saveState();
       this.syncChatSelect();
       this.renderMessages();
@@ -981,7 +1022,7 @@ export class AISidebar {
     el.className = 'ai-msg ai-msg--system';
     el.innerHTML = `<div class="ai-bubble ai-bubble--system"><p>${escapeHtml(text)}</p></div>`;
     this.messagesEl.appendChild(el);
-    this.scrollToBottom();
+    this.scrollToBottom(true);
   }
 
   private async compact(): Promise<void> {
@@ -1017,7 +1058,7 @@ export class AISidebar {
 
     this.activeChat.history.push({ role: 'user', content: userContent });
     if (this.activeChat.title === 'New Chat' && this.activeChat.history.length === 1) {
-      this.activeChat.title = prompt.slice(0, 40);
+      this.pendingTitles.set(this.activeChat.id, prompt);
       this.syncChatSelect();
     }
     this.saveState();
@@ -1048,6 +1089,7 @@ export class AISidebar {
     this.setLoading(false);
     this.updateSendBtn();
     this.scrollToBottom();
+    void this.resolveTitle(s.chat);
   }
 
   private updateSendBtn(): void {
@@ -1080,6 +1122,7 @@ export class AISidebar {
       if (s.bubble) this.renderAssistantContent(s.bubble, full);
       this.setLoading(false);
       this.scrollToBottom();
+      void this.resolveTitle(s.chat);
     });
 
     window.electronAPI?.onAiError((reqId, error) => {
@@ -1087,6 +1130,9 @@ export class AISidebar {
       if (!s) return;
       this.streamMap.delete(reqId);
       if (this.activeReqId === reqId) this.activeReqId = null;
+      void this.resolveTitle(s.chat, false);
+      s.bubble?.classList.remove('ai-bubble--streaming');
+      s.bubble?.querySelector('.ai-typing')?.remove();
       if (s.textEl) {
         s.textEl.textContent = `Error: ${error}`;
         s.textEl.classList.add('ai-error-text');
@@ -1136,7 +1182,7 @@ export class AISidebar {
     el.addEventListener('mouseleave', () => toolbar.classList.remove('ai-msg-toolbar--visible'));
 
     this.messagesEl.appendChild(el);
-    if (scroll) this.scrollToBottom();
+    if (scroll) this.scrollToBottom(true);
   }
 
   private appendAssistantBubble(): { bubble: HTMLElement; textEl: HTMLElement } {
@@ -1147,9 +1193,14 @@ export class AISidebar {
     const textEl = document.createElement('p');
     textEl.className = 'ai-stream-text';
     bubble.appendChild(textEl);
+    const typing = document.createElement('span');
+    typing.className = 'ai-typing';
+    typing.setAttribute('aria-label', 'Assistant is typing');
+    typing.innerHTML = '<span></span><span></span><span></span>';
+    bubble.appendChild(typing);
     msg.appendChild(bubble);
     this.messagesEl.appendChild(msg);
-    this.scrollToBottom();
+    this.scrollToBottom(true);
     return { bubble, textEl };
   }
 
@@ -1322,8 +1373,31 @@ export class AISidebar {
     this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 120) + 'px';
   }
 
-  private scrollToBottom(): void {
+  // once the user scrolls away, streaming must not drag the view back down
+  private distanceFromBottom(): number {
+    const el = this.messagesEl;
+    return el.scrollHeight - el.scrollTop - el.clientHeight;
+  }
+
+  private isPinnedToBottom(): boolean {
+    return this.distanceFromBottom() <= Math.max(48, this.messagesEl.clientHeight * SCROLL_AWAY_RATIO);
+  }
+
+  private scrollToBottom(force = false): void {
+    if (!force && !this.isPinnedToBottom()) {
+      this.unread = true;
+      this.syncScrollFab();
+      return;
+    }
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+    this.unread = false;
+    this.syncScrollFab();
+  }
+
+  private syncScrollFab(): void {
+    const away = !this.isPinnedToBottom();
+    this.scrollFabEl.hidden = !away;
+    this.scrollFabDotEl.hidden = !(away && this.unread);
   }
 
   focus(): void { this.inputEl.focus(); }
@@ -1498,6 +1572,19 @@ function formatInlineMarkdown(text: string): string {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   html = html.replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>');
   return html;
+}
+
+function cleanTitle(raw: string): string {
+  const words = raw.replace(/["'`]|[.\s]+$/g, '').replace(/\s+/g, ' ').trim().split(' ');
+  return words.length > 6 ? words.slice(0, 6).join(' ') : words.join(' ');
+}
+
+function truncateAtWord(raw: string, max = 40): string {
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return `${space > 12 ? cut.slice(0, space) : cut}…`;
 }
 
 function escapeHtml(s: string): string {
