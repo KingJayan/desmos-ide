@@ -6,18 +6,15 @@ import { existsSync, statSync, mkdirSync } from 'fs';
 
 const execFileAsync = promisify(execFile);
 
-const savePanelSource = join(__dirname, 'native', 'savepanel.swift');
-const savePanelBinary = join(__dirname, '..', 'build', 'native', 'savepanel');
-
-async function ensureSavePanelBinary(): Promise<string> {
-  const stale =
-    !existsSync(savePanelBinary) ||
-    statSync(savePanelBinary).mtimeMs < statSync(savePanelSource).mtimeMs;
+async function ensureNativeBinary(name: string): Promise<string> {
+  const source = join(__dirname, 'native', `${name}.swift`);
+  const binary = join(__dirname, '..', 'build', 'native', name);
+  const stale = !existsSync(binary) || statSync(binary).mtimeMs < statSync(source).mtimeMs;
   if (stale) {
-    mkdirSync(dirname(savePanelBinary), { recursive: true });
-    await execFileAsync('swiftc', ['-O', savePanelSource, '-o', savePanelBinary]);
+    mkdirSync(dirname(binary), { recursive: true });
+    await execFileAsync('swiftc', ['-O', source, '-o', binary]);
   }
-  return savePanelBinary;
+  return binary;
 }
 
 export type SaveDialogOptions = {
@@ -42,7 +39,7 @@ function ensureExtension(path: string, extension: string): string {
 export async function showSaveDialog(opts: SaveDialogOptions): Promise<string | null> {
   if (process.platform !== 'darwin') return saveDialogFallback(opts);
 
-  const binary = await ensureSavePanelBinary();
+  const binary = await ensureNativeBinary('savepanel');
   try {
     const { stdout } = await execFileAsync(binary, [opts.prompt, opts.defaultName], {
       maxBuffer: 256 * 1024,
@@ -51,6 +48,21 @@ export async function showSaveDialog(opts: SaveDialogOptions): Promise<string | 
     return path ? ensureExtension(path, opts.extension) : null;
   } catch (err) {
     if ((err as { code?: number }).code === 1) return null;
+    throw err;
+  }
+}
+
+// use nsalert cuz browser confirm() doesnt look native in a webview
+// throws on non-darwin so the caller can fall back to window.confirm
+export async function showConfirm(message: string): Promise<boolean> {
+  if (process.platform !== 'darwin') throw new Error('native confirm is macOS-only');
+
+  const binary = await ensureNativeBinary('confirm');
+  try {
+    await execFileAsync(binary, [message], { maxBuffer: 64 * 1024 });
+    return true;
+  } catch (err) {
+    if ((err as { code?: number }).code === 1) return false;
     throw err;
   }
 }

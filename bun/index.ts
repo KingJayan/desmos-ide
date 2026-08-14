@@ -1,6 +1,7 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/bun';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
 import { exportJson, openFile, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
+import { showConfirm } from './dialogs';
 import {
   getGitBranches, getGitHistory, getGitRemotes, getGitStatus,
   gitCheckoutBranch, gitCreateBranch, gitFetch, gitPull, gitPush,
@@ -55,6 +56,7 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       openExternal: ({ url }) => {
         if (/^https?:\/\//i.test(url)) Utils.openExternal(url);
       },
+      confirm: ({ message }) => showConfirm(message),
     },
     messages: {
       aiChat: async payload => {
