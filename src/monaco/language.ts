@@ -1,3 +1,5 @@
+import { BUILTINS, BUILTIN_NAMES } from '../compiler/builtins';
+
 export const LANGUAGE_ID = 'desmos-dsl';
 
 export const KEYWORDS = [
@@ -11,14 +13,8 @@ export const KEYWORDS = [
   'spiral', 'wave', 'grid',
 ] as const;
 
-export const BUILTIN_FNS = [
-  'sin', 'cos', 'tan', 'arcsin', 'arccos', 'arctan',
-  'ln', 'log', 'sqrt', 'abs', 'floor', 'ceil', 'round',
-  'min', 'max', 'mod', 'sign',
-  'rgb', 'hsv', 'gradient',
-  'slider', 'time',
-  'spiral', 'wave', 'grid',
-] as const;
+// re-exported so the editor and the analyzer can never disagree about what exists
+export const BUILTIN_FNS = BUILTIN_NAMES;
 
 export const languageConfig = {
   comments: { lineComment: '//' },
@@ -59,7 +55,7 @@ export const languageConfig = {
 
 export const monarchTokens = {
   keywords:  [...KEYWORDS],
-  builtins:  [...BUILTIN_FNS],
+  builtins:  [...BUILTIN_NAMES, 'gradient'],
 
   tokenizer: {
     root: [
@@ -252,7 +248,7 @@ export function buildCompletions(kinds: {
       detail: 'Desmos folder',
     },
     {
-      label: 'slider',
+      label: 'slider-decl',
       kind: Snippet,
       insertText: '${1:a} = slider(${2:0}, ${3:0}, ${4:10})',
       insertTextRules: 4,
@@ -280,30 +276,15 @@ export function buildCompletions(kinds: {
       detail: 'keyword',
     })),
 
-    ...BUILTIN_FNS.filter(fn => fn !== 'rgb' && fn !== 'hsv').map(fn => ({
-      label: fn,
+    ...BUILTINS.map(fn => ({
+      label: fn.name,
       kind: Function,
-      insertText: `${fn}(\${1:x})`,
+      insertText: `${fn.name}${fn.snippet ?? '(${1:x})'}`,
       insertTextRules: 4,
-      detail: 'built-in function',
+      detail: fn.signature,
+      ...(fn.doc ? { documentation: fn.doc } : {}),
     })),
 
-    {
-      label: 'rgb',
-      kind: Function,
-      insertText: 'rgb(${1:255}, ${2:0}, ${3:0})',
-      insertTextRules: 4,
-      detail: 'color — rgb(r, g, b)',
-      documentation: 'Desmos color via RGB (0–255 each). Shown as an inline color swatch.',
-    },
-    {
-      label: 'hsv',
-      kind: Function,
-      insertText: 'hsv(${1:0}, ${2:1}, ${3:1})',
-      insertTextRules: 4,
-      detail: 'color — hsv(h, s, v)',
-      documentation: 'Desmos color via HSV (h: 0–360, s/v: 0–1). Shown as an inline color swatch.',
-    },
     {
       label: 'gradient',
       kind: Function,

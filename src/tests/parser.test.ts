@@ -3,6 +3,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile } from '../index';
 import type { CompileSuccess, CompileFailure } from '../index';
+import { BUILTIN_FNS, buildCompletions } from '../monaco/language';
+import { builtinSignature } from '../compiler/builtins';
 
 function ok(src: string): CompileSuccess {
   const r = compile(src);
@@ -193,5 +195,26 @@ describe('math table stakes', () => {
 
   test('expr blocks still parse', () => {
     ok('r = 0\nexpr {\n  a = 1\n  b = 2\n  a + b\n}');
+  });
+});
+
+describe('builtins stay in sync', () => {
+  test('every highlighted builtin compiles', () => {
+    for (const name of BUILTIN_FNS) {
+      const r = compile(`y = ${name}(1)`);
+      const undef = r.success ? [] : r.errors.filter(e => e.message.includes(`undefined function '${name}'`));
+      assert.equal(undef.length, 0, `${name} is highlighted but the analyzer rejects it`);
+    }
+  });
+
+  test('every builtin has a hover signature', () => {
+    for (const name of BUILTIN_FNS) {
+      assert.ok(builtinSignature(name), `${name} has no signature`);
+    }
+  });
+
+  test('every builtin is offered as a completion', () => {
+    const labels = new Set(buildCompletions({ Keyword: 1, Snippet: 2, Function: 3 }).map(c => c.label));
+    for (const name of BUILTIN_FNS) assert.ok(labels.has(name), `${name} is missing from completions`);
   });
 });

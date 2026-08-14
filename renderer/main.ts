@@ -7,6 +7,7 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import * as monaco from 'monaco-editor';
 import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List } from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
+import { builtinSignature } from '../src/compiler/builtins';
 import CompileWorker from './compile.worker?worker';
 import type { CompileResult, SymbolInfo } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
@@ -420,16 +421,7 @@ function handleCompileResult(result: CompileResult): void {
 }
 
 const BUILTIN_SIGS: Record<string, string> = {
-  sin: 'sin(x) → number', cos: 'cos(x) → number', tan: 'tan(x) → number',
-  arcsin: 'arcsin(x) → number', arccos: 'arccos(x) → number', arctan: 'arctan(x) → number',
-  ln: 'ln(x) → number', log: 'log(x) → number', sqrt: 'sqrt(x) → number',
-  abs: 'abs(x) → number', floor: 'floor(x) → number', ceil: 'ceil(x) → number',
-  round: 'round(x) → number', min: 'min(a, b, ...) → number', max: 'max(a, b, ...) → number',
-  mod: 'mod(a, b) → number', sign: 'sign(x) → number',
-  rgb: 'rgb(r, g, b) → color  (0–255 each)',
-  hsv: 'hsv(h, s, v) → color  (h: 0–360, s/v: 0–1)',
   gradient: 'gradient(from, to) → color',
-  slider: 'slider(value, min, max, speed?) → number',
 };
 
 monaco.languages.registerHoverProvider(LANGUAGE_ID, {
@@ -438,7 +430,7 @@ monaco.languages.registerHoverProvider(LANGUAGE_ID, {
     if (!word) return null;
     const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
 
-    const sig = BUILTIN_SIGS[word.word];
+    const sig = builtinSignature(word.word) ?? BUILTIN_SIGS[word.word];
     if (sig) {
       return { range, contents: [{ value: `\`\`\`\n${sig}\n\`\`\``, isTrusted: true }] };
     }
