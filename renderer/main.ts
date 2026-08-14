@@ -576,6 +576,10 @@ function setStatus(msg: string, kind: 'success' | 'error' | 'info' = 'info'): vo
   statusMsg.className = kind;
 }
 
+function nativeConfirm(message: string): Promise<boolean> {
+  return window.electronAPI?.confirm(message) ?? Promise.resolve(confirm(message));
+}
+
 type GitStatusResult =
   | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }
   | { ok: false; errorCode: string; message: string };
@@ -823,7 +827,7 @@ function renderGitRemotes(result: GitRemotesResult): void {
     removeBtn.textContent = 'Remove';
     removeBtn.addEventListener('click', async e => {
       e.stopPropagation();
-      if (!confirm(`Remove remote ${remote.name}?`)) return;
+      if (!(await nativeConfirm(`Remove remote ${remote.name}?`))) return;
       const action = await window.electronAPI?.gitRemoteRemove(remote.name);
       handleGitActionResult(action);
       await refreshGitRemotes();
@@ -926,9 +930,9 @@ function applyMode(m: Mode): void {
   if (showDsl) editor.layout();
 }
 
-function setMode(m: Mode): void {
+async function setMode(m: Mode): Promise<void> {
   if (m !== 'enhanced' && mode === 'enhanced' && enhanced?.isDirty) {
-    if (!confirm('Leave Enhanced mode? Unsaved edits will be lost.')) return;
+    if (!(await nativeConfirm('Leave Enhanced mode? Unsaved edits will be lost.'))) return;
   }
   applyMode(m);
 }
@@ -975,15 +979,15 @@ window.electronAPI?.onFileChanged((changedPath, content) => {
   runCompile();
 });
 
-function enhancedDirtyGuard(): boolean {
+async function enhancedDirtyGuard(): Promise<boolean> {
   if (mode === 'enhanced' && enhanced?.isDirty) {
-    return confirm('Discard unsaved Enhanced edits and continue?');
+    return nativeConfirm('Discard unsaved Enhanced edits and continue?');
   }
   return true;
 }
 
 async function cmdNew(): Promise<void> {
-  if (!enhancedDirtyGuard()) return;
+  if (!(await enhancedDirtyGuard())) return;
   stopWatching();
   editor.setValue(DEFAULT_SRC);
   void setFilename(null);
@@ -993,7 +997,7 @@ async function cmdNew(): Promise<void> {
 }
 
 async function cmdOpen(): Promise<void> {
-  if (!enhancedDirtyGuard()) return;
+  if (!(await enhancedDirtyGuard())) return;
   const result = await window.electronAPI?.openFile();
   if (!result) return;
   if (!result.ok) {

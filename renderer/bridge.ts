@@ -75,6 +75,9 @@ export const electronAPI = {
 
   openExternal: (url: string) => rpc.request.openExternal({ url }),
 
+  // native NSAlert is macOS-only; fall back to the browser dialog elsewhere
+  confirm: (message: string) => rpc.request.confirm({ message }).catch(() => confirm(message)),
+
   onAiChunk: (cb: (reqId: string, text: string) => void) => { aiChunkCbs.push(cb); },
   onAiDone: (cb: (reqId: string) => void) => { aiDoneCbs.push(cb); },
   onAiError: (cb: (reqId: string, error: string) => void) => { aiErrorCbs.push(cb); },

@@ -86,6 +86,7 @@ export type DesmosIdeRPC = {
       copilotGetModels: { params: { githubToken: string }; response: CopilotModelsResult };
 
       openExternal: { params: { url: string }; response: void };
+      confirm: { params: { message: string }; response: boolean };
     };
     messages: {
       aiChat: { reqId: string; messages: AIMessage[]; config: AIConfig; memories: string[] };
