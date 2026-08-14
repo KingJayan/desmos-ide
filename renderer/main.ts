@@ -1,3 +1,4 @@
+import './bridge';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 (globalThis as unknown as { MonacoEnvironment: unknown }).MonacoEnvironment = {
   getWorker() { return new EditorWorker(); },
