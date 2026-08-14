@@ -56,6 +56,40 @@ describe('semantic errors', () => {
     const msg = fail('x = noSuchFunc(1)');
     assert.ok(msg.includes('noSuchFunc'));
   });
+
+  test('undefined variable', () => {
+    const msg = fail('y = undefinedThing + 1');
+    assert.ok(msg.includes('undefinedThing'));
+  });
+
+  test('declaration order does not matter', () => {
+    ok('y = later + 1\nlater = 2');
+  });
+
+  test('fn params and loop vars are in scope', () => {
+    ok('fn f(a, b) = a + b\npts = (cos(i), sin(i)) for i in 0..6');
+  });
+});
+
+describe('statement terminators', () => {
+  test('a line cannot merge into the previous statement', () => {
+    fail('a = 5\n-3\nb = 2');
+  });
+
+  test('adjacent statements stay separate', () => {
+    const r = ok('a = 5\nb = 2');
+    assert.equal(r.state.expressions.list.length, 2);
+  });
+
+  test('a trailing operator continues the line', () => {
+    ok('a = 1 +\n  2');
+  });
+
+  test('blocks and lists still span lines', () => {
+    ok('curve ring (t in 0..6.28) {\n  (cos(t), sin(t))\n}');
+    ok('z = { x > 0: x^2,\n  else: 0 }');
+    ok('polygon tri = [\n  (0,0),\n  (1,0)\n]');
+  });
 });
 
 describe('warnings', () => {

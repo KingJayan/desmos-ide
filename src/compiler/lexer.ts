@@ -27,6 +27,7 @@ export type TT =
   | 'dotdot'     // ..
   | 'dot'
   | 'arrow'      // ->
+  | 'nl'         // statement terminator
   | 'eof';
 
 export interface Token {
@@ -47,11 +48,19 @@ export class LexError extends Error {
   }
 }
 
+// a newline only ends a statement when the line is complete: not inside brackets,
+// and not right after a token that still needs a right-hand side
+const CONTINUES_LINE = new Set<TT>([
+  'op', 'comma', 'colon', 'arrow', 'dotdot', 'ellipsis', 'dot', 'kw', 'nl',
+  'lparen', 'lbrace', 'lbracket',
+]);
+
 export function tokenize(src: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   let line = 1;
   let lineStart = 0;
+  let depth = 0;
 
   const col = () => i - lineStart + 1;
 
@@ -62,7 +71,12 @@ export function tokenize(src: string): Token[] {
     const ch = src[i];
 
     // newline
-    if (ch === '\n') { line++; lineStart = ++i; continue; }
+    if (ch === '\n') {
+      const prev = tokens[tokens.length - 1];
+      if (depth === 0 && prev && !CONTINUES_LINE.has(prev.type)) push('nl', '\n');
+      line++; lineStart = ++i;
+      continue;
+    }
     if (ch === ' ' || ch === '\t' || ch === '\r') { i++; continue; }
 
     // line comment
@@ -128,12 +142,12 @@ export function tokenize(src: string): Token[] {
     if (ch === '=' && src[i + 1] === '=') { push('op',    '==',  startCol); i += 2; continue; }
 
     switch (ch) {
-      case '(': push('lparen',   ch, startCol); i++; break;
-      case ')': push('rparen',   ch, startCol); i++; break;
-      case '{': push('lbrace',   ch, startCol); i++; break;
-      case '}': push('rbrace',   ch, startCol); i++; break;
-      case '[': push('lbracket', ch, startCol); i++; break;
-      case ']': push('rbracket', ch, startCol); i++; break;
+      case '(': push('lparen',   ch, startCol); depth++; i++; break;
+      case ')': push('rparen',   ch, startCol); depth = Math.max(0, depth - 1); i++; break;
+      case '{': push('lbrace',   ch, startCol); depth++; i++; break;
+      case '}': push('rbrace',   ch, startCol); depth = Math.max(0, depth - 1); i++; break;
+      case '[': push('lbracket', ch, startCol); depth++; i++; break;
+      case ']': push('rbracket', ch, startCol); depth = Math.max(0, depth - 1); i++; break;
       case ',': push('comma',    ch, startCol); i++; break;
       case ':': push('colon',    ch, startCol); i++; break;
       case '.': push('dot',      ch, startCol); i++; break;
