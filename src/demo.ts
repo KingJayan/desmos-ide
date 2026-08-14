@@ -1,5 +1,5 @@
 // compiler demo
-// run:  npm run demo
+// run:  bun demo
 
 import { compile } from './index';
 
