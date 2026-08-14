@@ -1,9 +1,24 @@
 import { Utils } from 'electrobun/bun';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { basename, extname, join } from 'path';
+import { basename, extname, join, dirname } from 'path';
+import { existsSync, statSync, mkdirSync } from 'fs';
 
 const execFileAsync = promisify(execFile);
+
+const savePanelSource = join(__dirname, 'native', 'savepanel.swift');
+const savePanelBinary = join(__dirname, '..', 'build', 'native', 'savepanel');
+
+async function ensureSavePanelBinary(): Promise<string> {
+  const stale =
+    !existsSync(savePanelBinary) ||
+    statSync(savePanelBinary).mtimeMs < statSync(savePanelSource).mtimeMs;
+  if (stale) {
+    mkdirSync(dirname(savePanelBinary), { recursive: true });
+    await execFileAsync('swiftc', ['-O', savePanelSource, '-o', savePanelBinary]);
+  }
+  return savePanelBinary;
+}
 
 export type SaveDialogOptions = {
   defaultName: string;
@@ -14,10 +29,6 @@ export type SaveDialogOptions = {
 export type OpenDialogOptions = {
   extensions: string[];
 };
-
-function asString(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-}
 
 function ensureExtension(path: string, extension: string): string {
   if (!extension) return path;
@@ -31,20 +42,15 @@ function ensureExtension(path: string, extension: string): string {
 export async function showSaveDialog(opts: SaveDialogOptions): Promise<string | null> {
   if (process.platform !== 'darwin') return saveDialogFallback(opts);
 
-  const script = [
-    `set chosen to choose file name with prompt ${asString(opts.prompt)} default name ${asString(opts.defaultName)}`,
-    'POSIX path of chosen',
-  ].join('\n');
-
+  const binary = await ensureSavePanelBinary();
   try {
-    const { stdout } = await execFileAsync('osascript', ['-e', script], {
+    const { stdout } = await execFileAsync(binary, [opts.prompt, opts.defaultName], {
       maxBuffer: 256 * 1024,
     });
     const path = stdout.trim();
     return path ? ensureExtension(path, opts.extension) : null;
   } catch (err) {
-
-    if (String(err).includes('-128')) return null;
+    if ((err as { code?: number }).code === 1) return null;
     throw err;
   }
 }
