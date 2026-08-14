@@ -153,7 +153,12 @@ export function nameToLatex(name: string): string {
 }
 
 function fmtNum(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toPrecision(15).replace(/\.?0+$/, '');
+  if (Number.isInteger(n) && Number.isSafeInteger(n)) return String(n);
+  const text = n.toPrecision(15).replace(/(\.\d*?)0+(?=$|e)/, '$1').replace(/\.(?=$|e)/, '');
+  // js prints extreme magnitudes as `1e-7`, which is not latex desmos can read
+  const exp = text.indexOf('e');
+  if (exp === -1) return text;
+  return `${text.slice(0, exp)}\\cdot10^{${Number(text.slice(exp + 1))}}`;
 }
 
 const PREC: Record<string, number> = {
@@ -408,6 +413,7 @@ export class Codegen {
       label: stmt.content,
       showLabel: true,
       points: false,
+      ...(stmt.style?.color ? { color: resolveColor(stmt.style.color) ?? undefined } : {}),
     }, stmt.name);
   }
 
@@ -542,7 +548,7 @@ export class Codegen {
         switch (op) {
           case '+': return `${l}+${r}`;
           case '-': return `${l}-${r}`;
-          case '*': return `${l}\\cdot ${r}`;
+          case '*': return expr.implicit ? `${l}${r}` : `${l}\\cdot ${r}`;
           case '/': return `\\frac{${this.toLaTeX(left)}}{${this.toLaTeX(right)}}`;
           case '^': return `${l}^{${this.toLaTeX(right)}}`;
           default:  return `${l}${op}${r}`;

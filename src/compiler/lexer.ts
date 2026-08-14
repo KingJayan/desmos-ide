@@ -35,6 +35,8 @@ export interface Token {
   value: string;
   line: number;
   col: number;
+  /** true when anything at all separates this token from the one before it */
+  spaceBefore: boolean;
 }
 
 export class LexError extends Error {
@@ -55,6 +57,28 @@ const CONTINUES_LINE = new Set<TT>([
   'lparen', 'lbrace', 'lbracket',
 ]);
 
+// greek letters are ordinary identifier characters, the way desmos treats them.
+// each one normalises to its ascii name so `α` and `alpha` are the same variable everywhere.
+const GREEK_CHAR_NAMES: Record<string, string> = {
+  'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta', 'ε': 'epsilon',
+  'ζ': 'zeta', 'η': 'eta', 'θ': 'theta', 'ι': 'iota', 'κ': 'kappa',
+  'λ': 'lambda', 'μ': 'mu', 'ν': 'nu', 'ξ': 'xi', 'π': 'pi',
+  'ρ': 'rho', 'σ': 'sigma', 'τ': 'tau', 'υ': 'upsilon', 'φ': 'phi',
+  'χ': 'chi', 'ψ': 'psi', 'ω': 'omega',
+};
+
+export function normalizeIdent(name: string): string {
+  return name.replace(/[α-ω]/g, ch => GREEK_CHAR_NAMES[ch] ?? ch);
+}
+
+function isIdentStart(ch: string): boolean {
+  return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_' || ch in GREEK_CHAR_NAMES;
+}
+
+function isIdentPart(ch: string): boolean {
+  return isIdentStart(ch) || (ch >= '0' && ch <= '9');
+}
+
 export function tokenize(src: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
@@ -64,8 +88,11 @@ export function tokenize(src: string): Token[] {
 
   const col = () => i - lineStart + 1;
 
-  const push = (type: TT, value: string, overrideCol?: number) =>
-    tokens.push({ type, value, line, col: overrideCol ?? col() });
+  let sawGap = false;
+  const push = (type: TT, value: string, overrideCol?: number) => {
+    tokens.push({ type, value, line, col: overrideCol ?? col(), spaceBefore: sawGap });
+    sawGap = false;
+  };
 
   while (i < src.length) {
     const ch = src[i];
@@ -75,13 +102,15 @@ export function tokenize(src: string): Token[] {
       const prev = tokens[tokens.length - 1];
       if (depth === 0 && prev && !CONTINUES_LINE.has(prev.type)) push('nl', '\n');
       line++; lineStart = ++i;
+      sawGap = true;
       continue;
     }
-    if (ch === ' ' || ch === '\t' || ch === '\r') { i++; continue; }
+    if (ch === ' ' || ch === '\t' || ch === '\r') { i++; sawGap = true; continue; }
 
     // line comment
     if (ch === '/' && src[i + 1] === '/') {
       while (i < src.length && src[i] !== '\n') i++;
+      sawGap = true;
       continue;
     }
 
@@ -94,22 +123,25 @@ export function tokenize(src: string): Token[] {
         i++;
         while (i < src.length && src[i] >= '0' && src[i] <= '9') i++;
       }
+      // scientific notation, but only when real digits follow, so `2e` stays `2 * e`
+      if (i < src.length && (src[i] === 'e' || src[i] === 'E')) {
+        let j = i + 1;
+        if (src[j] === '+' || src[j] === '-') j++;
+        if (src[j] >= '0' && src[j] <= '9') {
+          i = j;
+          while (i < src.length && src[i] >= '0' && src[i] <= '9') i++;
+        }
+      }
       push('num', src.slice(start, i), startCol);
       continue;
     }
 
     // idents / kws
-    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_') {
+    if (isIdentStart(ch)) {
       const start = i;
       const startCol = col();
-      while (
-        i < src.length &&
-        ((src[i] >= 'a' && src[i] <= 'z') ||
-         (src[i] >= 'A' && src[i] <= 'Z') ||
-         (src[i] >= '0' && src[i] <= '9') ||
-         src[i] === '_')
-      ) i++;
-      const word = src.slice(start, i);
+      while (i < src.length && isIdentPart(src[i])) i++;
+      const word = normalizeIdent(src.slice(start, i));
       push(KEYWORDS.has(word) ? 'kw' : 'ident', word, startCol);
       continue;
     }
@@ -161,6 +193,6 @@ export function tokenize(src: string): Token[] {
     }
   }
 
-  tokens.push({ type: 'eof', value: '', line, col: col() });
+  tokens.push({ type: 'eof', value: '', line, col: col(), spaceBefore: true });
   return tokens;
 }

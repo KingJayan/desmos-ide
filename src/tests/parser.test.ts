@@ -145,3 +145,53 @@ describe('compile error shape', () => {
     assert.ok(!r.errors[0].message.startsWith('['));
   });
 });
+
+describe('math table stakes', () => {
+  test('scientific notation', () => {
+    assert.equal(ok('x = 1e5').state.expressions.list[0].latex, 'x=100000');
+  });
+
+  test('signed exponent', () => {
+    assert.equal(ok('x = 1.5e-3').state.expressions.list[0].latex, 'x=0.0015');
+  });
+
+  test('a tiny number stays valid latex', () => {
+    assert.equal(ok('x = 1e-7').state.expressions.list[0].latex, 'x=1\\cdot10^{-7}');
+  });
+
+  test('e is still a variable when no digits follow', () => {
+    assert.equal(ok('x = 2e').state.expressions.list[0].latex, 'x=2e');
+  });
+
+  test('implicit multiplication by a variable', () => {
+    assert.equal(ok('y = 2x').state.expressions.list[0].latex, 'y=2x');
+  });
+
+  test('implicit multiplication by a group', () => {
+    assert.equal(ok('y = 2(x + 1)').state.expressions.list[0].latex, 'y=2\\left(x+1\\right)');
+  });
+
+  test('implicit multiplication by a call', () => {
+    ok('y = 3sin(x)');
+  });
+
+  test('implicit multiplication binds tighter than addition', () => {
+    assert.equal(ok('y = 2x + 1').state.expressions.list[0].latex, 'y=2x+1');
+  });
+
+  test('greek letters are identifiers', () => {
+    assert.equal(ok('α = 3').state.expressions.list[0].latex, '\\alpha=3');
+  });
+
+  test('a greek letter and its ascii name are one variable', () => {
+    assert.equal(ok('alpha = 3\nβ = alpha + 1').state.expressions.list[1].latex, '\\beta=\\alpha+1');
+  });
+
+  test('text accepts a style block', () => {
+    assert.equal(ok('text l = "hi" at (0, 0) as { color red }').state.expressions.list[0].color, '#c74440');
+  });
+
+  test('expr blocks still parse', () => {
+    ok('r = 0\nexpr {\n  a = 1\n  b = 2\n  a + b\n}');
+  });
+});
