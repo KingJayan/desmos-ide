@@ -15,19 +15,32 @@ const execFileAsync = promisify(execFile);
 
 type GitErr = { ok: false; errorCode: string; message: string };
 
-const NO_REPO: GitErr = {
-  ok: false,
-  errorCode: 'NO_REPO',
-  message: 'No Git repository found from app working paths.',
-};
+function noRepo(): GitErr {
+  return {
+    ok: false,
+    errorCode: 'NO_REPO',
+    message: contextDir
+      ? 'The open file is not inside a Git repository.'
+      : 'No Git repository found from app working paths.',
+  };
+}
 
 let gitRepoPathCache: string | null = null;
+let contextDir: string | null = null;
+
+// the panel follows the open file, not the app binary
+export function setGitContext(filePath: string | null): void {
+  const dir = filePath ? dirname(filePath) : null;
+  if (dir === contextDir) return;
+  contextDir = dir;
+  gitRepoPathCache = null;
+}
 
 async function resolveGitRepoPath(): Promise<string | null> {
   if (gitRepoPathCache) return gitRepoPathCache;
   // in a packaged bundle cwd is Resources/, so walk up toward the project root too
   const appPath = dirname(process.execPath);
-  const candidates = Array.from(new Set([
+  const candidates = contextDir ? [contextDir] : Array.from(new Set([
     process.cwd(),
     appPath,
     join(appPath, '..'),
@@ -69,7 +82,7 @@ async function runGit(repoPath: string, args: string[], timeout = 2400): Promise
 // every command shares the same resolve-repo-then-run-or-map-error shape
 async function inRepo<T>(fn: (repoPath: string) => Promise<T>): Promise<T | GitErr> {
   const repoPath = await resolveGitRepoPath();
-  if (!repoPath) return NO_REPO;
+  if (!repoPath) return noRepo();
   try {
     return await fn(repoPath);
   } catch (err) {

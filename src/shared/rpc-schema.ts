@@ -66,6 +66,7 @@ export type DesmosIdeRPC = {
 
       aiCompact: { params: { messages: AIMessage[]; config: AIConfig; memories: string[] }; response: string };
 
+      setGitContext: { params: { path: string | null }; response: void };
       gitStatus: { params: void; response: GitStatusResult };
       gitBranches: { params: void; response: GitBranchesResult };
       gitHistory: { params: { limit: number }; response: GitHistoryResult };

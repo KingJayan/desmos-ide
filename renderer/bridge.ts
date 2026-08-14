@@ -46,6 +46,7 @@ export const electronAPI = {
   aiCompact: (messages: AIMessage[], config: AIConfig, memories: string[]) =>
     rpc.request.aiCompact({ messages, config, memories }),
 
+  setGitContext: (path: string | null) => rpc.request.setGitContext({ path }),
   gitStatus: () => rpc.request.gitStatus(),
   gitBranches: () => rpc.request.gitBranches(),
   gitHistory: (limit = 40) => rpc.request.gitHistory({ limit }),
