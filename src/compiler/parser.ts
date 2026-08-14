@@ -59,9 +59,12 @@ class Parser {
 
   parseProgram(): T.Program {
     const body: T.Statement[] = [];
-    while (!this.check('eof')) {
+    while (true) {
+      while (this.check('nl')) this.advance();
+      if (this.check('eof')) break;
       try {
         body.push(this.parseStatement());
+        this.eatTerminator();
       } catch (e) {
         if (e instanceof ParseError) {
           this.collectedErrors.push({
@@ -80,6 +83,14 @@ class Parser {
     return { type: 'Program', body };
   }
 
+  private eatTerminator(): void {
+    if (this.check('eof')) return;
+    if (!this.check('nl')) {
+      throw new ParseError('Expected end of statement — put each statement on its own line', this.peek());
+    }
+    this.advance();
+  }
+
   private recoverToNextStatement(): void {
     const stmtStartKws = new Set([
       'fn', 'alias', 'debug', 'expr',
@@ -88,6 +99,7 @@ class Parser {
     ]);
     while (!this.check('eof')) {
       const t = this.peek();
+      if (t.type === 'nl') { this.advance(); return; }
       if (t.type === 'kw' && stmtStartKws.has(t.value)) return;
       if (t.type === 'ident' && this.checkNext('op', '=')) return;
       this.advance();

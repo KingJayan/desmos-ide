@@ -1,5 +1,6 @@
 // variables, sliders, aliases
 x = 3
+b = 4
 a = slider(3, 0, 10, step=0.1, speed=1, loop)   // step=, speed= kwargs; loop flag auto-plays
 fn hyp(x, y) = sqrt(x^2 + y^2)                  // inlined at every call site
 alias r = hyp(a, b)                              // named alias — identical to assignment

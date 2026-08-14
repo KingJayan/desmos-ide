@@ -156,6 +156,14 @@ function checkExpr(
       break;
 
     case 'Ident':
+      if (!vars.has(expr.name)) {
+        errors.push({
+          error: `[${expr.pos.line}:${expr.pos.col}] Semantic error: undefined variable '${expr.name}'`,
+          line: expr.pos.line,
+          col: expr.pos.col,
+          phase: 2,
+        });
+      }
       break;
 
     case 'BinOp':
