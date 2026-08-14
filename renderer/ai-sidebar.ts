@@ -208,6 +208,7 @@ export class AISidebar {
   private providerStateEl!: HTMLElement;
   private configBtnEl!: HTMLButtonElement;
   private configEl!: HTMLElement;
+  private cfgProviderEl!: HTMLSelectElement;
   private cfgModelEl!: HTMLSelectElement;
   private cfgBaseUrlEl!: HTMLInputElement;
   private cfgApiKeyEl!: HTMLInputElement;
@@ -384,6 +385,10 @@ export class AISidebar {
           </div>
         </div>
         <div class="ai-config-popover" hidden>
+          <label class="ai-config-row">
+            <span>provider</span>
+            <select class="ai-config-input ai-config-provider"></select>
+          </label>
           <div class="ai-config-copilot" hidden>
             <div class="ai-copilot-row">
               <span class="ai-copilot-status"></span>
@@ -433,6 +438,7 @@ export class AISidebar {
     this.providerLabelEl = this.el.querySelector('.ai-status-provider-label')!;
     this.providerStateEl = this.el.querySelector('.ai-status-model')!;
     this.configEl = this.el.querySelector('.ai-config-popover')!;
+    this.cfgProviderEl = this.el.querySelector('.ai-config-provider')!;
     this.cfgModelEl = this.el.querySelector('.ai-config-model')!;
     this.cfgBaseUrlEl = this.el.querySelector('.ai-config-baseurl')!;
     this.cfgApiKeyEl = this.el.querySelector('.ai-config-key')!;
@@ -529,6 +535,7 @@ export class AISidebar {
       this.cfgCopilotEl.hidden = true;
       standard.hidden = false;
       this.cfgSaveEl.hidden = false;
+      this.populateProviderSelect();
       this.populateModelSelect(this.provider, cfg.model);
       this.cfgBaseUrlEl.value = cfg.baseUrl;
       this.cfgApiKeyEl.value = cfg.apiKey;
@@ -541,6 +548,17 @@ export class AISidebar {
       }
     });
 
+
+    this.cfgProviderEl.addEventListener('change', () => {
+      this.provider = this.cfgProviderEl.value as AIProvider;
+      this.saveProviderConfigs();
+      this.syncProviderUi();
+      this.syncConfigFields();
+      const token = this.getProviderConfig().apiKey;
+      if (this.provider === 'github-copilot' && token && !this.copilotModels) {
+        void this.fetchCopilotModels(token);
+      }
+    });
 
     this.cfgSaveEl.addEventListener('click', () => {
       const current = this.getProviderConfig();
@@ -675,12 +693,19 @@ export class AISidebar {
     this.configBtnEl.title = `${p?.label || this.provider} settings`;
   }
 
+  private populateProviderSelect(): void {
+    this.cfgProviderEl.innerHTML = PROVIDERS
+      .map(p => `<option value="${p.id}"${p.id === this.provider ? ' selected' : ''}>${escapeHtml(p.label)}</option>`)
+      .join('');
+  }
+
   private syncConfigFields(): void {
     const isCopilot = this.provider === 'github-copilot';
     const cfg = this.getProviderConfig();
     const standard = this.configEl.querySelector('.ai-config-standard') as HTMLElement;
     const saveBtn = this.cfgSaveEl;
 
+    this.populateProviderSelect();
     this.cfgCopilotEl.hidden = !isCopilot;
     standard.hidden = isCopilot;
     saveBtn.hidden = isCopilot;
