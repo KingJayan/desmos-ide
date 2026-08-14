@@ -3,6 +3,10 @@
 <p>a minimalist Desmos IDE - integrated DSL, and live graph</p>
 </div>
 
+<img src="https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="ts" />
+<img src="https://img.shields.io/badge/Bun-F9F1E1?style=for-the-badge&logo=electrobun&logoColor=000000" alt="Bun" />
+
+
 ## features
 
 - **DSL editor** — write math in a clean language; the compiler outputs Desmos expressions in real time
@@ -16,41 +20,27 @@
 
 see an [example file](example/demo.dsmx)
 
-**exprs:** full arithmetic (`+ - * / ^`), comparison operators, `where/else` and `if/then/else` conditionals, piecewise blocks, `map()` generators, `abs()`, `sqrt()`, trig, and all standard Desmos math.
-**generators:** `map(var -> expr, start..end step n)` compiles to Desmos list comprehensions.
-**colors:** named (`red blue green orange purple black white`), hex strings (`"#ff0000"`), `rgb(r,g,b)`, or `hsv(h,s,v)`.
-**gradients:** `as gradient(from, to)` on curves/for-comprehensions.
-**errors:** two-phase — phase 1 is syntax errors, phase 2 is semantic (undefined functions, arity mismatches, invalid generator ranges).
+[![Documentation](https://img.shields.io/badge/see%20full%20documentation-blue?style=for-the-badge&logo=readthedocs)](https://desmos-ide.vercel.app)
 
-[![Documentation](https://img.shields.io/badge/See%20Full%20Docs-blue?style=for-the-badge&logo=readthedocs)](https://desmos-ide.vercel.app)
-
-## architecture
-
-- **compiler** (`src/`) — full typescript `lexer → parser → semantic analysis → optimizer → codegen`; `compile(src)` returns `CompileSuccess | CompileFailure`
-- **renderer** (`renderer/`) — Monaco editor + Desmos CDN calculator wired in `main.ts`; `DesmosGraph` diffs expressions by ID; `EnhancedPane` for direct expr editing
-- **electron** (`electron/`) — `BrowserWindow`, native menu, `contextBridge` IPC for file ops
-
-
-## usage
+## dev
 
 ```bash
-npm i
-npm run dev        # launch dev server + Electron window
-npm run build      # production build → out/
-npm run demo       # run compiler demo in terminal (no Electron)
+bun i
+bun dev        # launch dev server + Electron window
+bun build      # production build → out/
+bun demo       # run compiler demo in terminal (no Electron)
 ```
-
-> **Note:** if your shell has `ELECTRON_RUN_AS_NODE=1` set (e.g. inside a Claude Code session), prefix with `unset ELECTRON_RUN_AS_NODE &&`.
 
 ## troubleshooting
 
 | symptom | fix |
 |---|---|
 | Electron window doesn't open | make sure `ELECTRON_RUN_AS_NODE` is unset |
-| Desmos graph blank | check network — Desmos loads from CDN; `webSecurity: false` is required |
-| Settings reset on load | localStorage entry may be malformed; the app auto-repairs it to defaults |
-| AI sidebar not streaming | check that `ANTHROPIC_API_KEY` is set in your environment |
+| Desmos graph blank | check network; `webSecurity: false` is required |
 
+or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
+
+##
 <div align="center">
 <p>made with :) by jayan</p>
 <p>licensed under Apache 2.0</p>
