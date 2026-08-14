@@ -9,7 +9,8 @@ import {
 import {
   buildSystemText, compactConversation, copilotGetModels, copilotPollDeviceFlow,
   copilotRevoke, copilotStartDeviceFlow, logAiError, sanitizeConfig,
-  sanitizeMemories, sanitizeMessages, streamOpenAICompatible, toProviderErrorMessage,
+  sanitizeMemories, sanitizeMessages, streamOpenAICompatible, titleConversation,
+  toProviderErrorMessage,
 } from './ai';
 
 const DEV_SERVER_URL = 'http://localhost:5173';
@@ -30,6 +31,8 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
 
       aiCompact: ({ messages, config, memories }) =>
         compactConversation(sanitizeMessages(messages), sanitizeConfig(config), sanitizeMemories(memories)),
+      aiTitle: ({ messages, config }) =>
+        titleConversation(sanitizeMessages(messages), sanitizeConfig(config)),
 
       setGitContext: ({ path }) => setGitContext(path),
       gitStatus: () => getGitStatus(),

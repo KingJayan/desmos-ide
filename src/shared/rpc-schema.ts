@@ -65,6 +65,7 @@ export type DesmosIdeRPC = {
       unwatchFile: { params: { path: string }; response: void };
 
       aiCompact: { params: { messages: AIMessage[]; config: AIConfig; memories: string[] }; response: string };
+      aiTitle: { params: { messages: AIMessage[]; config: AIConfig }; response: string };
 
       setGitContext: { params: { path: string | null }; response: void };
       gitStatus: { params: void; response: GitStatusResult };

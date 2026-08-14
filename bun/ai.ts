@@ -255,6 +255,27 @@ export async function compactConversation(
   }
 }
 
+export async function titleConversation(messages: AIMessage[], config: AIConfig): Promise<string> {
+  if (!messages.length) return '';
+  try {
+    return await completeOpenAICompatible(
+      config,
+      [
+        {
+          role: 'system',
+          content: 'Write a title of 4 to 6 words for this conversation. Reply with the title only. No quotes, no final period.',
+        },
+        ...messages.slice(0, 2),
+        { role: 'user', content: 'Give the title now.' },
+      ],
+      24,
+    );
+  } catch (err) {
+    logAiError('ai:title', 'title', config, err);
+    return '';
+  }
+}
+
 export async function copilotStartDeviceFlow(): Promise<CopilotDeviceFlow> {
   const resp = await fetch('https://github.com/login/device/code', {
     method: 'POST',
