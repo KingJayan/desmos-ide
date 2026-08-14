@@ -28,7 +28,14 @@ const rpc = Electroview.defineRPC<DesmosIdeRPC>({
   },
 });
 
-new Electrobun.Electroview({ rpc });
+// outside the electrobun webview there is no bun bridge, so the ui must still load
+let bridgeReady = false;
+try {
+  new Electrobun.Electroview({ rpc });
+  bridgeReady = true;
+} catch (err) {
+  console.warn('electrobun bridge unavailable — file, git and ai actions are disabled', err);
+}
 
 // keeps the electron-era surface so the ui modules need no changes
 export const electronAPI = {
@@ -45,6 +52,7 @@ export const electronAPI = {
     rpc.send.aiChat({ reqId, messages, config, memories }),
   aiCompact: (messages: AIMessage[], config: AIConfig, memories: string[]) =>
     rpc.request.aiCompact({ messages, config, memories }),
+  aiTitle: (messages: AIMessage[], config: AIConfig) => rpc.request.aiTitle({ messages, config }),
 
   setGitContext: (path: string | null) => rpc.request.setGitContext({ path }),
   gitStatus: () => rpc.request.gitStatus(),
@@ -76,4 +84,4 @@ export const electronAPI = {
   onFileChanged: (cb: (path: string, content: string) => void) => { fileChangedCbs.push(cb); },
 };
 
-window.electronAPI = electronAPI;
+if (bridgeReady) window.electronAPI = electronAPI;
