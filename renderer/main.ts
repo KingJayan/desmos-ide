@@ -391,6 +391,7 @@ function renderOutline(symbols: SymbolInfo[]): void {
 
 let lastCompileResult: CompileResult | null = null;
 const sliderManager = new InlineSliderManager(editor);
+window.addEventListener('beforeunload', () => sliderManager.dispose());
 
 function handleCompileResult(result: CompileResult): void {
   lastCompileResult = result;
