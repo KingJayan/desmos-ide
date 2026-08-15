@@ -11,10 +11,14 @@
 
 - **DSL editor** — write math in a clean language; the compiler outputs Desmos expressions in real time
 - **live graph** — Desmos graph updates as you type, diffed by expression ID to avoid flicker
+- **formatter** — ⇧⌥F, or turn on format-on-save in settings
+- **inline sliders** — drag a `slider(...)` declaration right in the editor just like Desmos
+- **source control** — branches, history and remotes for the repo the open file lives in
 - **themes** — Catppuccin (Mocha, Latte, Frappé, Macchiato), GitHub Dark/Light, Monokai, VS Dark/Light
 - **customizable editor** — font, font size, minimap, line numbers, word wrap
-- **file operations** — open/save `.desmos` files via native dialogs (Electron)
-- **AI sidebar** — chat with Claude to generate or modify expressions (streamed)
+- **file operations** — open and save `.dsmx` files through native dialogs
+- **AI sidebar** — chat to generate or modify expressions, streamed. Works with any
+  OpenAI-compatible endpoint, OpenRouter, a local Ollama, or GitHub Copilot
 
 ## syntax
 
@@ -26,17 +30,20 @@ see an [example file](example/demo.dsmx)
 
 ```bash
 bun i
-bun dev        # launch dev server + Electron window
-bun build      # production build → out/
-bun demo       # run compiler demo in terminal (no Electron)
+bun dev        # build the view, then launch the app
+bun dev:hmr    # vite dev server + app, for renderer hot reload
+bun run build  # production build → build/<channel>-<platform>/
+bun test       # compiler and editor tests
+bun demo       # run the compiler in the terminal, no app shell
 ```
 
 ## troubleshooting
 
 | symptom | fix |
 |---|---|
-| Electron window doesn't open | make sure `ELECTRON_RUN_AS_NODE` is unset |
-| Desmos graph blank | check network; `webSecurity: false` is required |
+| window opens blank | run `bun run build:view` — the app serves the built `dist/` |
+| AI sidebar does nothing | open the provider popover and set a model plus an API key |
+| source control panel is empty | it follows the open file; save the file inside a repo first |
 
 or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
 
