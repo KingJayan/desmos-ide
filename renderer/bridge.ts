@@ -3,6 +3,15 @@ import type { AIConfig, AIMessage, DesmosIdeRPC } from '../src/shared/rpc-schema
 
 type Listener<T extends unknown[]> = (...args: T) => void;
 
+/** registers a listener and hands back the function that removes it again */
+function subscribe<T extends unknown[]>(list: Listener<T>[], cb: Listener<T>): () => void {
+  list.push(cb);
+  return () => {
+    const i = list.indexOf(cb);
+    if (i !== -1) list.splice(i, 1);
+  };
+}
+
 const aiChunkCbs: Listener<[string, string]>[] = [];
 const aiDoneCbs: Listener<[string]>[] = [];
 const aiErrorCbs: Listener<[string, string]>[] = [];
@@ -43,10 +52,10 @@ export const electronAPI = {
   saveFile: (path: string | null, content: string) => rpc.request.saveFile({ path, content }),
   exportJson: (content: string) => rpc.request.exportJson({ content }),
 
-  onMenuNew: (cb: () => void) => { menuCbs.new.push(cb); },
-  onMenuOpen: (cb: () => void) => { menuCbs.open.push(cb); },
-  onMenuSave: (cb: () => void) => { menuCbs.save.push(cb); },
-  onMenuSaveAs: (cb: () => void) => { menuCbs.saveAs.push(cb); },
+  onMenuNew: (cb: () => void) => subscribe(menuCbs.new, cb),
+  onMenuOpen: (cb: () => void) => subscribe(menuCbs.open, cb),
+  onMenuSave: (cb: () => void) => subscribe(menuCbs.save, cb),
+  onMenuSaveAs: (cb: () => void) => subscribe(menuCbs.saveAs, cb),
 
   aiChat: (reqId: string, messages: AIMessage[], config: AIConfig, memories: string[]) =>
     rpc.send.aiChat({ reqId, messages, config, memories }),
@@ -78,13 +87,13 @@ export const electronAPI = {
   // native NSAlert is macOS-only; fall back to the browser dialog elsewhere
   confirm: (message: string) => rpc.request.confirm({ message }).catch(() => confirm(message)),
 
-  onAiChunk: (cb: (reqId: string, text: string) => void) => { aiChunkCbs.push(cb); },
-  onAiDone: (cb: (reqId: string) => void) => { aiDoneCbs.push(cb); },
-  onAiError: (cb: (reqId: string, error: string) => void) => { aiErrorCbs.push(cb); },
+  onAiChunk: (cb: (reqId: string, text: string) => void) => subscribe(aiChunkCbs, cb),
+  onAiDone: (cb: (reqId: string) => void) => subscribe(aiDoneCbs, cb),
+  onAiError: (cb: (reqId: string, error: string) => void) => subscribe(aiErrorCbs, cb),
 
   watchFile: (path: string) => rpc.request.watchFile({ path }),
   unwatchFile: (path: string) => rpc.request.unwatchFile({ path }),
-  onFileChanged: (cb: (path: string, content: string) => void) => { fileChangedCbs.push(cb); },
+  onFileChanged: (cb: (path: string, content: string) => void) => subscribe(fileChangedCbs, cb),
 };
 
 if (bridgeReady) window.electronAPI = electronAPI;
