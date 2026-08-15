@@ -173,6 +173,19 @@ function buildThemeCss(theme: DesmosThemeSpec): string {
 `;
 }
 
+/** desmos settles its own rewrites well inside this window */
+const SETTLE_MS = 600;
+
+/** only the parts of an expression the DSL can write */
+function fingerprint(expr: DesmosExpr): string {
+  return JSON.stringify([
+    expr.type, expr.latex ?? '', expr.label ?? '', expr.color ?? '',
+    expr.title ?? '',
+    expr.slider ? [expr.slider.min ?? '', expr.slider.max ?? ''] : null,
+    expr.parametricDomain ? [expr.parametricDomain.min, expr.parametricDomain.max] : null,
+  ]);
+}
+
 export class DesmosGraph {
   private calc: DesmosCalculator;
   private container: HTMLElement;
@@ -250,13 +263,45 @@ export class DesmosGraph {
     iframe.addEventListener('load', this.themeLoadListener);
   }
 
+  /**
+   * an edit made on the graph, not by us. desmos rewrites latex into its own
+   * normal form, so the baseline is what desmos reports back and never what we
+   * sent it; the first report after an update only seeds that baseline.
+   */
+  onExpressionEdited(cb: (exprs: DesmosExpr[]) => void): void {
+    const calc = this.calc as DesmosCalculator & {
+      observeEvent?(name: string, handler: () => void): void;
+    };
+    if (typeof calc.observeEvent !== 'function') return;
+
+    calc.observeEvent('change', () => {
+      const settling = this.settleUntil > Date.now();
+      const edited: DesmosExpr[] = [];
+
+      for (const expr of this.currentList()) {
+        const print = fingerprint(expr);
+        if (this.observed.get(expr.id) !== print) {
+          this.observed.set(expr.id, print);
+          if (!settling) edited.push(expr);
+        }
+      }
+      if (edited.length) cb(edited);
+    });
+  }
+
+  /** desmos keeps rewriting for a moment after a write, so ignore that window */
+  private settleUntil = 0;
+  private observed = new Map<string, string>();
+
+  private updating = false;
+
   update(list: DesmosExpr[]): void {
     const incoming = new Map(list.map(e => [e.id, e]));
     const toSet: DesmosExpr[] = [];
     const toRemove: string[] = [];
 
     for (const expr of list) {
-      const snap = JSON.stringify(expr);
+      const snap = fingerprint(expr);
       if (this.snapshots.get(expr.id) !== snap) {
         toSet.push(expr);
         this.snapshots.set(expr.id, snap);
@@ -271,7 +316,12 @@ export class DesmosGraph {
     }
 
     if (toRemove.length === 0 && toSet.length === 0) return;
-    for (const id of toRemove) this.calc.removeExpression({ id });
+    // writing to the graph fires change events, which must not come back
+    this.settleUntil = Date.now() + SETTLE_MS;
+    for (const id of toRemove) {
+      this.calc.removeExpression({ id });
+      this.observed.delete(id);
+    }
     for (const expr of toSet) this.calc.setExpression(expr as unknown as Record<string, unknown>);
   }
 

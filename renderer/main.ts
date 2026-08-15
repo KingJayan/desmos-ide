@@ -22,6 +22,7 @@ import type { PaletteCommand } from './command-palette';
 import { InlineSliderManager } from './inline-sliders';
 import { SearchPanel } from './search-panel';
 import { GraphLink } from './graph-link';
+import { decompile } from '../src/compiler/decompile';
 import type { Mode } from './session';
 import {
   loadRecent, loadSession, pushRecent, recentLabel, removeRecent, saveRecent, saveSession,
@@ -320,6 +321,47 @@ const graphLink = new GraphLink({
 });
 
 graph.onSelectionChange(id => graphLink.onGraphSelected(id));
+
+/* edits on the graph sync back */
+graph.onExpressionEdited(exprs => {
+  const edits: monaco.editor.IIdentifiedSingleEditOperation[] = [];
+  const refused: string[] = [];
+
+  for (const expr of exprs) {
+    const at = sourceMap.find(e => e.id === expr.id);
+    if (!at) continue;
+
+    const statement = decompile(expr, expr.id);
+    if (!statement) { refused.push(expr.id); continue; }
+
+    const nextLine = sourceMap
+      .filter(e => e.line > at.line)
+      .reduce((min, e) => Math.min(min, e.line), model.getLineCount() + 1);
+    let endLine = Math.min(Math.max(at.line, nextLine - 1), model.getLineCount());
+
+    //keep blanklines
+    while (endLine > at.line && model.getLineContent(endLine).trim() === '') endLine--;
+
+    const original = model.getValueInRange(
+      new monaco.Range(at.line, 1, endLine, model.getLineMaxColumn(endLine)),
+    );
+    const indent = /^\s*/.exec(original)?.[0] ?? '';
+    const style = / as \{[^}]*\}\s*$/.exec(original)?.[0] ?? '';
+
+    edits.push({
+      range: new monaco.Range(at.line, 1, endLine, model.getLineMaxColumn(endLine)),
+      text: indent + statement + style.trimEnd(),
+    });
+  }
+
+  if (edits.length) {
+    editor.executeEdits('graph-writeback', edits);
+  }
+  if (refused.length) {
+    setStatus(`Cannot write back as DSL: ${refused.join(', ')}`, 'error');
+  }
+});
+
 editor.onDidChangeCursorPosition(e => graphLink.onCursorMoved(e.position.lineNumber));
 
 function applyTheme(theme: ColorTheme): void {
