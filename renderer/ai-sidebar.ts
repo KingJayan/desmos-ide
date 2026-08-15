@@ -227,7 +227,6 @@ export class AISidebar {
   private ctxPillCloseBtn!: HTMLButtonElement;
   private contextDisabledForMsg = false;
   private promptChipIndex = 0;
-  private promptChipInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     container: HTMLElement,
@@ -361,7 +360,7 @@ export class AISidebar {
           <span class="ai-scroll-fab-dot" hidden></span>
         </button>
         <div class="ai-status-left">
-          <button class="ai-provider-chip" id="ai-provider-chip" title="Provider settings"><span class="ai-status-provider-label"></span></button>
+          <button class="ai-provider-chip" id="ai-provider-chip" title="Change the AI provider and model"><span class="ai-status-provider-label"></span></button>
           <button class="ai-status-model" title="Change model"></button>
           <span class="ai-status-memory"></span>
         </div>
@@ -733,7 +732,7 @@ export class AISidebar {
     }
     this.providerStateEl.textContent = cfg.model;
     this.providerStateEl.title = `Model: ${cfg.model}`;
-    this.configBtnEl.title = `${p?.label || this.provider} settings`;
+    this.configBtnEl.title = `Provider: ${p?.label || this.provider} — click to switch to OpenRouter, Ollama or Copilot`;
   }
 
   private populateProviderSelect(): void {
@@ -898,8 +897,6 @@ export class AISidebar {
   }
 
   private renderMessages(): void {
-    // wiping the list detaches the prompt chips, so the rotation must not outlive them
-    this.stopPromptChips();
     this.messagesEl.innerHTML = '';
     if (!this.activeChat.history.length) { this.appendWelcome(); return; }
     const history = this.activeChat.history;
@@ -1406,9 +1403,7 @@ export class AISidebar {
 
   focus(): void { this.inputEl.focus(); }
 
-  dispose(): void {
-    this.stopPromptChips();
-  }
+  dispose(): void {}
 
   private updateCtxPill(): void {
     if (!this.sendContext || this.contextDisabledForMsg) {
@@ -1439,67 +1434,46 @@ export class AISidebar {
     this.updateCtxPill();
   }
 
-  private stopPromptChips(): void {
-    if (this.promptChipInterval === null) return;
-    clearInterval(this.promptChipInterval);
-    this.promptChipInterval = null;
-  }
-
   private initPromptChips(): void {
-    // the empty state re-renders on every new and deleted chat, so the previous
-    // rotation has to be stopped or the timers stack up for the life of the window
-    this.stopPromptChips();
-
     const container = this.messagesEl.querySelector('.ai-prompt-chips') as HTMLElement;
     if (!container) return;
 
     const chipsEl = document.createElement('div');
     chipsEl.className = 'ai-chips-container';
 
-    const createChip = (text: string) => {
-      const chip = document.createElement('button');
-      chip.className = 'ai-prompt-chip';
-      chip.type = 'button';
-      chip.textContent = text;
-      chip.addEventListener('click', () => {
-        this.inputEl.value = text;
-        this.autoResize();
-        this.inputEl.focus();
-      });
-      return chip;
+    const fill = (offset: number) => {
+      chipsEl.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const text = PROMPT_SUGGESTIONS[(offset + i) % PROMPT_SUGGESTIONS.length];
+        const chip = document.createElement('button');
+        chip.className = 'ai-prompt-chip';
+        chip.type = 'button';
+        chip.textContent = text;
+        chip.addEventListener('click', () => {
+          this.inputEl.value = text;
+          this.autoResize();
+          this.inputEl.focus();
+        });
+        chipsEl.appendChild(chip);
+      }
     };
 
-    for (let i = 0; i < 3; i++) {
-      chipsEl.appendChild(createChip(PROMPT_SUGGESTIONS[i]));
-    }
-    container.appendChild(chipsEl);
+    // these used to cycle on a timer, which moved the text out from under whoever
+    // was reading it. they change only when asked to now.
+    let offset = 0;
+    fill(offset);
 
-    let currentIndex = 3;
-    this.promptChipInterval = setInterval(() => {
-      const chips = chipsEl.querySelectorAll<HTMLElement>('.ai-prompt-chip');
+    const more = document.createElement('button');
+    more.className = 'ai-prompt-chip ai-prompt-chip--more';
+    more.type = 'button';
+    more.textContent = 'more ideas';
+    more.title = 'Show another three suggestions';
+    more.addEventListener('click', () => {
+      offset = (offset + 3) % PROMPT_SUGGESTIONS.length;
+      fill(offset);
+    });
 
-      for (let i = 0; i < chips.length; i++) {
-        chips[i].classList.remove('ai-prompt-chip--active');
-        chips[i].classList.add('ai-prompt-chip--exit');
-      }
-
-      setTimeout(() => {
-        for (let i = 0; i < chips.length; i++) {
-          chips[i].classList.remove('ai-prompt-chip--exit');
-          chips[i].textContent = PROMPT_SUGGESTIONS[(currentIndex + i) % PROMPT_SUGGESTIONS.length];
-          chips[i].classList.add('ai-prompt-chip--enter');
-        }
-        chips[0].classList.add('ai-prompt-chip--active');
-
-        setTimeout(() => {
-          for (let i = 0; i < chips.length; i++) {
-            chips[i].classList.remove('ai-prompt-chip--enter');
-          }
-        }, 400);
-      }, 400);
-
-      currentIndex = (currentIndex + 1) % PROMPT_SUGGESTIONS.length;
-    }, 4000);
+    container.append(chipsEl, more);
   }
 }
 
