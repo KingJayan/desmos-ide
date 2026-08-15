@@ -8,6 +8,7 @@ import * as monaco from 'monaco-editor';
 import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List } from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
 import { builtinSignature } from '../src/compiler/builtins';
+import { formatDsl } from '../src/compiler/format';
 import CompileWorker from './compile.worker?worker';
 import type { CompileResult, SymbolInfo } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
@@ -423,6 +424,16 @@ function handleCompileResult(result: CompileResult): void {
 const BUILTIN_SIGS: Record<string, string> = {
   gradient: 'gradient(from, to) → color',
 };
+
+// makes ⇧⌥F and the "Format Code" palette entry real, and gives format-on-save
+// something to call
+monaco.languages.registerDocumentFormattingEditProvider(LANGUAGE_ID, {
+  provideDocumentFormattingEdits(model) {
+    const formatted = formatDsl(model.getValue());
+    if (formatted === model.getValue()) return [];
+    return [{ range: model.getFullModelRange(), text: formatted }];
+  },
+});
 
 monaco.languages.registerHoverProvider(LANGUAGE_ID, {
   provideHover(model, position) {
@@ -1016,6 +1027,7 @@ async function cmdSave(saveAs = false): Promise<void> {
     setStatus('Switch to DSL or Split to save, or use Export JSON', 'error');
     return;
   }
+  if (formatOnSave) await formatDocument();
   const result = await window.electronAPI?.saveFile(
     saveAs ? null : currentPath,
     editor.getValue(),
@@ -1033,6 +1045,12 @@ async function cmdSave(saveAs = false): Promise<void> {
 btnNew.addEventListener('click',  () => cmdNew());
 btnOpen.addEventListener('click', () => cmdOpen());
 btnSave.addEventListener('click', () => cmdSave());
+
+// runs the registered formatter through monaco so the edit lands on the undo stack
+function formatDocument(): Promise<void> {
+  const action = editor.getAction('editor.action.formatDocument');
+  return action ? Promise.resolve(action.run()).then(() => undefined) : Promise.resolve();
+}
 
 function runEditorAction(actionId: string): void {
   editor.focus();
@@ -1357,10 +1375,12 @@ document.addEventListener('mousemove', e => {
 
 // settings
 let settingsPanel: SettingsPanel | null = null;
+let formatOnSave = initSettings.formatOnSave;
 
 function ensureSettingsPanel(): SettingsPanel {
   if (settingsPanel) return settingsPanel;
   settingsPanel = new SettingsPanel(s => {
+    formatOnSave = s.formatOnSave;
     applyTheme(s.colorTheme);
     applyUiFont(s.uiFontFamily);
     monaco.editor.setTheme(s.editorTheme);

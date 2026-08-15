@@ -21,6 +21,7 @@ export interface EditorSettings {
   minimap:     boolean;
   lineNumbers: 'on' | 'off' | 'relative';
   wordWrap:    'off' | 'on';
+  formatOnSave: boolean;
 }
 
 const DEFAULTS: EditorSettings = {
@@ -32,6 +33,7 @@ const DEFAULTS: EditorSettings = {
   minimap:     false,
   lineNumbers: 'on',
   wordWrap:    'off',
+  formatOnSave: false,
 };
 
 const STORAGE_KEY = 'desmos-ide-settings';
@@ -88,7 +90,8 @@ function validate(raw: Record<string, unknown>): EditorSettings {
     ? (raw.lineNumbers as EditorSettings['lineNumbers']) : d.lineNumbers;
   const wordWrap = VALID_WORD_WRAP.has(raw.wordWrap as string)
     ? (raw.wordWrap as EditorSettings['wordWrap']) : d.wordWrap;
-  return { colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily, minimap, lineNumbers, wordWrap };
+  const formatOnSave = typeof raw.formatOnSave === 'boolean' ? raw.formatOnSave : d.formatOnSave;
+  return { colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily, minimap, lineNumbers, wordWrap, formatOnSave };
 }
 
 export function loadSettings(): EditorSettings {
@@ -237,6 +240,14 @@ export class SettingsPanel {
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
             </div>
+
+            <div class="settings-row">
+              <label class="settings-label" for="s-format-on-save">Format On Save</label>
+              <label class="settings-toggle" aria-label="Format On Save">
+                <input type="checkbox" id="s-format-on-save" class="settings-toggle-input" />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -251,6 +262,7 @@ export class SettingsPanel {
     const lineNumEl     = overlay.querySelector('#s-line-numbers') as HTMLSelectElement;
     const minimapEl     = overlay.querySelector('#s-minimap')      as HTMLInputElement;
     const wordWrapEl    = overlay.querySelector('#s-word-wrap')    as HTMLInputElement;
+    const formatSaveEl  = overlay.querySelector('#s-format-on-save') as HTMLInputElement;
 
     const s = this.settings;
     colorThemeEl.value  = s.colorTheme;
@@ -262,6 +274,7 @@ export class SettingsPanel {
     lineNumEl.value     = s.lineNumbers;
     minimapEl.checked   = s.minimap;
     wordWrapEl.checked  = s.wordWrap === 'on';
+    formatSaveEl.checked = s.formatOnSave;
 
     const emit = () => { saveSettings(this.settings); this.onChange({ ...this.settings }); };
 
@@ -296,6 +309,10 @@ export class SettingsPanel {
     });
     wordWrapEl.addEventListener('change', () => {
       this.settings.wordWrap = wordWrapEl.checked ? 'on' : 'off';
+      emit();
+    });
+    formatSaveEl.addEventListener('change', () => {
+      this.settings.formatOnSave = formatSaveEl.checked;
       emit();
     });
 
