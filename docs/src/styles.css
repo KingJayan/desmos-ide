@@ -1100,3 +1100,10 @@ tr:last-child td {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* monaco writes inline colors, so only the container needs styling here */
+pre.highlighted code {
+  display: block;
+  white-space: pre;
+}
+pre.highlighted .mtk1 { color: var(--text); }

@@ -14,7 +14,7 @@
 - **formatter** — ⇧⌥F, or turn on format-on-save in settings
 - **inline sliders** — drag a `slider(...)` declaration right in the editor just like Desmos
 - **source control** — branches, history and remotes for the repo the open file lives in
-- **themes** — Catppuccin (Mocha, Latte, Frappé, Macchiato), GitHub Dark/Light, Monokai, VS Dark/Light
+- **themes** — Catppuccin, GitHub Dark/Light, Monokai, VS Dark/Light
 - **customizable editor** — font, font size, minimap, line numbers, word wrap
 - **file operations** — open and save `.dsmx` files through native dialogs
 - **AI sidebar** — chat to generate or modify expressions, streamed. Works with any
@@ -41,8 +41,8 @@ bun demo       # run the compiler in the terminal, no app shell
 
 | symptom | fix |
 |---|---|
-| window opens blank | run `bun run build:view` — the app serves the built `dist/` |
-| AI sidebar does nothing | open the provider popover and set a model plus an API key |
+| window opens blank | run `bun run build:view` (serves built `dist/`) |
+| AI sidebar does nothing | open the provider popover and set a model + API key |
 | source control panel is empty | it follows the open file; save the file inside a repo first |
 
 or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
