@@ -1,47 +1,6 @@
 import * as monaco from 'monaco-editor';
-
-interface SliderVar {
-  name: string;
-  value: number;
-  numStr: string;
-  line: number;
-  col: number;
-  domainMin: number;
-  domainMax: number;
-}
-
-// matches: let name = value [min..max]  (whitespace flexible)
-const SLIDER_LINE_RE = /^(let\s+\w+\s*=\s*)(-?\d+(?:\.\d*)?)\s*\[\s*(-?\d+(?:\.\d*)?)\s*\.\.\s*(-?\d+(?:\.\d*)?)\s*\]/;
-
-function parseSliderVars(src: string): SliderVar[] {
-  const results: SliderVar[] = [];
-  const lines = src.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(SLIDER_LINE_RE);
-    if (!m) continue;
-    const prefix = m[1];
-    const numStr = m[2];
-    const value = parseFloat(numStr);
-    const domainMin = parseFloat(m[3]);
-    const domainMax = parseFloat(m[4]);
-    if (!isFinite(value) || !isFinite(domainMin) || !isFinite(domainMax)) continue;
-    results.push({
-      name: /let\s+(\w+)/.exec(lines[i])![1],
-      value,
-      numStr,
-      line: i + 1,
-      col: prefix.length + 1,
-      domainMin,
-      domainMax,
-    });
-  }
-  return results;
-}
-
-function sliderRange(info: SliderVar): { min: number; max: number; step: number } {
-  const step = Number.isInteger(info.domainMin) && Number.isInteger(info.domainMax) && Number.isInteger(info.value) ? 1 : 0.01;
-  return { min: info.domainMin, max: info.domainMax, step };
-}
+import { parseSliderVars, sliderRange } from '../src/monaco/sliders';
+import type { SliderVar } from '../src/monaco/sliders';
 
 class SliderWidget implements monaco.editor.IContentWidget {
   readonly allowEditorOverflow = true;
@@ -97,8 +56,7 @@ class SliderWidget implements monaco.editor.IContentWidget {
     let lastLen = info.numStr.length;
 
     const emitChange = () => {
-      const rawVal = parseFloat(this.track.value);
-      const newStr = step === 1 ? String(Math.round(rawVal)) : rawVal.toFixed(2);
+      const newStr = this.fmt(parseFloat(this.track.value));
       this.valueLabel.textContent = newStr;
       this.updateFill();
       this.onchange(this.line, info.col, lastLen, newStr);
@@ -116,7 +74,8 @@ class SliderWidget implements monaco.editor.IContentWidget {
   }
 
   private fmt(v: number): string {
-    return this.step === 1 ? String(Math.round(v)) : v.toFixed(2);
+    const decimals = (String(this.step).split('.')[1] ?? '').length;
+    return decimals === 0 ? String(Math.round(v)) : v.toFixed(decimals);
   }
 
   private updateFill(): void {
