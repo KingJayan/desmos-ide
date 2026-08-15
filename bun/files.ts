@@ -41,6 +41,18 @@ export async function openFile(): Promise<FileResult<{ path: string; content: st
   }
 }
 
+// opens a known path with no dialog, for the recent-files list and search results
+export async function readFileAt(path: string): Promise<FileResult<{ path: string; content: string }>> {
+  if (typeof path !== 'string' || !path) {
+    return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Path must be a string.' };
+  }
+  try {
+    return { ok: true, path, content: await withRetry(() => readFile(path, 'utf-8')) };
+  } catch (err) {
+    return fileError(err);
+  }
+}
+
 export async function saveFile(path: string | null, content: string): Promise<FileResult<{ path: string }>> {
   if (typeof content !== 'string') return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Content must be a string.' };
   let savePath = path;
