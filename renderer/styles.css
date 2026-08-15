@@ -2391,3 +2391,8 @@ html, body {
   border-bottom: 1px solid var(--surface0);
   flex-shrink: 0;
 }
+
+.graph-linked-line {
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--blue);
+}

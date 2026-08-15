@@ -279,6 +279,32 @@ export class DesmosGraph {
     return this.calc.getExpressions() as unknown as DesmosExpr[];
   }
 
+  onSelectionChange(cb: (id: string | null) => void): void {
+    if (typeof this.calc.observe !== 'function') return;
+    this.selectionCb = cb;
+    this.calc.observe('selectedExpressionId', () => {
+      const id = this.calc.selectedExpressionId ?? null;
+      // ignore the echo of a selection this side just made
+      if (id === this.selfSelected) return;
+      this.selectionCb?.(id);
+    });
+  }
+
+  /** the other direction: put the graph's selection on a given expression */
+  select(id: string | null): void {
+    if (this.calc.selectedExpressionId === (id ?? undefined)) return;
+    this.selfSelected = id;
+    try {
+      this.calc.controller?.dispatch?.(
+        id ? { type: 'set-selected-id', id } : { type: 'set-none-selected' },
+      );
+    } catch {
+    }
+  }
+
+  private selectionCb: ((id: string | null) => void) | null = null;
+  private selfSelected: string | null = null;
+
   screenshot(): string | null {
     try {
       return (this.calc as unknown as { screenshot: () => string }).screenshot();

@@ -115,4 +115,9 @@ interface DesmosCalculator {
   removeExpression(ref: { id: string }): void;
   getExpressions(): Record<string, unknown>[];
   destroy(): void;
+
+  selectedExpressionId?: string;
+  observe?(property: string, cb: () => void): void;
+  unobserve?(property: string): void;
+  controller?: { dispatch?(action: Record<string, unknown>): void };
 }

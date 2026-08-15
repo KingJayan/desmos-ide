@@ -3,12 +3,12 @@
 import { tokenize, LexError } from './compiler/lexer';
 import { parse, ParseError } from './compiler/parser';
 import { optimize } from './compiler/optimizer';
-import { codegen, DesmosState, DesmosExpr } from './compiler/codegen';
+import { codegenWithSourceMap, DesmosState, DesmosExpr, ExprSource } from './compiler/codegen';
 import { analyze } from './compiler/analyze';
 import type { Program, Statement, Expr } from './compiler/types';
 
 export { registerLanguage, LANGUAGE_ID, errorToMarker } from './monaco/language';
-export type { DesmosState, DesmosExpr, DesmosSlider } from './compiler/codegen';
+export type { DesmosState, DesmosExpr, DesmosSlider, ExprSource } from './compiler/codegen';
 export type { DiagnosticMarker } from './monaco/language';
 
 export type SymbolKind =
@@ -38,6 +38,8 @@ export interface CompileSuccess {
   state: DesmosState;
   warnings: WarningMarker[];
   symbols: SymbolInfo[];
+  /** maps each graph expression back to the statement that produced it */
+  sourceMap: ExprSource[];
 }
 
 export interface CompileError {
@@ -199,11 +201,11 @@ export function compile(src: string): CompileResult {
     }
 
     const optimized = optimize(ast);
-    const state     = codegen(optimized);
+    const { state, sourceMap } = codegenWithSourceMap(optimized);
     const symbols   = extractSymbols(ast);
     const warnings  = checkWarnings(ast);
 
-    return { success: true, state, warnings, symbols };
+    return { success: true, state, warnings, symbols, sourceMap };
   } catch (e) {
     if (e instanceof LexError)
       return { success: false, errors: [mkError(e.message, 1, e.line, e.col)] };

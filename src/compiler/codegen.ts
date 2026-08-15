@@ -96,6 +96,13 @@ export interface DesmosExpr {
   parametricDomain?: { min: string; max: string };
 }
 
+/** where an emitted expression came from, so the graph can point back at the source */
+export interface ExprSource {
+  id: string;
+  line: number;
+  col: number;
+}
+
 export interface DesmosState {
   version: 9;
   graph: {
@@ -176,6 +183,13 @@ function needsParens(childOp: string, parentOp: string, side: 'left' | 'right'):
 export class Codegen {
   private list: DesmosExpr[] = [];
   private idCounts = new Map<string, number>();
+  private sources: ExprSource[] = [];
+  private currentPos: T.Pos | null = null;
+
+  /** valid once generate() has run */
+  sourceMap(): ExprSource[] {
+    return this.sources;
+  }
 
   generate(program: T.Program): DesmosState {
     for (const stmt of program.body) this.genStmt(stmt);
@@ -196,10 +210,15 @@ export class Codegen {
   private emit(partial: Omit<DesmosExpr, 'id'>, idBase?: string): string {
     const id = idBase ? this.stableId(idBase) : this.stableId(`__anon_${this.list.length}`);
     this.list.push({ ...partial, id });
+    if (this.currentPos) {
+      this.sources.push({ id, line: this.currentPos.line, col: this.currentPos.col });
+    }
     return id;
   }
 
   private genStmt(stmt: T.Statement): void {
+    // one statement can emit more than one expression; they all map back to it
+    this.currentPos = stmt.pos;
     switch (stmt.type) {
       case 'VarDecl':     this.genVarDecl(stmt);     break;
       case 'AliasDecl':   this.genAliasDecl(stmt);   break;
@@ -631,4 +650,12 @@ export class Codegen {
 
 export function codegen(program: T.Program): DesmosState {
   return new Codegen().generate(program);
+}
+
+export function codegenWithSourceMap(
+  program: T.Program,
+): { state: DesmosState; sourceMap: ExprSource[] } {
+  const gen = new Codegen();
+  const state = gen.generate(program);
+  return { state, sourceMap: gen.sourceMap() };
 }

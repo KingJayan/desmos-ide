@@ -10,7 +10,7 @@ import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } f
 import { builtinSignature } from '../src/compiler/builtins';
 import { formatDsl } from '../src/compiler/format';
 import CompileWorker from './compile.worker?worker';
-import type { CompileResult, SymbolInfo } from '../src/index';
+import type { CompileResult, SymbolInfo, ExprSource } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
 import { EnhancedPane } from './enhanced';
@@ -21,6 +21,7 @@ import { CommandPalette } from './command-palette';
 import type { PaletteCommand } from './command-palette';
 import { InlineSliderManager } from './inline-sliders';
 import { SearchPanel } from './search-panel';
+import { GraphLink } from './graph-link';
 import type { Mode } from './session';
 import {
   loadRecent, loadSession, pushRecent, recentLabel, removeRecent, saveRecent, saveSession,
@@ -298,6 +299,29 @@ const editor = monaco.editor.create(editorContainer, {
 
 const graph = new DesmosGraph(graphContainer);
 
+// clicking a curve on the graph puts the cursor on the line that drew it, and
+// moving the cursor selects that curve back on the graph
+let sourceMap: ExprSource[] = [];
+const linkedLine = editor.createDecorationsCollection();
+
+const graphLink = new GraphLink({
+  sourceMap: () => sourceMap,
+  revealLine: (line, col) => {
+    editor.setPosition({ lineNumber: line, column: col });
+    editor.revealLineInCenterIfOutsideViewport(line);
+  },
+  highlightLine: line => {
+    linkedLine.set(line === null ? [] : [{
+      range: new monaco.Range(line, 1, line, 1),
+      options: { isWholeLine: true, className: 'graph-linked-line' },
+    }]);
+  },
+  selectOnGraph: id => graph.select(id),
+});
+
+graph.onSelectionChange(id => graphLink.onGraphSelected(id));
+editor.onDidChangeCursorPosition(e => graphLink.onCursorMoved(e.position.lineNumber));
+
 function applyTheme(theme: ColorTheme): void {
   document.documentElement.setAttribute('data-color-theme', theme);
   graph.setTheme(theme);
@@ -411,6 +435,7 @@ function handleCompileResult(result: CompileResult): void {
     if (mode !== 'enhanced') {
       graph.update(result.state.expressions.list);
     }
+    sourceMap = result.sourceMap;
     if (mode === 'split') {
       ensureEnhancedPane().syncFromGraph(graph.currentList());
     }
@@ -1538,6 +1563,8 @@ const baseCommands: PaletteCommand[] = [
     description: 'Clear all expressions from the graph',
     action: () => {
       graph.update([]);
+      sourceMap = [];
+      graphLink.reset();
       setStatus('Graph reset', 'info');
     },
   },
