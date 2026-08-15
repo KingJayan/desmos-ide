@@ -929,13 +929,6 @@ html, body {
   height: 12px;
 }
 
-.ai-memory-badge {
-  font-size: 10px;
-  color: var(--mauve);
-  font-family: var(--font-mono);
-  flex-shrink: 0;
-}
-
 .ai-empty-state {
   flex: 1;
   display: flex;
@@ -1097,18 +1090,6 @@ html, body {
   cursor: pointer;
 }
 .ai-status-model:hover { color: var(--mauve); }
-
-.ai-status-context {
-  font-size: 10px;
-  background: color-mix(in srgb, var(--blue) 15%, transparent);
-  color: var(--blue);
-  border: 1px solid color-mix(in srgb, var(--blue) 40%, transparent);
-  border-radius: 3px;
-  padding: 1px 6px;
-  display: none;
-  flex-shrink: 0;
-}
-.ai-status-context.ai-status-context--show { display: block; }
 
 .ai-status-memory {
   font-size: 10px;
@@ -1638,7 +1619,7 @@ html, body {
 .ai-sidebar--compact .ai-ctx-btn { padding: 2px 5px; }
 .ai-sidebar--compact .ai-provider-label { display: none; }
 .ai-sidebar--compact .ai-provider-state { display: none; }
-.ai-sidebar--compact .ai-memory-badge { display: none; }
+.ai-sidebar--compact .ai-status-memory { display: none; }
 .ai-sidebar--compact .ai-provider-select { max-width: 72px; font-size: 9px; }
 
 .ai-send-btn {

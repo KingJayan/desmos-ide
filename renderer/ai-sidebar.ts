@@ -1,4 +1,4 @@
-import { createIcons, ArrowDown, Plus, Trash2, SlidersHorizontal } from 'lucide';
+import { createIcons, ArrowDown, Plus, Trash2 } from 'lucide';
 
 type ConvMessage = { role: 'user' | 'assistant'; content: string };
 type ApplyAction = { type: 'insert' | 'replace'; code: string };
@@ -363,7 +363,6 @@ export class AISidebar {
         <div class="ai-status-left">
           <button class="ai-provider-chip" id="ai-provider-chip" title="Provider settings"><span class="ai-status-provider-label"></span></button>
           <button class="ai-status-model" title="Change model"></button>
-          <span class="ai-status-context"></span>
           <span class="ai-status-memory"></span>
         </div>
         <div class="ai-status-right">
@@ -466,7 +465,7 @@ export class AISidebar {
     const confirmBtn = this.el.querySelector('.ai-confirm-btn') as HTMLButtonElement;
 
     createIcons({
-      icons: { ArrowDown, Plus, Trash2, SlidersHorizontal },
+      icons: { ArrowDown, Plus, Trash2 },
       attrs: { 'stroke-width': '2' },
     });
 
@@ -710,8 +709,12 @@ export class AISidebar {
   }
 
   private syncMemoryBadge(): void {
-    const el = this.el.querySelector('.ai-memory-badge') as HTMLElement;
-    if (el) el.textContent = this.memories.length ? `${this.memories.length} mem` : '';
+    const el = this.el.querySelector('.ai-status-memory') as HTMLElement | null;
+    if (!el) return;
+    const n = this.memories.length;
+    el.textContent = n ? `${n} mem` : '';
+    el.title = n ? `${n} saved ${n === 1 ? 'memory' : 'memories'} — /memory list` : '';
+    el.classList.toggle('ai-status-memory--show', n > 0);
   }
 
   private syncProviderUi(): void {
@@ -773,7 +776,6 @@ export class AISidebar {
     try {
       const result = await window.electronAPI?.copilotGetModels(githubToken);
       if (result?.ok && result.models.length) {
-        result.models = result.models;
         this.copilotModels = result.models;
       } else if (result && !result.ok) {
         this.appendSystemMsg(`Could not fetch Copilot models: ${result.error}. Using default list.`);
@@ -896,6 +898,8 @@ export class AISidebar {
   }
 
   private renderMessages(): void {
+    // wiping the list detaches the prompt chips, so the rotation must not outlive them
+    this.stopPromptChips();
     this.messagesEl.innerHTML = '';
     if (!this.activeChat.history.length) { this.appendWelcome(); return; }
     const history = this.activeChat.history;
@@ -1402,6 +1406,10 @@ export class AISidebar {
 
   focus(): void { this.inputEl.focus(); }
 
+  dispose(): void {
+    this.stopPromptChips();
+  }
+
   private updateCtxPill(): void {
     if (!this.sendContext || this.contextDisabledForMsg) {
       this.ctxPillEl.hidden = true;
@@ -1431,7 +1439,17 @@ export class AISidebar {
     this.updateCtxPill();
   }
 
+  private stopPromptChips(): void {
+    if (this.promptChipInterval === null) return;
+    clearInterval(this.promptChipInterval);
+    this.promptChipInterval = null;
+  }
+
   private initPromptChips(): void {
+    // the empty state re-renders on every new and deleted chat, so the previous
+    // rotation has to be stopped or the timers stack up for the life of the window
+    this.stopPromptChips();
+
     const container = this.messagesEl.querySelector('.ai-prompt-chips') as HTMLElement;
     if (!container) return;
 

@@ -8,10 +8,10 @@ interface Window {
     openFile(): Promise<{ ok: true; path: string; content: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
     saveFile(path: string | null, content: string): Promise<{ ok: true; path: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
     exportJson(content: string): Promise<{ ok: true; path: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
-    onMenuNew(cb: () => void): void;
-    onMenuOpen(cb: () => void): void;
-    onMenuSave(cb: () => void): void;
-    onMenuSaveAs(cb: () => void): void;
+    onMenuNew(cb: () => void): () => void;
+    onMenuOpen(cb: () => void): () => void;
+    onMenuSave(cb: () => void): () => void;
+    onMenuSaveAs(cb: () => void): () => void;
     aiChat(
       reqId: string,
       messages: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -84,12 +84,12 @@ interface Window {
       | { ok: true; message: string }
       | { ok: false; errorCode: string; message: string }
     >;
-    onAiChunk(cb: (reqId: string, text: string) => void): void;
-    onAiDone(cb: (reqId: string) => void): void;
-    onAiError(cb: (reqId: string, error: string) => void): void;
+    onAiChunk(cb: (reqId: string, text: string) => void): () => void;
+    onAiDone(cb: (reqId: string) => void): () => void;
+    onAiError(cb: (reqId: string, error: string) => void): () => void;
     watchFile(path: string): Promise<void>;
     unwatchFile(path: string): Promise<void>;
-    onFileChanged(cb: (path: string, content: string) => void): void;
+    onFileChanged(cb: (path: string, content: string) => void): () => void;
   };
 }
 
