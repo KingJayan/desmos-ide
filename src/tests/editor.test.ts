@@ -2,6 +2,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSliderVars, sliderRange } from '../monaco/sliders';
+import { errorToMarker } from '../monaco/language';
+import { compile } from '../index';
+import type { CompileFailure } from '../index';
 
 describe('inline sliders', () => {
   test('finds the dsl slider declaration', () => {
@@ -53,5 +56,39 @@ describe('inline sliders', () => {
   test('reports one-based line numbers', () => {
     const [s] = parseSliderVars('x = 1\n\na = slider(0, 0, 10)');
     assert.equal(s.line, 3);
+  });
+});
+
+describe('error markers', () => {
+  test('maps a compile error onto a monaco range', () => {
+    const m = errorToMarker({ message: 'bad', line: 3, col: 5 })!;
+    assert.equal(m.startLineNumber, 3);
+    assert.equal(m.startColumn, 5);
+    assert.equal(m.endColumn, 6, 'a marker with no token length still covers one column');
+    assert.equal(m.severity, 8);
+  });
+
+  test('spans the whole token when endCol is known', () => {
+    assert.equal(errorToMarker({ message: 'bad', line: 1, col: 2, endCol: 9 })!.endColumn, 9);
+  });
+
+  test('appends a suggested fix to the message', () => {
+    assert.match(errorToMarker({ message: 'bad', line: 1, col: 1, fix: 'try x' })!.message, /Fix: try x/);
+  });
+
+  test('drops an error with no position', () => {
+    assert.equal(errorToMarker({ message: 'bad' }), null);
+  });
+});
+
+describe('compile errors reach the editor', () => {
+  test('every reported error can be placed in the gutter', () => {
+    const r = compile('y = undefinedThing\nz = ((');
+    assert.equal(r.success, false);
+    const errors = (r as CompileFailure).errors;
+    assert.ok(errors.length > 0);
+    for (const e of errors) {
+      assert.ok(errorToMarker(e), `error without a position: ${e.message}`);
+    }
   });
 });
