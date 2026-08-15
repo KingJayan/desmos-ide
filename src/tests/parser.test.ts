@@ -5,6 +5,8 @@ import { compile } from '../index';
 import type { CompileSuccess, CompileFailure } from '../index';
 import { BUILTIN_FNS, buildCompletions } from '../monaco/language';
 import { builtinSignature } from '../compiler/builtins';
+import { formatDsl } from '../compiler/format';
+import { readFileSync } from 'node:fs';
 
 function ok(src: string): CompileSuccess {
   const r = compile(src);
@@ -216,5 +218,68 @@ describe('builtins stay in sync', () => {
   test('every builtin is offered as a completion', () => {
     const labels = new Set(buildCompletions({ Keyword: 1, Snippet: 2, Function: 3 }).map(c => c.label));
     for (const name of BUILTIN_FNS) assert.ok(labels.has(name), `${name} is missing from completions`);
+  });
+});
+
+describe('formatter', () => {
+  const round = (s: string) => formatDsl(formatDsl(s));
+
+  test('normalises operator spacing', () => {
+    assert.equal(formatDsl('x=1+2*3'), 'x = 1 + 2 * 3\n');
+  });
+
+  test('keeps powers tight', () => {
+    assert.equal(formatDsl('y  =  x ^ 2'), 'y = x^2\n');
+  });
+
+  test('spaces after commas only', () => {
+    assert.equal(formatDsl('p = f( 1 ,2 , 3 )'), 'p = f(1, 2, 3)\n');
+  });
+
+  test('keeps implicit multiplication adjacent', () => {
+    assert.equal(formatDsl('y=2x+3sin(t)'), 'y = 2x + 3sin(t)\n');
+  });
+
+  test('keeps unary minus tight', () => {
+    assert.equal(formatDsl('v = x where x>0 else -x'), 'v = x where x > 0 else -x\n');
+  });
+
+  test('kwargs stay tight, assignments do not', () => {
+    assert.equal(formatDsl('a=slider(0,0,10,step = 2)'), 'a = slider(0, 0, 10, step=2)\n');
+  });
+
+  test('indents block bodies', () => {
+    assert.equal(formatDsl('expr {\na = 1\na\n}'), 'expr {\n  a = 1\n  a\n}\n');
+  });
+
+  test('collapses repeated blank lines', () => {
+    assert.equal(formatDsl('\n\nx = 1\n\n\n\ny = 2\n'), 'x = 1\n\ny = 2\n');
+  });
+
+  test('preserves comments and strings verbatim', () => {
+    const src = 'text l = "a  b // not a comment" at (0, 0) // real comment\n';
+    assert.equal(formatDsl(src), src);
+  });
+
+  test('leaves an empty file empty', () => {
+    assert.equal(formatDsl('   \n\n'), '');
+  });
+
+  test('is idempotent on the example file', () => {
+    const src = readFileSync(new URL('../../example/demo.dsmx', import.meta.url), 'utf8');
+    const once = formatDsl(src);
+    assert.equal(round(src), once);
+    assert.ok(compile(once).success, 'formatted output must still compile');
+  });
+
+  test('formatting never changes the compiled output', () => {
+    const src = readFileSync(new URL('../../example/demo.dsmx', import.meta.url), 'utf8');
+    const before = compile(src);
+    const after = compile(formatDsl(src));
+    assert.ok(before.success && after.success);
+    assert.deepEqual(
+      (after as CompileSuccess).state.expressions.list,
+      (before as CompileSuccess).state.expressions.list,
+    );
   });
 });
