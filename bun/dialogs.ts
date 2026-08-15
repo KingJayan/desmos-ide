@@ -67,6 +67,19 @@ export async function showConfirm(message: string): Promise<boolean> {
   }
 }
 
+export async function showPrompt(message: string, defaultValue: string): Promise<string | null> {
+  if (process.platform !== 'darwin') throw new Error('native prompt is macOS-only');
+
+  const binary = await ensureNativeBinary('prompt');
+  try {
+    const { stdout } = await execFileAsync(binary, [message, defaultValue], { maxBuffer: 64 * 1024 });
+    return stdout.replace(/\n$/, '');
+  } catch (err) {
+    if ((err as { code?: number }).code === 1) return null;
+    throw err;
+  }
+}
+
 async function saveDialogFallback(opts: SaveDialogOptions): Promise<string | null> {
   const picked = await Utils.openFileDialog({
     canChooseFiles: false,
