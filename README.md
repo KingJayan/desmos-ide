@@ -12,6 +12,7 @@
 - **DSL editor** — write math in a clean language; the compiler outputs Desmos expressions in real time
 - **live graph** — Desmos graph updates as you type, diffed by expression ID to avoid flicker
 - **formatter** — ⇧⌥F, or turn on format-on-save in settings
+- **persistence** — autosaves the open file, and reopens it where you left off
 - **inline sliders** — drag a `slider(...)` declaration right in the editor just like Desmos
 - **source control** — branches, history and remotes for the repo the open file lives in
 - **themes** — Catppuccin, GitHub Dark/Light, Monokai, VS Dark/Light
@@ -44,6 +45,7 @@ bun demo       # run the compiler in the terminal, no app shell
 | window opens blank | run `bun run build:view` (serves built `dist/`) |
 | AI sidebar does nothing | open the provider popover and set a model + API key |
 | source control panel is empty | it follows the open file; save the file inside a repo first |
+| ⇧⌘F finds nothing | only searches the recent files; open a file first |
 
 or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
 

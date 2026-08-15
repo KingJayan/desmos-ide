@@ -18,7 +18,13 @@ import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings } from './settings';
 import type { ColorTheme } from './settings';
 import { CommandPalette } from './command-palette';
+import type { PaletteCommand } from './command-palette';
 import { InlineSliderManager } from './inline-sliders';
+import { SearchPanel } from './search-panel';
+import type { Mode } from './session';
+import {
+  loadRecent, loadSession, pushRecent, recentLabel, removeRecent, saveRecent, saveSession,
+} from './session';
 import { registerColorProvider } from './color-provider';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
@@ -574,6 +580,7 @@ function runCompile(): void {
 editor.onDidChangeModelContent(() => {
   if (compileTimer !== null) clearTimeout(compileTimer);
   compileTimer = setTimeout(runCompile, 280);
+  schedulePersist();
 });
 
 window.addEventListener('unload', () => {
@@ -593,6 +600,11 @@ function setStatus(msg: string, kind: 'success' | 'error' | 'info' = 'info'): vo
 
 function nativeConfirm(message: string): Promise<boolean> {
   return window.electronAPI?.confirm(message) ?? Promise.resolve(confirm(message));
+}
+
+function nativePrompt(message: string, defaultValue = ''): Promise<string | null> {
+  return window.electronAPI?.prompt(message, defaultValue)
+    ?? Promise.resolve(prompt(message, defaultValue));
 }
 
 type GitStatusResult =
@@ -918,7 +930,6 @@ function startGitStatusRefresh(): void {
 runCompile();
 
 //mode switching
-type Mode = 'dsl' | 'split' | 'enhanced';
 let mode: Mode = 'dsl';
 
 function applyMode(m: Mode): void {
@@ -947,7 +958,7 @@ function applyMode(m: Mode): void {
 
 async function setMode(m: Mode): Promise<void> {
   if (m !== 'enhanced' && mode === 'enhanced' && enhanced?.isDirty) {
-    if (!(await nativeConfirm('Leave Enhanced mode? Unsaved edits will be lost.'))) return;
+    if (!(await nativeConfirm('Leave Enhanced mode? Edits made here are not in the DSL file and will be lost.'))) return;
   }
   applyMode(m);
 }
@@ -963,6 +974,7 @@ let watchedPath: string | null = null;
 // the git panel follows the open file, so point the main process at it before refreshing
 function setFilename(p: string | null): Promise<unknown> {
   currentPath = p;
+  if (p) rememberRecent(p);
   filenameEl.textContent = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
   return Promise.resolve(window.electronAPI?.setGitContext(p)).then(refreshGitPanels);
 }
@@ -996,7 +1008,7 @@ window.electronAPI?.onFileChanged((changedPath, content) => {
 
 async function enhancedDirtyGuard(): Promise<boolean> {
   if (mode === 'enhanced' && enhanced?.isDirty) {
-    return nativeConfirm('Discard unsaved Enhanced edits and continue?');
+    return nativeConfirm('Discard the Enhanced edits? They are not in the DSL file.');
   }
   return true;
 }
@@ -1024,11 +1036,12 @@ async function cmdOpen(): Promise<void> {
   startWatching(result.path);
   applyMode(mode === 'enhanced' ? 'dsl' : mode);
   runCompile();
+  persistSession();
 }
 
 async function cmdSave(saveAs = false): Promise<void> {
   if (mode === 'enhanced') {
-    setStatus('Switch to DSL or Split to save, or use Export JSON', 'error');
+    setStatus('Enhanced mode edits the graph, not the file — switch to DSL to save, or Export JSON', 'error');
     return;
   }
   if (formatOnSave) await formatDocument();
@@ -1041,6 +1054,7 @@ async function cmdSave(saveAs = false): Promise<void> {
     void setFilename(result.path);
     startWatching(result.path);
     setStatus('Saved', 'success');
+    persistSession();
   } else if (!result.canceled) {
     setStatus(result.message, 'error');
   }
@@ -1049,6 +1063,84 @@ async function cmdSave(saveAs = false): Promise<void> {
 btnNew.addEventListener('click',  () => cmdNew());
 btnOpen.addEventListener('click', () => cmdOpen());
 btnSave.addEventListener('click', () => cmdSave());
+
+//persistence
+const AUTOSAVE_DELAY = 1200;
+let recentFiles = loadRecent();
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let autosaving = false;
+let restoring = false;
+
+function rememberRecent(path: string): void {
+  recentFiles = pushRecent(recentFiles, path);
+  saveRecent(recentFiles);
+  syncRecent();
+}
+
+function forgetRecent(path: string): void {
+  recentFiles = removeRecent(recentFiles, path);
+  saveRecent(recentFiles);
+  syncRecent();
+}
+
+function persistSession(): void {
+  const pos = editor.getPosition();
+  saveSession({
+    path: currentPath,
+    source: editor.getValue(),
+    mode,
+    line: pos?.lineNumber ?? 1,
+    col: pos?.column ?? 1,
+  });
+}
+
+// writes straight to the open file. an untitled buffer is never given a path
+// behind the user's back, so it only rides along in the restored session.
+async function autosave(): Promise<void> {
+  if (!currentPath || mode === 'enhanced' || autosaving) return;
+  autosaving = true;
+  try {
+    const result = await window.electronAPI?.saveFile(currentPath, editor.getValue());
+    if (result?.ok) setStatus('Autosaved', 'info');
+    else if (result && !result.canceled) setStatus(result.message, 'error');
+  } finally {
+    autosaving = false;
+  }
+}
+
+function schedulePersist(): void {
+  if (restoring) return;
+  if (persistTimer !== null) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persistSession();
+    void autosave();
+  }, AUTOSAVE_DELAY);
+}
+
+// opens a path the app already knows about, with no dialog
+async function openPath(path: string, at?: { line: number; col: number }): Promise<boolean> {
+  if (!(await enhancedDirtyGuard())) return false;
+  const result = await window.electronAPI?.readFileAt(path);
+  if (!result) return false;
+  if (!result.ok) {
+    // a recent file that has been moved is not worth offering again
+    forgetRecent(path);
+    setStatus(result.message, 'error');
+    return false;
+  }
+  editor.setValue(result.content);
+  void setFilename(result.path);
+  startWatching(result.path);
+  if (mode === 'enhanced') applyMode('dsl');
+  if (at) {
+    editor.setPosition({ lineNumber: at.line, column: at.col });
+    editor.revealLineInCenter(at.line);
+  }
+  editor.focus();
+  runCompile();
+  return true;
+}
 
 // runs the registered formatter through monaco so the edit lands on the undo stack
 function formatDocument(): Promise<void> {
@@ -1112,7 +1204,7 @@ window.addEventListener('keydown', e => {
 
   if (e.shiftKey && !e.altKey && k === 'f') {
     e.preventDefault();
-    setStatus('Global search is not enabled yet', 'info');
+    searchPanel.toggle();
     return;
   }
 
@@ -1140,6 +1232,7 @@ window.electronAPI?.onMenuNew(cmdNew);
 window.electronAPI?.onMenuOpen(cmdOpen);
 window.electronAPI?.onMenuSave(() => cmdSave());
 window.electronAPI?.onMenuSaveAs(() => cmdSave(true));
+window.electronAPI?.onMenuOpenRecent(path => void openPath(path));
 
 window.addEventListener('focus', () => {
   void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitRemotes()]);
@@ -1166,7 +1259,7 @@ gitRemoteRefreshBtn.addEventListener('click', e => {
 
 gitBranchCreateBtn.addEventListener('click', async e => {
   e.stopPropagation();
-  const raw = prompt('New branch name:');
+  const raw = await nativePrompt('New branch name:');
   const name = raw?.trim();
   if (!name) return;
   const action = await window.electronAPI?.gitCreateBranch(name);
@@ -1176,10 +1269,10 @@ gitBranchCreateBtn.addEventListener('click', async e => {
 
 gitRemoteAddBtn.addEventListener('click', async e => {
   e.stopPropagation();
-  const nameRaw = prompt('Remote name:', 'origin');
+  const nameRaw = await nativePrompt('Remote name:', 'origin');
   const name = nameRaw?.trim();
   if (!name) return;
-  const urlRaw = prompt(`Remote URL for ${name}:`);
+  const urlRaw = await nativePrompt(`Remote URL for ${name}:`);
   const url = urlRaw?.trim();
   if (!url) return;
   const action = await window.electronAPI?.gitRemoteAdd(name, url);
@@ -1402,7 +1495,16 @@ function ensureSettingsPanel(): SettingsPanel {
 btnSidebarSettings.addEventListener('click', () => ensureSettingsPanel().toggle());
 
 const palette = new CommandPalette();
-palette.register([
+
+const searchPanel = new SearchPanel({
+  paths: () => recentFiles.map(f => f.path),
+  search: (paths, query, useRegex) =>
+    window.electronAPI?.searchFiles(paths, query, useRegex)
+      ?? Promise.resolve({ ok: false as const, errorCode: 'NO_BRIDGE', message: 'Search needs the desktop app.' }),
+  onOpen: hit => openPath(hit.path, { line: hit.line, col: hit.col }),
+});
+
+const baseCommands: PaletteCommand[] = [
   {
     id: 'file.new',
     label: 'New File',
@@ -1493,7 +1595,7 @@ palette.register([
   {
     id: 'mode.enhanced',
     label: 'Switch to Enhanced Mode',
-    description: 'Show the expression editor with LaTeX rendering',
+    description: 'Edit the graph directly, bypassing the DSL — export as JSON to keep the edits',
     action: () => setMode('enhanced'),
   },
   {
@@ -1530,9 +1632,82 @@ palette.register([
       void editor.getAction('editor.action.rename')?.run();
     },
   },
-]);
+  {
+    id: 'file.search',
+    label: 'Search in Recent Files',
+    description: 'Find text across the files you have opened',
+    keybinding: '⇧⌘F',
+    action: () => searchPanel.show(),
+  },
+];
 
-void setFilename(null);
-applyMode('dsl');
+function syncRecent(): void {
+  refreshPaletteCommands();
+  void window.electronAPI?.setRecentFiles(recentFiles.map(f => f.path));
+}
+
+// the recent files are commands too, so they are reachable without new chrome
+function refreshPaletteCommands(): void {
+  const paths = recentFiles.map(f => f.path);
+  palette.register([
+    ...baseCommands,
+    ...recentFiles.map(f => {
+      const { name, hint } = recentLabel(f.path, paths);
+      return {
+        id: `file.recent:${f.path}`,
+        label: `Open Recent: ${name}`,
+        description: hint || f.path,
+        action: () => void openPath(f.path),
+      };
+    }),
+  ]);
+}
+
+syncRecent();
+
+// restores the last session before anything else touches the buffer
+async function restoreSession(): Promise<void> {
+  const saved = loadSession();
+  if (!saved) {
+    void setFilename(null);
+    applyMode('dsl');
+    return;
+  }
+
+  restoring = true;
+  try {
+    if (saved.path) {
+      const result = await window.electronAPI?.readFileAt(saved.path);
+      if (result?.ok) {
+        // the file on disk wins: it may have changed since the app last ran
+        editor.setValue(result.content);
+        void setFilename(result.path);
+        startWatching(result.path);
+      } else {
+        forgetRecent(saved.path);
+        editor.setValue(saved.source);
+        void setFilename(null);
+        setStatus(`Could not reopen ${saved.path.split(/[\\/]/).pop()}`, 'error');
+      }
+    } else if (saved.source.trim()) {
+      editor.setValue(saved.source);
+      void setFilename(null);
+    }
+    applyMode(saved.mode);
+    editor.setPosition({ lineNumber: saved.line, column: saved.col });
+    editor.revealLineInCenter(saved.line);
+  } finally {
+    restoring = false;
+  }
+  runCompile();
+}
+
+void restoreSession();
 startGitStatusRefresh();
 editor.focus();
+
+window.addEventListener('beforeunload', () => {
+  if (persistTimer !== null) clearTimeout(persistTimer);
+  persistSession();
+  searchPanel.dispose();
+});
