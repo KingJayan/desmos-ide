@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { highlightSnippets } from './highlight.js';
   import pkg from '../package.json';
   import dsl from '../../package.json';
 
@@ -156,6 +157,8 @@
 
   onMount(() => {
     if (route !== 'docs') return;
+
+    highlightSnippets();
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -603,7 +606,7 @@ v = map(n -> n^2, 1..10 step 1)</code></pre>
 
     <h3>compiled output</h3>
     <p><code>map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)</code> compiles to:</p>
-    <pre><code>\left[\left(\cos\left(i\right),\sin\left(i\right)\right)\operatorname&#123;for&#125;i=\left[0,0.1,...,6.28\right]\right]</code></pre>
+    <pre class="no-highlight"><code>\left[\left(\cos\left(i\right),\sin\left(i\right)\right)\operatorname&#123;for&#125;i=\left[0,0.1,...,6.28\right]\right]</code></pre>
 
     <h3>range syntax</h3>
     <table>
