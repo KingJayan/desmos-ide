@@ -2,7 +2,7 @@
   "name": "desmos-ide",
   "version": "1.2.5",
   "description": "an IDE for Desmos with a custom DSL",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "bun build:view && electrobun dev",
     "dev:hmr": "DESMOS_IDE_DEV=1 concurrently -k \"vite\" \"electrobun dev\"",
@@ -19,7 +19,6 @@
     "r": "bun run build && bun run dev"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
     "@types/katex": "^0.16.8",
     "electrobun": "^1.18.1",
     "katex": "^0.16.45",
