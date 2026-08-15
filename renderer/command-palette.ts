@@ -1,3 +1,5 @@
+import { iconEl } from './icons';
+
 export interface PaletteCommand {
   id: string;
   label: string;
@@ -28,7 +30,7 @@ export class CommandPalette {
 
     const icon = document.createElement('span');
     icon.className = 'cmd-search-icon';
-    icon.textContent = '›';
+    icon.appendChild(iconEl('chevron-right', { size: 14 }));
 
     this.input = document.createElement('input');
     this.input.className = 'cmd-input';
@@ -42,6 +44,12 @@ export class CommandPalette {
     this.list = document.createElement('ul');
     this.list.className = 'cmd-list';
     this.list.setAttribute('role', 'listbox');
+    this.list.id = 'cmd-list';
+
+    // the input keeps focus, so screen readers need to be told which option is active
+    this.input.setAttribute('role', 'combobox');
+    this.input.setAttribute('aria-controls', 'cmd-list');
+    this.input.setAttribute('aria-expanded', 'true');
 
     modal.append(searchWrap, this.list);
     this.overlay.appendChild(modal);
@@ -101,8 +109,10 @@ export class CommandPalette {
     this.filtered.forEach((cmd, i) => {
       const li = document.createElement('li');
       li.className = 'cmd-item' + (i === this.activeIdx ? ' cmd-item--active' : '');
+      li.id = `cmd-item-${i}`;
       li.setAttribute('role', 'option');
       li.setAttribute('aria-selected', String(i === this.activeIdx));
+      if (i === this.activeIdx) this.input.setAttribute('aria-activedescendant', li.id);
 
       const left = document.createElement('div');
       left.className = 'cmd-item-left';

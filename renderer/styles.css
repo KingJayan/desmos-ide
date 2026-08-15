@@ -26,25 +26,6 @@
   --radius:    4px;
 }
 
-:root[data-color-theme='desmos-dark'] {
-  --base:     #1e1e2e;
-  --mantle:   #181825;
-  --crust:    #11111b;
-  --surface0: #313244;
-  --surface1: #45475a;
-  --overlay0: #6c7086;
-  --overlay1: #7f849c;
-  --overlay2: #9399b2;
-  --subtext1: #bac2de;
-  --text:     #cdd6f4;
-  --blue:     #89b4fa;
-  --green:    #a6e3a1;
-  --yellow:   #f9e2af;
-  --red:      #f38ba8;
-  --mauve:    #cba6f7;
-  --peach:    #fab387;
-}
-
 :root[data-color-theme='catppuccin-latte'] {
   --base:     #eff1f5;
   --mantle:   #e6e9ef;
@@ -197,6 +178,78 @@
   --peach:    #a31515;
 }
 
+:is(.btn,
+    .toolbar-btn, .mode-btn, .activity-btn, .action-btn,
+    .git-panel-btn, .unsaved-export-btn, .search-regex-btn,
+    .ai-icon-btn, .ai-config-btn, .ai-toolbar-btn, .ai-code-copy-btn,
+    .ai-action-btn, .ai-ctx-btn, .ai-send-btn) {
+  --btn-accent: var(--blue);
+  --btn-press: 0.94;
+  --btn-hover-border: var(--btn-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--subtext1);
+  cursor: pointer;
+  transition:
+    color 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s,
+    transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:is(.btn,
+    .toolbar-btn, .mode-btn, .activity-btn, .action-btn,
+    .git-panel-btn, .unsaved-export-btn, .search-regex-btn,
+    .ai-icon-btn, .ai-config-btn, .ai-toolbar-btn, .ai-code-copy-btn,
+    .ai-action-btn, .ai-ctx-btn, .ai-send-btn):hover {
+  color: var(--btn-accent);
+  border-color: var(--btn-hover-border);
+  background: color-mix(in srgb, var(--btn-accent) 8%, transparent);
+}
+
+:is(.btn,
+    .toolbar-btn, .mode-btn, .activity-btn, .action-btn,
+    .git-panel-btn, .unsaved-export-btn, .search-regex-btn,
+    .ai-icon-btn, .ai-config-btn, .ai-toolbar-btn, .ai-code-copy-btn,
+    .ai-action-btn, .ai-ctx-btn, .ai-send-btn):active {
+  transform: scale(var(--btn-press));
+  box-shadow: none;
+}
+
+:is(.btn,
+    .toolbar-btn, .mode-btn, .activity-btn, .action-btn,
+    .git-panel-btn, .unsaved-export-btn, .search-regex-btn,
+    .ai-icon-btn, .ai-config-btn, .ai-toolbar-btn, .ai-code-copy-btn,
+    .ai-action-btn, .ai-ctx-btn, .ai-send-btn):disabled {
+  opacity: 0.35;
+  cursor: default;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------- a11y base
+   one keyboard ring for every interactive element, and one guard that stops
+   all motion. individual rules can still add a calmer still state after this. */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 html, body {
   height: 100%;
@@ -258,34 +311,19 @@ html, body {
 }
 
 .mode-btn {
-  background: none;
-  border: none;
+  --btn-hover-border: transparent;
   color: var(--overlay2);
   padding: 3px 12px;
   border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-  font-family: var(--font-ui);
-  transition: background 0.12s, color 0.12s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1);
 }
-.mode-btn:hover  { color: var(--text); }
-.mode-btn:active { transform: scale(0.94); }
 .mode-btn.active { background: var(--surface1); color: var(--text); }
 
 .toolbar-btn {
-  background: none;
-  border: 1px solid var(--surface1);
-  color: var(--subtext1);
-  padding: 4px 12px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 12px;
-  font-family: var(--font-ui);
-  transition: border-color 0.12s, color 0.12s, background 0.12s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.12s;
+  border-color: var(--surface1);
+  --btn-press: 0.93;
   -webkit-app-region: no-drag;
 }
-.toolbar-btn:hover  { border-color: var(--blue); color: var(--blue); box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 20%, transparent); }
-.toolbar-btn:active { transform: scale(0.93); box-shadow: none; }
+.toolbar-btn:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 20%, transparent); }
 
 
 #workspace {
@@ -307,23 +345,14 @@ html, body {
 }
 
 .activity-btn {
+  --btn-hover-border: transparent;
+  --btn-press: 0.92;
   width: 38px;
   height: 38px;
+  padding: 0;
   border-radius: 6px;
-  border: none;
-  background: transparent;
   color: var(--overlay1);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   position: relative;
-  transition: color 0.12s, background 0.12s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1);
-}
-
-.activity-btn:hover {
-  color: var(--text);
-  background: color-mix(in srgb, var(--surface0) 45%, transparent);
 }
 
 .activity-btn.active {
@@ -523,20 +552,11 @@ html, body {
 }
 
 .git-panel-btn {
-  appearance: none;
-  border: 1px solid var(--surface1);
+  border-color: var(--surface1);
   background: var(--surface0);
-  color: var(--subtext1);
   border-radius: 5px;
   padding: 3px 8px;
   font-size: 11px;
-  font-family: var(--font-ui);
-  cursor: pointer;
-}
-
-.git-panel-btn:hover {
-  border-color: var(--blue);
-  color: var(--blue);
 }
 
 .git-panel-btn .lucide {
@@ -642,15 +662,13 @@ html, body {
 #enhanced-unsaved-bar.hidden { display: none; }
 
 .unsaved-export-btn {
+  --btn-accent: var(--yellow);
   padding: 2px 10px;
-  border-radius: 4px;
-  border: 1px solid color-mix(in srgb, var(--yellow) 50%, transparent);
+  border-color: color-mix(in srgb, var(--yellow) 50%, transparent);
   background: color-mix(in srgb, var(--yellow) 15%, transparent);
   color: var(--yellow);
   font-size: 11px;
-  cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
 }
 .unsaved-export-btn:hover { background: color-mix(in srgb, var(--yellow) 28%, transparent); }
 
@@ -739,19 +757,13 @@ html, body {
 }
 
 .action-btn {
+  --btn-press: 0.98;
   width: 100%;
-  background: none;
-  border: 1px dashed var(--surface1);
+  border-style: dashed;
+  border-color: var(--surface1);
   color: var(--overlay2);
   padding: 8px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  transition: border-color 0.15s, color 0.15s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1), background 0.15s;
 }
-.action-btn:hover  { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--blue) 5%, transparent); }
-.action-btn:active { transform: scale(0.98); }
 
 #ai-divider {
   width: 4px;
@@ -851,23 +863,15 @@ html, body {
 }
 
 .ai-icon-btn {
-  background: none;
-  border: 1px solid var(--surface1);
-  border-radius: 4px;
+  --btn-press: 0.88;
+  border-color: var(--surface1);
   color: var(--overlay1);
   width: 24px;
   height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   padding: 0;
-  cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 0.12s, color 0.12s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1);
 }
-.ai-icon-btn:hover  { border-color: var(--blue); color: var(--blue); }
-.ai-icon-btn:active { transform: scale(0.88); }
-.ai-icon-btn--danger:hover { border-color: var(--red); color: var(--red); }
+.ai-icon-btn--danger { --btn-accent: var(--red); }
 
 .ai-icon-btn .lucide {
   width: 13px;
@@ -898,6 +902,19 @@ html, body {
   font-family: var(--font-mono);
 }
 
+/* copilot has no name to show, only a connected state */
+.ai-provider-label--dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--overlay0);
+  flex-shrink: 0;
+}
+.ai-provider-label--on {
+  border-color: var(--green);
+  background: var(--green);
+}
+
 .ai-provider-state {
   font-size: 10px;
   border: 1px solid var(--surface1);
@@ -909,20 +926,13 @@ html, body {
 .ai-provider-state--env { color: var(--overlay1); border-color: var(--surface1); }
 
 .ai-config-btn {
-  background: transparent;
-  border: 1px solid var(--surface1);
+  --btn-accent: var(--mauve);
+  border-color: var(--surface1);
   color: var(--overlay1);
-  border-radius: 4px;
   width: 24px;
   height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   padding: 0;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
 }
-.ai-config-btn:hover { color: var(--mauve); border-color: var(--mauve); }
 
 .ai-config-btn .lucide {
   width: 12px;
@@ -1128,20 +1138,13 @@ html, body {
 .ai-msg-toolbar--visible { display: flex; }
 
 .ai-toolbar-btn {
-  background: transparent;
-  border: 1px solid var(--surface1);
+  border-color: var(--surface1);
   color: var(--overlay1);
   width: 20px;
   height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: 3px;
-  cursor: pointer;
   padding: 0;
-  transition: border-color 0.12s, color 0.12s;
 }
-.ai-toolbar-btn:hover { border-color: var(--blue); color: var(--blue); }
 
 .ai-msg-meta {
   font-size: 10px;
@@ -1324,21 +1327,13 @@ html, body {
 }
 
 .ai-code-copy-btn {
-  background: transparent;
-  border: 1px solid var(--surface1);
-  border-radius: 4px;
+  --btn-press: 0.93;
+  border-color: var(--surface1);
   color: var(--overlay1);
   padding: 2px 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: border-color 0.12s, color 0.12s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1);
   flex-shrink: 0;
   margin-left: auto;
 }
-.ai-code-copy-btn:hover { border-color: var(--blue); color: var(--blue); }
-.ai-code-copy-btn:active { transform: scale(0.93); }
 
 .ai-code-block pre {
   background: var(--base);
@@ -1366,15 +1361,11 @@ html, body {
 }
 
 .ai-action-btn {
+  --btn-press: 0.93;
   padding: 3px 10px;
   border-radius: 3px;
   font-size: 11px;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.12s, color 0.12s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1);
 }
-.ai-action-btn:active { transform: scale(0.93); }
 
 .ai-action-btn--insert {
   background: var(--surface0);
@@ -1384,6 +1375,7 @@ html, body {
 .ai-action-btn--insert:hover  { background: var(--blue); color: var(--crust); }
 
 .ai-action-btn--replace {
+  --btn-accent: var(--green);
   background: var(--surface0);
   color: var(--green);
   border-color: var(--green);
@@ -1391,11 +1383,10 @@ html, body {
 .ai-action-btn--replace:hover { background: var(--green); color: var(--crust); }
 
 .ai-action-btn--deny {
-  background: none;
+  --btn-accent: var(--red);
   color: var(--overlay0);
   border-color: var(--surface1);
 }
-.ai-action-btn--deny:hover { color: var(--red); border-color: var(--red); }
 
 .ai-dismissed {
   font-size: 11px;
@@ -1578,23 +1569,14 @@ html, body {
 }
 
 .ai-ctx-btn {
-  display: flex;
-  align-items: center;
+  --btn-accent: var(--mauve);
   gap: 3px;
   padding: 2px 6px;
-  border: 1px solid var(--surface1);
-  border-radius: 4px;
-  background: transparent;
+  border-color: var(--surface1);
   color: var(--overlay0);
   font-size: 10px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
   flex-shrink: 0;
   white-space: nowrap;
-}
-.ai-ctx-btn:hover {
-  color: var(--text);
-  border-color: var(--overlay1);
 }
 .ai-ctx-btn--on {
   color: var(--mauve);
@@ -1613,23 +1595,24 @@ html, body {
 .ai-sidebar--compact .ai-provider-select { max-width: 72px; font-size: 9px; }
 
 .ai-send-btn {
+  --btn-press: 0.9;
+  --btn-hover-border: transparent;
   background: var(--mauve);
-  border: none;
   border-radius: 6px;
   color: var(--crust);
   width: 28px;
   height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  cursor: pointer;
-  transition: opacity 0.12s, transform 0.1s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.12s;
   padding: 0;
 }
-.ai-send-btn:hover    { opacity: 0.9; transform: scale(1.08); box-shadow: 0 2px 8px color-mix(in srgb, var(--mauve) 40%, transparent); }
-.ai-send-btn:active   { transform: scale(0.9); box-shadow: none; opacity: 1; }
-.ai-send-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+.ai-send-btn:hover {
+  background: var(--mauve);
+  color: var(--crust);
+  opacity: 0.9;
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--mauve) 40%, transparent);
+}
+.ai-send-btn:active { opacity: 1; }
 
 .ai-config-copilot { display: flex; flex-direction: column; gap: 6px; }
 .ai-copilot-row { display: flex; align-items: center; gap: 6px; }
@@ -1703,82 +1686,6 @@ html, body {
   padding: 6px 8px;
   background: var(--mantle);
   border-top: 1px solid var(--surface0);
-}
-
-.ai-confirm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  animation: overlay-in 0.15s ease;
-}
-.ai-confirm-overlay[hidden] { display: none; }
-
-.ai-confirm-modal {
-  background: var(--mantle);
-  border: 1px solid var(--surface0);
-  border-radius: 8px;
-  width: 360px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
-  animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1);
-  font-family: var(--font-ui);
-}
-
-.ai-confirm-header {
-  padding: 16px 16px 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text);
-}
-
-.ai-confirm-body {
-  padding: 0 16px 16px;
-  font-size: 13px;
-  color: var(--overlay1);
-  line-height: 1.4;
-}
-
-.ai-confirm-actions {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--surface0);
-  background: var(--crust);
-  justify-content: flex-end;
-}
-
-.ai-confirm-actions button {
-  padding: 6px 12px;
-  border: 1px solid var(--surface1);
-  border-radius: 4px;
-  background: var(--surface0);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: var(--font-ui);
-}
-
-.ai-confirm-actions button:hover {
-  background: var(--surface1);
-  border-color: var(--surface2);
-}
-
-.ai-confirm-btn {
-  background: var(--red) !important;
-  border-color: var(--red) !important;
-  color: var(--crust) !important;
-}
-
-.ai-confirm-btn:hover {
-  background: color-mix(in srgb, var(--red) 90%, black) !important;
 }
 
 .settings-overlay {
@@ -2439,7 +2346,6 @@ html, body {
   border-radius: 5px 5px 0 0;
 }
 
-/* search across recent files (⇧⌘F) */
 .search-modal {
   width: 680px;
   max-height: 560px;
@@ -2452,17 +2358,12 @@ html, body {
 
 .search-regex-btn {
   flex-shrink: 0;
-  background: none;
-  border: 1px solid var(--surface1);
-  border-radius: 4px;
+  border-color: var(--surface1);
   color: var(--overlay0);
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 7px;
-  cursor: pointer;
-  transition: color 0.1s, background 0.1s, border-color 0.1s;
 }
-.search-regex-btn:hover { color: var(--text); border-color: var(--overlay0); }
 .search-regex-btn.active {
   color: var(--blue);
   border-color: var(--blue);
@@ -2482,7 +2383,6 @@ html, body {
   font-size: 12px;
 }
 
-/* enhanced mode edits the graph, not the file, which is not obvious from the tab */
 #enhanced-note {
   padding: 7px 14px;
   font-size: 11px;

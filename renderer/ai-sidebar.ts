@@ -1,4 +1,5 @@
-import { createIcons, ArrowDown, Plus, Trash2 } from 'lucide';
+import { createIcons, ArrowDown, Plus } from 'lucide';
+import { iconSvg } from './icons';
 
 type ConvMessage = { role: 'user' | 'assistant'; content: string };
 type ApplyAction = { type: 'insert' | 'replace'; code: string };
@@ -226,7 +227,6 @@ export class AISidebar {
   private ctxPillEl!: HTMLElement;
   private ctxPillCloseBtn!: HTMLButtonElement;
   private contextDisabledForMsg = false;
-  private promptChipIndex = 0;
 
   constructor(
     container: HTMLElement,
@@ -366,11 +366,11 @@ export class AISidebar {
         </div>
         <div class="ai-status-right">
           <button class="ai-ctx-btn${this.sendContext ? ' ai-ctx-btn--on' : ''}" id="ai-ctx-btn" title="Send code context with each message. Toggle off to protect sensitive code.">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            ${iconSvg('file-text', { size: 12, strokeWidth: 2.5 })}
             <span>ctx</span>
           </button>
           <button class="ai-ctx-btn${this.autoApprove ? ' ai-ctx-btn--on' : ''}" id="ai-autoapprove-btn" title="${this.autoApprove ? 'Auto-approve ON — code applied without diff preview' : 'Auto-approve OFF — shows diff before applying'}">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ${iconSvg('check', { size: 12, strokeWidth: 2.5 })}
             <span>auto</span>
           </button>
         </div>
@@ -380,14 +380,14 @@ export class AISidebar {
         <div class="ai-ctx-pill" hidden>
           <span class="ai-ctx-pill-text"></span>
           <button class="ai-ctx-pill-close" type="button" title="Disable context for this message">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            ${iconSvg('x', { size: 12, strokeWidth: 2.5 })}
           </button>
         </div>
         <div class="ai-compose-wrap">
           <textarea class="ai-input" rows="1" placeholder="Ask about your DSL…"></textarea>
           <div class="ai-compose-bar">
             <button class="ai-send-btn" title="Send (Enter)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              ${iconSvg('send', { size: 14, strokeWidth: 2.5 })}
             </button>
           </div>
         </div>
@@ -425,16 +425,6 @@ export class AISidebar {
           <button class="ai-config-save" type="button">save</button>
         </div>
       </div>
-      <div class="ai-confirm-overlay" hidden>
-        <div class="ai-confirm-modal">
-          <div class="ai-confirm-header">Disconnect GitHub Copilot?</div>
-          <div class="ai-confirm-body">This will disconnect your GitHub Copilot authentication. You can reconnect anytime.</div>
-          <div class="ai-confirm-actions">
-            <button class="ai-confirm-cancel" type="button">Cancel</button>
-            <button class="ai-confirm-btn" type="button">Disconnect</button>
-          </div>
-        </div>
-      </div>
     `;
 
     this.messagesEl   = this.el.querySelector('.ai-messages')!;
@@ -459,12 +449,8 @@ export class AISidebar {
     this.ctxPillCloseBtn = this.el.querySelector('.ai-ctx-pill-close')!;
     const ctxBtn      = this.el.querySelector('#ai-ctx-btn') as HTMLButtonElement;
 
-    const confirmOverlay = this.el.querySelector('.ai-confirm-overlay') as HTMLElement;
-    const confirmCancelBtn = this.el.querySelector('.ai-confirm-cancel') as HTMLButtonElement;
-    const confirmBtn = this.el.querySelector('.ai-confirm-btn') as HTMLButtonElement;
-
     createIcons({
-      icons: { ArrowDown, Plus, Trash2 },
+      icons: { ArrowDown, Plus },
       attrs: { 'stroke-width': '2' },
     });
 
@@ -585,21 +571,11 @@ export class AISidebar {
     });
 
     this.el.querySelector('.ai-copilot-connect')!.addEventListener('click', () => this.startCopilotAuth());
-    this.el.querySelector('.ai-copilot-disconnect')!.addEventListener('click', () => {
-      confirmOverlay.hidden = false;
-    });
-
-    confirmOverlay.addEventListener('click', (e) => {
-      if (e.target === confirmOverlay) confirmOverlay.hidden = true;
-    });
-
-    confirmCancelBtn.addEventListener('click', () => {
-      confirmOverlay.hidden = true;
-    });
-
-    confirmBtn.addEventListener('click', async () => {
-      confirmOverlay.hidden = true;
-      await this.revokeCopilotAuth();
+    this.el.querySelector('.ai-copilot-disconnect')!.addEventListener('click', async () => {
+      const ok = await window.electronAPI?.confirm(
+        'Disconnect GitHub Copilot? You can reconnect at any time.',
+      );
+      if (ok) await this.revokeCopilotAuth();
     });
 
     this.configEl.addEventListener('click', e => e.stopPropagation());
@@ -723,10 +699,13 @@ export class AISidebar {
     const providerChip = this.el.querySelector('.ai-provider-chip') as HTMLElement;
     if (this.provider === 'github-copilot') {
       const connected = !!cfg.apiKey;
-      this.providerLabelEl.textContent = connected ? '●' : '○';
+      this.providerLabelEl.textContent = '';
+      this.providerLabelEl.classList.add('ai-provider-label--dot');
+      this.providerLabelEl.classList.toggle('ai-provider-label--on', connected);
       this.providerLabelEl.title = connected ? 'GitHub Copilot connected' : 'Not connected';
       providerChip.textContent = 'Copilot';
     } else {
+      this.providerLabelEl.classList.remove('ai-provider-label--dot', 'ai-provider-label--on');
       this.providerLabelEl.textContent = p?.label.split('-')[0] || this.provider;
       providerChip.textContent = p?.label || this.provider;
     }
@@ -1095,10 +1074,10 @@ export class AISidebar {
 
   private updateSendBtn(): void {
     if (this.streaming && this.activeReqId) {
-      this.sendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18"/></svg>';
+      this.sendBtn.innerHTML = iconSvg('square', { size: 14, filled: true });
       this.sendBtn.title = 'Stop generation';
     } else {
-      this.sendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+      this.sendBtn.innerHTML = iconSvg('send', { size: 14, strokeWidth: 2.5 });
       this.sendBtn.title = 'Send (Enter)';
     }
   }
@@ -1157,11 +1136,11 @@ export class AISidebar {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'ai-toolbar-btn';
     copyBtn.title = 'Copy message';
-    copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/></svg>';
+    copyBtn.innerHTML = iconSvg('copy', { size: 12 });
     copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(text);
       const orig = copyBtn.innerHTML;
-      copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      copyBtn.innerHTML = iconSvg('check', { size: 12 });
       setTimeout(() => { copyBtn.innerHTML = orig; }, 1500);
     });
     toolbar.appendChild(copyBtn);
@@ -1170,7 +1149,7 @@ export class AISidebar {
     const editBtn = document.createElement('button');
     editBtn.className = 'ai-toolbar-btn';
     editBtn.title = 'Edit and resend';
-    editBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    editBtn.innerHTML = iconSvg('square-pen', { size: 12 });
     editBtn.addEventListener('click', () => {
       this.inputEl.value = text;
       this.autoResize();
@@ -1231,12 +1210,12 @@ export class AISidebar {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'ai-code-copy-btn';
     copyBtn.title = 'Copy code';
-    copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/></svg>';
+    copyBtn.innerHTML = iconSvg('copy', { size: 14 });
     copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(code);
       const orig = copyBtn.textContent;
-      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-      setTimeout(() => { copyBtn.innerHTML = orig || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/></svg>'; }, 1500);
+      copyBtn.innerHTML = iconSvg('check', { size: 14 });
+      setTimeout(() => { copyBtn.innerHTML = orig || iconSvg('copy', { size: 14 }); }, 1500);
     });
     header.appendChild(copyBtn);
     wrap.appendChild(header);

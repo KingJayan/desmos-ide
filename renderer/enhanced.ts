@@ -1,6 +1,7 @@
 import type { DesmosExpr } from '../src/compiler/codegen';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { iconEl } from './icons';
 
 const PALETTE = ['#2d70b3', '#c74440', '#388c46', '#6042a6', '#fa7e19', '#000000'];
 
@@ -180,7 +181,7 @@ export class EnhancedPane {
 
       const del = document.createElement('button');
       del.className = 'expr-delete';
-      del.textContent = '×';
+      del.appendChild(iconEl('x', { size: 12 }));
       del.title = 'Remove';
       del.addEventListener('click', () => this.removeRow(expr.id));
 

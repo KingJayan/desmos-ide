@@ -1,4 +1,5 @@
 import type { SearchHit } from '../src/shared/rpc-schema';
+import { iconEl } from './icons';
 
 export interface SearchPanelOptions {
   /** the paths to search, newest first */
@@ -37,7 +38,7 @@ export class SearchPanel {
 
     const icon = document.createElement('span');
     icon.className = 'cmd-search-icon';
-    icon.textContent = '⌕';
+    icon.appendChild(iconEl('search', { size: 13 }));
 
     this.input = document.createElement('input');
     this.input.className = 'cmd-input';
@@ -57,10 +58,16 @@ export class SearchPanel {
 
     this.summary = document.createElement('div');
     this.summary.className = 'search-summary';
+    this.summary.setAttribute('role', 'status');
 
     this.list = document.createElement('ul');
     this.list.className = 'cmd-list';
     this.list.setAttribute('role', 'listbox');
+    this.list.id = 'search-list';
+
+    this.input.setAttribute('role', 'combobox');
+    this.input.setAttribute('aria-controls', 'search-list');
+    this.input.setAttribute('aria-expanded', 'true');
 
     modal.append(searchWrap, this.summary, this.list);
     this.overlay.appendChild(modal);
@@ -161,8 +168,10 @@ export class SearchPanel {
     this.hits.forEach((hit, i) => {
       const li = document.createElement('li');
       li.className = 'cmd-item' + (i === this.activeIdx ? ' cmd-item--active' : '');
+      li.id = `search-item-${i}`;
       li.setAttribute('role', 'option');
       li.setAttribute('aria-selected', String(i === this.activeIdx));
+      if (i === this.activeIdx) this.input.setAttribute('aria-activedescendant', li.id);
 
       const left = document.createElement('div');
       left.className = 'cmd-item-left';
