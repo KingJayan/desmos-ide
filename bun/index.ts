@@ -1,7 +1,9 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/bun';
+import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
-import { exportJson, openFile, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
-import { showConfirm } from './dialogs';
+import { exportJson, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
+import { showConfirm, showPrompt } from './dialogs';
+import { searchPaths } from './search';
 import {
   getGitBranches, getGitHistory, getGitRemotes, getGitStatus,
   gitCheckoutBranch, gitCreateBranch, gitFetch, gitPull, gitPush,
@@ -29,6 +31,8 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
           rpc.send.fileChanged({ path: changedPath, content }));
       },
       unwatchFile: ({ path }) => unwatchFile(path),
+      readFileAt: ({ path }) => readFileAt(path),
+      searchFiles: ({ paths, query, useRegex }) => searchPaths(paths, query, useRegex),
 
       aiCompact: ({ messages, config, memories }) =>
         compactConversation(sanitizeMessages(messages), sanitizeConfig(config), sanitizeMemories(memories)),
@@ -56,7 +60,9 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       openExternal: ({ url }) => {
         if (/^https?:\/\//i.test(url)) Utils.openExternal(url);
       },
+      setRecentFiles: ({ paths }) => setRecentFiles(paths),
       confirm: ({ message }) => showConfirm(message),
+      promptInput: ({ message, defaultValue }) => showPrompt(message, defaultValue),
     },
     messages: {
       aiChat: async payload => {
@@ -98,7 +104,16 @@ const win = new BrowserWindow({
   rpc,
 });
 
-ApplicationMenu.setApplicationMenu([
+// the recent list lives in the renderer, so the menu is rebuilt whenever it changes
+let recentPaths: string[] = [];
+
+function setRecentFiles(paths: string[]): void {
+  recentPaths = Array.isArray(paths) ? paths.filter(p => typeof p === 'string' && p).slice(0, 12) : [];
+  buildMenu();
+}
+
+function buildMenu(): void {
+  ApplicationMenu.setApplicationMenu([
   {
     label: 'desmos-ide',
     submenu: [
@@ -115,6 +130,13 @@ ApplicationMenu.setApplicationMenu([
       { label: 'Open…', accelerator: 'CmdOrCtrl+O', action: 'menu:open' },
       { label: 'Save', accelerator: 'CmdOrCtrl+S', action: 'menu:save' },
       { label: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', action: 'menu:saveAs' },
+      { type: 'separator' },
+      {
+        label: 'Open Recent',
+        submenu: recentPaths.length
+          ? recentPaths.map(path => ({ label: basename(path), action: `menu:recent:${path}` }))
+          : [{ label: 'No Recent Files', enabled: false }],
+      },
       { type: 'separator' },
       { role: 'quit' },
     ],
@@ -135,7 +157,10 @@ ApplicationMenu.setApplicationMenu([
       { role: 'minimize' },
     ],
   },
-]);
+  ]);
+}
+
+buildMenu();
 
 ApplicationMenu.on('application-menu-clicked', (event: unknown) => {
   const action = (event as { data?: { action?: string } })?.data?.action;
@@ -143,6 +168,7 @@ ApplicationMenu.on('application-menu-clicked', (event: unknown) => {
   else if (action === 'menu:open') rpc.send.menuOpen();
   else if (action === 'menu:save') rpc.send.menuSave();
   else if (action === 'menu:saveAs') rpc.send.menuSaveAs();
+  else if (action?.startsWith('menu:recent:')) rpc.send.menuOpenRecent({ path: action.slice('menu:recent:'.length) });
 });
 
 win.on('close', () => {

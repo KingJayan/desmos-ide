@@ -12,6 +12,8 @@ interface Window {
     onMenuOpen(cb: () => void): () => void;
     onMenuSave(cb: () => void): () => void;
     onMenuSaveAs(cb: () => void): () => void;
+    onMenuOpenRecent(cb: (path: string) => void): () => void;
+    setRecentFiles(paths: string[]): Promise<void>;
     aiChat(
       reqId: string,
       messages: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -39,6 +41,12 @@ interface Window {
     copilotGetModels(githubToken: string): Promise<{ ok: true; models: string[] } | { ok: false; error: string }>;
     openExternal(url: string): Promise<void>;
     confirm(message: string): Promise<boolean>;
+    prompt(message: string, defaultValue?: string): Promise<string | null>;
+    readFileAt(path: string): Promise<{ ok: true; path: string; content: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
+    searchFiles(paths: string[], query: string, useRegex?: boolean): Promise<
+      | { ok: true; hits: Array<{ path: string; line: number; col: number; text: string }>; scanned: number }
+      | { ok: false; errorCode: string; message: string }
+    >;
     setGitContext(path: string | null): Promise<void>;
     gitStatus(): Promise<
       | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }

@@ -19,6 +19,7 @@ const fileChangedCbs: Listener<[string, string]>[] = [];
 const menuCbs: Record<'new' | 'open' | 'save' | 'saveAs', Listener<[]>[]> = {
   new: [], open: [], save: [], saveAs: [],
 };
+const menuRecentCbs: Listener<[string]>[] = [];
 
 const rpc = Electroview.defineRPC<DesmosIdeRPC>({
   maxRequestTime: 60_000,
@@ -33,6 +34,7 @@ const rpc = Electroview.defineRPC<DesmosIdeRPC>({
       menuOpen: () => menuCbs.open.forEach(cb => cb()),
       menuSave: () => menuCbs.save.forEach(cb => cb()),
       menuSaveAs: () => menuCbs.saveAs.forEach(cb => cb()),
+      menuOpenRecent: ({ path }) => menuRecentCbs.forEach(cb => cb(path)),
     },
   },
 });
@@ -56,6 +58,7 @@ export const electronAPI = {
   onMenuOpen: (cb: () => void) => subscribe(menuCbs.open, cb),
   onMenuSave: (cb: () => void) => subscribe(menuCbs.save, cb),
   onMenuSaveAs: (cb: () => void) => subscribe(menuCbs.saveAs, cb),
+  onMenuOpenRecent: (cb: (path: string) => void) => subscribe(menuRecentCbs, cb),
 
   aiChat: (reqId: string, messages: AIMessage[], config: AIConfig, memories: string[]) =>
     rpc.send.aiChat({ reqId, messages, config, memories }),
@@ -84,12 +87,18 @@ export const electronAPI = {
 
   openExternal: (url: string) => rpc.request.openExternal({ url }),
 
-  // native NSAlert is macOS-only; fall back to the browser dialog elsewhere
   confirm: (message: string) => rpc.request.confirm({ message }).catch(() => confirm(message)),
+  prompt: (message: string, defaultValue = '') =>
+    rpc.request.promptInput({ message, defaultValue }).catch(() => prompt(message, defaultValue)),
 
   onAiChunk: (cb: (reqId: string, text: string) => void) => subscribe(aiChunkCbs, cb),
   onAiDone: (cb: (reqId: string) => void) => subscribe(aiDoneCbs, cb),
   onAiError: (cb: (reqId: string, error: string) => void) => subscribe(aiErrorCbs, cb),
+
+  setRecentFiles: (paths: string[]) => rpc.request.setRecentFiles({ paths }),
+  readFileAt: (path: string) => rpc.request.readFileAt({ path }),
+  searchFiles: (paths: string[], query: string, useRegex = false) =>
+    rpc.request.searchFiles({ paths, query, useRegex }),
 
   watchFile: (path: string) => rpc.request.watchFile({ path }),
   unwatchFile: (path: string) => rpc.request.unwatchFile({ path }),

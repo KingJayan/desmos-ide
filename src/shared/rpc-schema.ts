@@ -10,6 +10,12 @@ export type FileResult<T> =
   | ({ ok: true } & T)
   | { ok: false; canceled?: boolean; errorCode: string; message: string };
 
+export type SearchHit = { path: string; line: number; col: number; text: string };
+
+export type SearchResult =
+  | { ok: true; hits: SearchHit[]; scanned: number }
+  | { ok: false; errorCode: string; message: string };
+
 export type GitStatusResult =
   | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }
   | { ok: false; errorCode: string; message: string };
@@ -63,6 +69,8 @@ export type DesmosIdeRPC = {
       exportJson: { params: { content: string }; response: FileResult<{ path: string }> };
       watchFile: { params: { path: string }; response: void };
       unwatchFile: { params: { path: string }; response: void };
+      readFileAt: { params: { path: string }; response: FileResult<{ path: string; content: string }> };
+      searchFiles: { params: { paths: string[]; query: string; useRegex: boolean }; response: SearchResult };
 
       aiCompact: { params: { messages: AIMessage[]; config: AIConfig; memories: string[] }; response: string };
       aiTitle: { params: { messages: AIMessage[]; config: AIConfig }; response: string };
@@ -86,7 +94,9 @@ export type DesmosIdeRPC = {
       copilotGetModels: { params: { githubToken: string }; response: CopilotModelsResult };
 
       openExternal: { params: { url: string }; response: void };
+      setRecentFiles: { params: { paths: string[] }; response: void };
       confirm: { params: { message: string }; response: boolean };
+      promptInput: { params: { message: string; defaultValue: string }; response: string | null };
     };
     messages: {
       aiChat: { reqId: string; messages: AIMessage[]; config: AIConfig; memories: string[] };
@@ -103,6 +113,7 @@ export type DesmosIdeRPC = {
       menuOpen: void;
       menuSave: void;
       menuSaveAs: void;
+      menuOpenRecent: { path: string };
     };
   };
 };
