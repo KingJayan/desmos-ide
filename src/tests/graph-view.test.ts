@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { heldBounds } from '../../renderer/desmos';
+import { heldBounds, scaledFill } from '../../renderer/desmos';
 
 const square = { pxW: 800, pxH: 800, perPxX: 0.025, perPxY: 0.025 };
 const math = { left: -10, right: 10, bottom: -10, top: 10 };
@@ -30,5 +30,23 @@ describe('the graph keeps its picture when a sidebar opens', () => {
 
   test('a pan or a zoom writes nothing back', () => {
     assert.equal(heldBounds(square, { ...square, perPxX: 0.05, perPxY: 0.05 }, math), null);
+  });
+});
+
+describe('a fill keeps its weight when the background changes', () => {
+  test('a light theme takes a lighter share of the stated opacity', () => {
+    assert.equal(scaledFill('0.2', 0.55), '0.11');
+  });
+
+  test('a dark theme draws exactly what the file says', () => {
+    assert.equal(scaledFill('0.2', 1), '0.2');
+  });
+
+  test('an expression with no fill stays without one', () => {
+    assert.equal(scaledFill(undefined, 0.55), undefined);
+  });
+
+  test('an opacity the DSL wrote as an expression is left alone', () => {
+    assert.equal(scaledFill('a/2', 0.55), 'a/2');
   });
 });

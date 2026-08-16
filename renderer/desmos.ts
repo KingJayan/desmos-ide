@@ -4,25 +4,19 @@ import type { ColorTheme } from './settings';
 type DesmosThemeSpec = {
   background: string;
   text: string;
+  fillScale: number;
 };
 
-/*
- * desmos takes a background and a text colour and derives the rest, the grid
- * included, so the text colour is the only handle on how heavy the grid looks.
- * on a light background a text colour dark enough to read makes a grid too dark
- * to sit behind a curve, so the light themes take a mid grey: it reads against
- * the background but it does not fight the plot
- */
 const DESMOS_THEMES: Record<ColorTheme, DesmosThemeSpec> = {
-  'desmos-dark': { background: '#24273a', text: '#7f849c' },
-  'catppuccin-latte': { background: '#eff1f5', text: '#9ca0b0' },
-  'catppuccin-frappe': { background: '#303446', text: '#737994' },
-  'catppuccin-macchiato': { background: '#24273a', text: '#8087a2' },
-  'github-dark': { background: '#0d1117', text: '#8b949e' },
-  'github-light': { background: '#ffffff', text: '#8c959f' },
-  monokai: { background: '#272822', text: '#90908a' },
-  'vs-dark': { background: '#1e1e1e', text: '#9da0a6' },
-  'vs-light': { background: '#ffffff', text: '#949494' },
+  'desmos-dark': { background: '#24273a', text: '#7f849c', fillScale: 1 },
+  'catppuccin-latte': { background: '#eff1f5', text: '#9ca0b0', fillScale: 0.55 },
+  'catppuccin-frappe': { background: '#303446', text: '#737994', fillScale: 1 },
+  'catppuccin-macchiato': { background: '#24273a', text: '#8087a2', fillScale: 1 },
+  'github-dark': { background: '#0d1117', text: '#8b949e', fillScale: 1 },
+  'github-light': { background: '#ffffff', text: '#8c959f', fillScale: 0.55 },
+  monokai: { background: '#272822', text: '#90908a', fillScale: 1 },
+  'vs-dark': { background: '#1e1e1e', text: '#9da0a6', fillScale: 1 },
+  'vs-light': { background: '#ffffff', text: '#949494', fillScale: 0.55 },
 };
 
 function themeSettings(theme: ColorTheme): { backgroundColor: string; textColor: string } {
@@ -30,10 +24,8 @@ function themeSettings(theme: ColorTheme): { backgroundColor: string; textColor:
   return { backgroundColor: spec.background, textColor: spec.text };
 }
 
-/** desmos settles its own rewrites well inside this window */
 const SETTLE_MS = 600;
 
-/** only the parts of an expression the DSL can write */
 function fingerprint(expr: DesmosExpr): string {
   return JSON.stringify([
     expr.type, expr.latex ?? '', expr.label ?? '', expr.color ?? '',
@@ -43,9 +35,18 @@ function fingerprint(expr: DesmosExpr): string {
   ]);
 }
 
-function toSetExpression(expr: DesmosExpr): Record<string, unknown> {
+export function scaledFill(fillOpacity: string | undefined, scale: number): string | undefined {
+  if (fillOpacity === undefined || scale === 1) return fillOpacity;
+  const value = Number(fillOpacity);
+  if (!Number.isFinite(value)) return fillOpacity;
+  return String(Math.round(value * scale * 1000) / 1000);
+}
+
+function toSetExpression(expr: DesmosExpr, fillScale: number): Record<string, unknown> {
   const { slider, ...rest } = expr;
   const out: Record<string, unknown> = { ...rest };
+  const fill = scaledFill(expr.fillOpacity, fillScale);
+  if (fill !== undefined) out.fillOpacity = fill;
   if (!slider) return out;
 
   if (slider.min !== undefined || slider.max !== undefined || slider.step !== undefined) {
@@ -84,6 +85,7 @@ export class DesmosGraph {
   private calc: DesmosCalculator;
   private theme: ColorTheme = 'desmos-dark';
   private snapshots = new Map<string, string>();
+  private drawn = new Map<string, DesmosExpr>();
 
   constructor(container: HTMLElement) {
     this.calc = Desmos.GraphingCalculator(container, {
@@ -100,11 +102,6 @@ export class DesmosGraph {
     this.holdViewOnResize();
   }
 
-  /*
-   * opening a sidebar makes the graph narrower. desmos keeps the x range and
-   * stretches y to fill the new shape, so the picture jumps. hold the scale and
-   * the centre instead: only the amount of paper on screen changes.
-   */
   private view: GraphView | null = null;
 
   private holdViewOnResize(): void {
@@ -145,8 +142,16 @@ export class DesmosGraph {
   }
 
   setTheme(theme: ColorTheme): void {
+    const before = DESMOS_THEMES[this.theme].fillScale;
     this.theme = theme;
     this.calc.updateSettings(themeSettings(theme));
+
+    // fillOpacity is not part of the fingerprint, so a fill has to be sent again by hand
+    if (DESMOS_THEMES[theme].fillScale === before) return;
+    this.settleUntil = Date.now() + SETTLE_MS;
+    for (const expr of this.drawn.values()) {
+      if (expr.fillOpacity !== undefined) this.setOne(expr);
+    }
   }
 
   onExpressionEdited(cb: (exprs: DesmosExpr[]) => void): void {
@@ -170,12 +175,12 @@ export class DesmosGraph {
     });
   }
 
-  /** desmos keeps rewriting for a moment after a write, so ignore that window */
   private settleUntil = 0;
   private observed = new Map<string, string>();
 
   update(list: DesmosExpr[]): void {
     const incoming = new Map(list.map(e => [e.id, e]));
+    this.drawn = incoming;
     const toSet: DesmosExpr[] = [];
     const toRemove: string[] = [];
 
@@ -195,13 +200,16 @@ export class DesmosGraph {
     }
 
     if (toRemove.length === 0 && toSet.length === 0) return;
-    // writing to the graph fires change events, which must not come back
     this.settleUntil = Date.now() + SETTLE_MS;
     for (const id of toRemove) {
       this.calc.removeExpression({ id });
       this.observed.delete(id);
     }
-    for (const expr of toSet) this.calc.setExpression(toSetExpression(expr));
+    for (const expr of toSet) this.setOne(expr);
+  }
+
+  private setOne(expr: DesmosExpr): void {
+    this.calc.setExpression(toSetExpression(expr, DESMOS_THEMES[this.theme].fillScale));
   }
 
   currentList(): DesmosExpr[] {
