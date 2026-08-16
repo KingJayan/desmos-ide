@@ -2,10 +2,14 @@ import { createIcons, ArrowDown, Plus } from 'lucide';
 import { iconSvg } from './icons';
 import { escapeHtml } from './escape';
 import { SecretStore } from './secret-store';
+import { lineDiff } from './diff';
+import {
+  MAX_CHATS, SLASH_COMMANDS,
+  capChats, matchSlashCommands, pruneHistory, trimChatBytes, withContext,
+} from './chat-store';
+import type { Chat, SlashCommand } from './chat-store';
 
-type ConvMessage = { role: 'user' | 'assistant'; content: string };
 type ApplyAction = { type: 'insert' | 'replace'; code: string };
-type Chat = { id: string; title: string; history: ConvMessage[] };
 
 type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot';
 
@@ -136,19 +140,6 @@ const PROVIDER_MODELS: Record<AIProvider, string[]> = {
 
 const SCROLL_AWAY_RATIO  = 0.25;
 const MAX_HISTORY        = 20;
-const MAX_CHATS          = 10;
-const MAX_CHAT_BYTES     = 40_000;
-const CONTEXT_CHAR_LIMIT = 1_500;
-const PRUNE_THRESHOLD    = 18;
-
-const SLASH_COMMANDS = [
-  { cmd: '/help',         desc: 'Show all available commands',       arg: '' },
-  { cmd: '/clear',        desc: 'Clear chat history',                arg: '' },
-  { cmd: '/compact',      desc: 'Summarize & compress conversation', arg: '' },
-  { cmd: '/memory add',   desc: 'Save a fact to memory',             arg: '<fact>' },
-  { cmd: '/memory list',  desc: 'List saved memories',               arg: '' },
-  { cmd: '/memory clear', desc: 'Clear all memories',                arg: '' },
-];
 
 interface CopilotAuthState {
   deviceCode: string;
@@ -156,34 +147,6 @@ interface CopilotAuthState {
   verificationUri: string;
   pollTimer: ReturnType<typeof setInterval> | null;
   interval: number;
-}
-
-// compute line-level diff for diff preview
-type DiffLine = { op: '=' | '+' | '-'; line: string };
-function lineDiff(before: string, after: string): DiffLine[] {
-  const a = before.split('\n');
-  const b = after.split('\n');
-  const m = a.length, n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = m - 1; i >= 0; i--) {
-    for (let j = n - 1; j >= 0; j--) {
-      dp[i][j] = a[i] === b[j]
-        ? dp[i + 1][j + 1] + 1
-        : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-  const result: DiffLine[] = [];
-  let i = 0, j = 0;
-  while (i < m || j < n) {
-    if (i < m && j < n && a[i] === b[j]) {
-      result.push({ op: '=', line: a[i] }); i++; j++;
-    } else if (j < n && (i >= m || dp[i][j + 1] >= (i < m ? dp[i + 1][j] : 0))) {
-      result.push({ op: '+', line: b[j] }); j++;
-    } else {
-      result.push({ op: '-', line: a[i] }); i++;
-    }
-  }
-  return result;
 }
 
 /** the keys an older version wrote into localStorage in the clear */
@@ -269,7 +232,7 @@ export class AISidebar {
   private pendingTitles = new Map<string, string>();
   private acEl!: HTMLElement;
   private acIndex = -1;
-  private acItems: typeof SLASH_COMMANDS = [];
+  private acItems: SlashCommand[] = [];
   private autoApproveBtn!: HTMLButtonElement;
   private ctxPillEl!: HTMLElement;
   private ctxPillCloseBtn!: HTMLButtonElement;
@@ -374,37 +337,26 @@ export class AISidebar {
 
   private saveState(): void {
     if (this.chats.length > MAX_CHATS) {
-      const dropped = this.chats.splice(0, this.chats.length - MAX_CHATS);
-      if (dropped.includes(this.activeChat)) this.activeChat = this.chats[0];
+      const capped = capChats(this.chats, this.activeChat);
+      this.chats = capped.chats;
+      this.activeChat = capped.active;
       this.syncChatSelect();
     }
-    for (const chat of this.chats) {
-      while (chat.history.length > 2 && JSON.stringify(chat.history).length > MAX_CHAT_BYTES) {
-        chat.history.splice(0, 2);
-      }
-    }
+    for (const chat of this.chats) chat.history = trimChatBytes(chat.history);
     localStorage.setItem('ai-chats', JSON.stringify(this.chats));
     localStorage.setItem('ai-memories', JSON.stringify(this.memories));
   }
 
   private buildUserContent(prompt: string): string {
     if (!this.sendContext || this.contextDisabledForMsg) return prompt;
-    const { dsl, selection } = this.getContext();
-    const src = selection || dsl;
-    if (!src) return prompt;
-    const label = selection ? 'Selected code' : 'Current file';
-    const truncated = src.length > CONTEXT_CHAR_LIMIT
-      ? src.slice(0, CONTEXT_CHAR_LIMIT) + '\n…[truncated]'
-      : src;
-    return `${prompt}\n\n${label}:\n\`\`\`dsmx\n${truncated}\n\`\`\``;
+    return withContext(prompt, this.getContext());
   }
 
   private pruneHistory(): void {
-    const h = this.activeChat.history;
-    if (h.length >= PRUNE_THRESHOLD) {
-      this.activeChat.history = h.slice(-(PRUNE_THRESHOLD - 4));
-      this.appendSystemMsg('Older turns pruned to fit context window. Use /compact for AI summarization.');
-    }
+    const { history, pruned } = pruneHistory(this.activeChat.history);
+    if (!pruned) return;
+    this.activeChat.history = history;
+    this.appendSystemMsg('Older turns pruned to fit context window. Use /compact for AI summarization.');
   }
 
   private render(): void {
@@ -711,7 +663,7 @@ export class AISidebar {
   private updateAc(): void {
     const val = this.inputEl.value;
     if (!val.startsWith('/')) { this.hideAc(); return; }
-    this.acItems = SLASH_COMMANDS.filter(c => c.cmd.startsWith(val.trimEnd()));
+    this.acItems = matchSlashCommands(val);
     if (!this.acItems.length) { this.hideAc(); return; }
     this.acIndex = -1;
     this.acEl.innerHTML = this.acItems
