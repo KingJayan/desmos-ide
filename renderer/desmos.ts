@@ -57,6 +57,29 @@ function toSetExpression(expr: DesmosExpr): Record<string, unknown> {
   return out;
 }
 
+export interface GraphView {
+  pxW: number;
+  pxH: number;
+  perPxX: number;
+  perPxY: number;
+}
+
+export interface MathBounds {
+  left: number;
+  right: number;
+  bottom: number;
+  top: number;
+}
+
+export function heldBounds(before: GraphView, now: GraphView, math: MathBounds): MathBounds | null {
+  if (now.pxW === before.pxW && now.pxH === before.pxH) return null;
+  const cx = (math.left + math.right) / 2;
+  const cy = (math.top + math.bottom) / 2;
+  const halfW = now.pxW * before.perPxX / 2;
+  const halfH = now.pxH * before.perPxY / 2;
+  return { left: cx - halfW, right: cx + halfW, bottom: cy - halfH, top: cy + halfH };
+}
+
 export class DesmosGraph {
   private calc: DesmosCalculator;
   private theme: ColorTheme = 'desmos-dark';
@@ -74,6 +97,45 @@ export class DesmosGraph {
       ...themeSettings(this.theme),
       showResetButtonOnGraphpaper: true,
     });
+    this.holdViewOnResize();
+  }
+
+  /*
+   * opening a sidebar makes the graph narrower. desmos keeps the x range and
+   * stretches y to fill the new shape, so the picture jumps. hold the scale and
+   * the centre instead: only the amount of paper on screen changes.
+   */
+  private view: GraphView | null = null;
+
+  private holdViewOnResize(): void {
+    const read = (): GraphView | null => {
+      const b = this.calc.graphpaperBounds;
+      if (!b || !b.pixelCoordinates.width || !b.pixelCoordinates.height) return null;
+      return {
+        pxW: b.pixelCoordinates.width,
+        pxH: b.pixelCoordinates.height,
+        perPxX: b.mathCoordinates.width / b.pixelCoordinates.width,
+        perPxY: b.mathCoordinates.height / b.pixelCoordinates.height,
+      };
+    };
+
+    if (typeof this.calc.observe !== 'function' || typeof this.calc.setMathBounds !== 'function') return;
+    this.view = read();
+
+    this.calc.observe('graphpaperBounds', () => {
+      const now = read();
+      const before = this.view;
+      if (!now) return;
+
+      const held = before && heldBounds(before, now, this.calc.graphpaperBounds!.mathCoordinates);
+      if (!before || !held) {
+        this.view = now;
+        return;
+      }
+
+      this.view = { pxW: now.pxW, pxH: now.pxH, perPxX: before.perPxX, perPxY: before.perPxY };
+      this.calc.setMathBounds!(held);
+    });
   }
 
   setTheme(theme: ColorTheme): void {
@@ -81,11 +143,6 @@ export class DesmosGraph {
     this.calc.updateSettings(themeSettings(theme));
   }
 
-  /**
-   * an edit made on the graph, not by us. desmos rewrites latex into its own
-   * normal form, so the baseline is what desmos reports back and never what we
-   * sent it; the first report after an update only seeds that baseline.
-   */
   onExpressionEdited(cb: (exprs: DesmosExpr[]) => void): void {
     const calc = this.calc as DesmosCalculator & {
       observeEvent?(name: string, handler: () => void): void;

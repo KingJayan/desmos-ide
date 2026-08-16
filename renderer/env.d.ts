@@ -126,6 +126,11 @@ interface DesmosCalculator {
   destroy(): void;
 
   selectedExpressionId?: string;
+  graphpaperBounds?: {
+    mathCoordinates: { left: number; right: number; top: number; bottom: number; width: number; height: number };
+    pixelCoordinates: { left: number; right: number; top: number; bottom: number; width: number; height: number };
+  };
+  setMathBounds?(bounds: { left: number; right: number; bottom: number; top: number }): void;
   observe?(property: string, cb: () => void): void;
   unobserve?(property: string): void;
   controller?: { dispatch?(action: Record<string, unknown>): void };
