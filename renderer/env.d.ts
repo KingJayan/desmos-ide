@@ -128,4 +128,12 @@ interface DesmosCalculator {
   observe?(property: string, cb: () => void): void;
   unobserve?(property: string): void;
   controller?: { dispatch?(action: Record<string, unknown>): void };
+
+  HelperExpression?(opts: { latex: string }): DesmosHelper;
+}
+
+interface DesmosHelper {
+  numericValue: number;
+  observe(property: string, cb: () => void): void;
+  unobserve?(property: string): void;
 }

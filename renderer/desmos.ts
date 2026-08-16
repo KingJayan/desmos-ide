@@ -26,7 +26,6 @@ function themeSettings(theme: ColorTheme): { backgroundColor: string; textColor:
 /** desmos settles its own rewrites well inside this window */
 const SETTLE_MS = 600;
 
-/** only the parts of an expr DSL can write */
 /** only the parts of an expression the DSL can write */
 function fingerprint(expr: DesmosExpr): string {
   return JSON.stringify([
@@ -35,6 +34,20 @@ function fingerprint(expr: DesmosExpr): string {
     expr.slider ? [expr.slider.min ?? '', expr.slider.max ?? ''] : null,
     expr.parametricDomain ? [expr.parametricDomain.min, expr.parametricDomain.max] : null,
   ]);
+}
+
+function toSetExpression(expr: DesmosExpr): Record<string, unknown> {
+  const { slider, ...rest } = expr;
+  const out: Record<string, unknown> = { ...rest };
+  if (!slider) return out;
+
+  if (slider.min !== undefined || slider.max !== undefined || slider.step !== undefined) {
+    out.sliderBounds = { min: slider.min, max: slider.max, step: slider.step };
+  }
+  if (slider.isPlaying !== undefined) out.playing = slider.isPlaying;
+  if (slider.animationPeriod !== undefined) out.animationPeriod = slider.animationPeriod;
+  if (slider.loopMode !== undefined) out.loopMode = slider.loopMode;
+  return out;
 }
 
 export class DesmosGraph {
@@ -118,7 +131,7 @@ export class DesmosGraph {
       this.calc.removeExpression({ id });
       this.observed.delete(id);
     }
-    for (const expr of toSet) this.calc.setExpression(expr as unknown as Record<string, unknown>);
+    for (const expr of toSet) this.calc.setExpression(toSetExpression(expr));
   }
 
   currentList(): DesmosExpr[] {
@@ -136,7 +149,6 @@ export class DesmosGraph {
     });
   }
 
-  /** the other direction: put the graphs selection on a given expression */
   /** the other direction: put the graph's selection on a given expression */
   select(id: string | null): void {
     if (this.calc.selectedExpressionId === (id ?? undefined)) return;
@@ -151,6 +163,29 @@ export class DesmosGraph {
 
   private selectionCb: ((id: string | null) => void) | null = null;
   private selfSelected: string | null = null;
+
+  setClockPlaying(id: string, playing: boolean): void {
+    this.settleUntil = Date.now() + SETTLE_MS;
+    this.calc.setExpression({ id, playing });
+  }
+
+  setClockPeriod(id: string, period: number): void {
+    this.settleUntil = Date.now() + SETTLE_MS;
+    this.calc.setExpression({ id, animationPeriod: period });
+  }
+
+  /** moves the clock by hand, which is what scrubbing does */
+  setClockValue(id: string, name: string, value: number): void {
+    this.settleUntil = Date.now() + SETTLE_MS;
+    this.calc.setExpression({ id, latex: `${name}=${value}`, playing: false });
+  }
+
+  watchClock(latexName: string, cb: (value: number) => void): () => void {
+    if (typeof this.calc.HelperExpression !== 'function') return () => {};
+    const helper = this.calc.HelperExpression({ latex: latexName });
+    helper.observe('numericValue', () => cb(helper.numericValue));
+    return () => helper.unobserve?.('numericValue');
+  }
 
   screenshot(): string | null {
     try {
