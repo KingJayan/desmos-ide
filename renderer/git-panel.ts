@@ -64,6 +64,7 @@ export class GitPanel {
   };
 
   constructor(private opts: GitPanelOptions) {
+    this.wireSectionToggles();
     this.refreshStatusBtn.addEventListener('click', () => { void this.refreshAll(); });
 
     this.branchRefreshBtn.addEventListener('click', e => {
@@ -99,6 +100,29 @@ export class GitPanel {
       this.report(await window.electronAPI?.gitRemoteAdd(name, url));
       await this.refreshRemotes();
     });
+  }
+
+  private wireSectionToggles(): void {
+    for (const header of this.container.querySelectorAll<HTMLElement>('.git-section-header')) {
+      const key = header.dataset.section;
+      const section = header.parentElement;
+      if (!key || !section) continue;
+      const apply = (collapsed: boolean): void => {
+        section.classList.toggle('git-section--collapsed', collapsed);
+        header.setAttribute('aria-expanded', String(!collapsed));
+        localStorage.setItem(`git-section-${key}`, collapsed ? 'collapsed' : 'open');
+      };
+      apply(localStorage.getItem(`git-section-${key}`) === 'collapsed');
+      header.addEventListener('click', () => {
+        apply(!section.classList.contains('git-section--collapsed'));
+      });
+      header.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        // space would otherwise scroll the panel away from the header
+        e.preventDefault();
+        apply(!section.classList.contains('git-section--collapsed'));
+      });
+    }
   }
 
   //refreshing

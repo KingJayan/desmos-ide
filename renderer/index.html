@@ -89,16 +89,18 @@
           </div>
           <div id="git-summary-msg" class="git-summary-msg">Loading Git status...</div>
 
-          <section class="git-section">
-            <div class="git-section-header">
+          <section class="git-section" id="git-section-modified">
+            <div class="git-section-header" data-section="modified" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
               <div id="git-modified-panel-title" class="git-modified-panel-title">modified files</div>
             </div>
             <div id="git-modified-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
             <ul id="git-modified-list" class="git-modified-list"></ul>
           </section>
 
-          <section class="git-section">
-            <div class="git-section-header">
+          <section class="git-section" id="git-section-branch">
+            <div class="git-section-header" data-section="branch" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
               <div id="git-branch-panel-title" class="git-modified-panel-title">branches</div>
               <div class="git-inline-actions">
                 <button id="git-branch-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh branches" aria-label="refresh branches">
@@ -113,8 +115,9 @@
             <ul id="git-branch-list" class="git-modified-list"></ul>
           </section>
 
-          <section class="git-section">
-            <div class="git-section-header">
+          <section class="git-section" id="git-section-history">
+            <div class="git-section-header" data-section="history" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
               <div id="git-history-panel-title" class="git-modified-panel-title">version tree</div>
               <div class="git-inline-actions">
                 <button id="git-history-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh version tree" aria-label="refresh version tree">
@@ -126,8 +129,9 @@
             <pre id="git-history-content" class="git-history-content"></pre>
           </section>
 
-          <section class="git-section">
-            <div class="git-section-header">
+          <section class="git-section" id="git-section-remote">
+            <div class="git-section-header" data-section="remote" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
               <div id="git-remote-panel-title" class="git-modified-panel-title">remotes</div>
               <div class="git-inline-actions">
                 <button id="git-remote-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh remotes" aria-label="refresh remotes">

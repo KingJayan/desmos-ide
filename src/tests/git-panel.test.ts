@@ -138,3 +138,39 @@ describe('the git panel gives its timer back', () => {
     assert.deepEqual(calls, []);
   });
 });
+
+describe('the git panel sections fold away', () => {
+  const store = new Map<string, string>();
+
+  beforeEach(() => {
+    calls = [];
+    store.clear();
+    stubApi();
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+    };
+    container.innerHTML = `
+      <section class="git-section">
+        <div class="git-section-header" data-section="branch" aria-expanded="true"></div>
+        <ul class="git-modified-list"></ul>
+      </section>`;
+  });
+
+  test('a click folds the section and a second one opens it', () => {
+    panel();
+    const header = container.querySelector('.git-section-header')!;
+    const section = header.parentElement!;
+    header.dispatchEvent(new document.defaultView!.Event('click'));
+    assert.ok(section.classList.contains('git-section--collapsed'));
+    assert.equal(header.getAttribute('aria-expanded'), 'false');
+    header.dispatchEvent(new document.defaultView!.Event('click'));
+    assert.ok(!section.classList.contains('git-section--collapsed'));
+  });
+
+  test('a folded section is still folded next time', () => {
+    store.set('git-section-branch', 'collapsed');
+    panel();
+    assert.ok(container.querySelector('.git-section')!.classList.contains('git-section--collapsed'));
+  });
+});

@@ -72,11 +72,27 @@
 .git-section-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--surface0);
+  cursor: pointer;
+  user-select: none;
 }
+.git-section-header:hover { background: color-mix(in srgb, var(--surface0) 45%, transparent); }
+.git-section-header:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+
+.git-section-chevron {
+  display: inline-flex;
+  color: var(--overlay0);
+  transition: transform 0.15s ease;
+}
+.git-section-chevron .lucide { width: 13px; height: 13px; }
+
+.git-section-header .git-modified-panel-title { margin-right: auto; }
+
+.git-section--collapsed > .git-section-header { border-bottom: none; }
+.git-section--collapsed > .git-section-header .git-section-chevron { transform: rotate(-90deg); }
+.git-section--collapsed > :not(.git-section-header) { display: none; }
 
 .git-modified-panel-title {
   padding: 0;

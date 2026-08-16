@@ -5,7 +5,7 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 };
 
 import * as monaco from 'monaco-editor';
-import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List } from 'lucide';
+import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown } from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
 import { builtinSignature } from '../src/compiler/builtins';
 import { formatDsl } from '../src/compiler/format';
@@ -38,7 +38,7 @@ import { registerColorProvider } from './color-provider';
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 registerColorProvider();
 createIcons({
-  icons: { GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List },
+  icons: { GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown },
   attrs: { 'stroke-width': '1.9' },
 });
 
