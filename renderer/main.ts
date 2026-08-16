@@ -15,6 +15,7 @@ import type { CompileResult, SymbolInfo, ExprSource } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
 import { EnhancedPane } from './enhanced';
+import { Transport } from './transport';
 import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings } from './settings';
 import type { ColorTheme, EditorSettings } from './settings';
@@ -302,6 +303,14 @@ const editor = monaco.editor.create(editorContainer, {
 
 const graph = new DesmosGraph(graphContainer);
 
+// the timeline bar drives the one `time` clock the source declares
+const transport = new Transport(document.getElementById('transport')!, {
+  setPlaying: (id, playing) => graph.setClockPlaying(id, playing),
+  setPeriod:  (id, period)  => graph.setClockPeriod(id, period),
+  setValue:   (id, name, v) => graph.setClockValue(id, name, v),
+  watch:      (name, cb)    => graph.watchClock(name, cb),
+});
+
 // clicking a curve on the graph puts the cursor on the line that drew it, and
 // moving the cursor selects that curve back on the graph
 let sourceMap: ExprSource[] = [];
@@ -485,10 +494,12 @@ function handleCompileResult(result: CompileResult): void {
     }
     sliderManager.update(editor.getValue());
     renderOutline(result.symbols);
+    transport.setClock(result.clock);
   } else {
     const { syntax, semantic } = errorsByPhase(result.errors, errorToMarker);
     monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', syntax);
     monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', semantic);
+    // the last good graph stays on screen, so the bar keeps driving its clock
   }
   const { msg, kind } = compileStatus(result);
   setStatus(msg, kind);
@@ -498,6 +509,7 @@ const BUILTIN_SIGS: Record<string, string> = {
   gradient: 'gradient(from, to) → color',
 };
 
+// makes ⇧⌥F and the "Format Code" palette entry real
 // makes ⇧⌥F and the "Format Code" palette entry real, and gives format-on-save
 // something to call
 monaco.languages.registerDocumentFormattingEditProvider(LANGUAGE_ID, {
@@ -642,6 +654,7 @@ window.addEventListener('unload', () => {
   activeWorker = null;
   stopWatching();
   enhanced?.dispose();
+  transport.dispose();
   if (gitRefreshTimer) {
     clearInterval(gitRefreshTimer);
     gitRefreshTimer = null;
