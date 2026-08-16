@@ -1,6 +1,6 @@
 <div align="center">
 <h2><code>KingJayan/desmos-ide</code></h2>
-<p>a minimalist Desmos IDE - integrated DSL, and live graph</p>
+<p>a minimalist Desmos IDE - integrated DSL and live graph</p>
 </div>
 
 <p align="center">
@@ -37,7 +37,7 @@ bun dev:hmr    # vite dev server + app for renderer hmr
 bun run build  # prod build → build/<channel>-<platform>/
 bun test       # compiler + editor tests
 bun test:e2e   # webkit over built app
-bun demo       # run compiler in the terminal, w/o app shell
+bun demo       # run compiler in the terminal w/o app shell
 ```
 
 ## troubleshooting
