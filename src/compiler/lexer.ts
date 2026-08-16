@@ -37,6 +37,8 @@ export interface Token {
   col: number;
   /** true when anything at all separates this token from the one before it */
   spaceBefore: boolean;
+  /** the source text, present only where normalising changed it (`α` -> `alpha`) */
+  raw?: string;
 }
 
 export class LexError extends Error {
@@ -141,8 +143,10 @@ export function tokenize(src: string): Token[] {
       const start = i;
       const startCol = col();
       while (i < src.length && isIdentPart(src[i])) i++;
-      const word = normalizeIdent(src.slice(start, i));
+      const text = src.slice(start, i);
+      const word = normalizeIdent(text);
       push(KEYWORDS.has(word) ? 'kw' : 'ident', word, startCol);
+      if (word !== text) tokens[tokens.length - 1].raw = text;
       continue;
     }
 

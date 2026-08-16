@@ -9,6 +9,7 @@ import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, 
 import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
 import { builtinSignature } from '../src/compiler/builtins';
 import { formatDsl } from '../src/compiler/format';
+import { findRenameEdits, isValidIdent } from '../src/compiler/rename';
 import CompileWorker from './compile.worker?worker';
 import type { CompileResult, SymbolInfo, ExprSource } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
@@ -564,10 +565,6 @@ monaco.languages.registerDefinitionProvider(LANGUAGE_ID, {
   },
 });
 
-function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 const RESERVED = new Set<string>([...KEYWORDS, ...BUILTIN_FNS]);
 
 monaco.languages.registerRenameProvider(LANGUAGE_ID, {
@@ -586,24 +583,19 @@ monaco.languages.registerRenameProvider(LANGUAGE_ID, {
   provideRenameEdits(model, position, newName) {
     const word = model.getWordAtPosition(position);
     if (!word || RESERVED.has(word.word)) return { edits: [] };
-    const oldName = word.word;
-    const text = model.getValue();
-    const re = new RegExp(`\\b${escapeRe(oldName)}\\b`, 'g');
-    const edits: monaco.languages.IWorkspaceTextEdit[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      const startPos = model.getPositionAt(m.index);
-      const endPos = model.getPositionAt(m.index + oldName.length);
-      edits.push({
+    if (!isValidIdent(newName)) {
+      return { edits: [], rejectReason: `"${newName}" is not a valid name` };
+    }
+    return {
+      edits: findRenameEdits(model.getValue(), word.word).map(e => ({
         resource: model.uri,
         textEdit: {
-          range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+          range: new monaco.Range(e.line, e.col, e.line, e.col + e.length),
           text: newName,
         },
         versionId: undefined,
-      });
-    }
-    return { edits };
+      })),
+    };
   },
 });
 
@@ -1563,11 +1555,17 @@ btnSidebarSettings.addEventListener('click', () => ensureSettingsPanel().toggle(
 
 const palette = new CommandPalette();
 
+const NO_BRIDGE = Promise.resolve({
+  ok: false as const, errorCode: 'NO_BRIDGE', message: 'Search needs the desktop app.',
+});
+
 const searchPanel = new SearchPanel({
   paths: () => recentFiles.map(f => f.path),
+  folder: () => (currentPath ? currentPath.replace(/\/[^/]*$/, '') || '/' : null),
   search: (paths, query, useRegex) =>
-    window.electronAPI?.searchFiles(paths, query, useRegex)
-      ?? Promise.resolve({ ok: false as const, errorCode: 'NO_BRIDGE', message: 'Search needs the desktop app.' }),
+    window.electronAPI?.searchFiles(paths, query, useRegex) ?? NO_BRIDGE,
+  searchFolder: (root, query, useRegex) =>
+    window.electronAPI?.searchFolder(root, query, useRegex) ?? NO_BRIDGE,
   onOpen: hit => openPath(hit.path, { line: hit.line, col: hit.col }),
 });
 
