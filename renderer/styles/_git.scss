@@ -12,6 +12,17 @@
 #status-msg.error   { color: var(--red); animation: status-flash 0.3s ease; }
 #status-msg.success { color: var(--green); animation: status-flash 0.3s ease; }
 
+#status-facts {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  color: var(--overlay1);
+  white-space: nowrap;
+}
+.status-fact.hidden { display: none; }
+
 .git-pill {
   display: inline-flex;
   align-items: center;

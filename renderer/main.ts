@@ -56,6 +56,9 @@ const btnSave         = document.getElementById('btn-save')     as HTMLButtonEle
 const filenameEl      = document.getElementById('filename')!;
 const savedDotEl      = document.getElementById('saved-dot')!;
 const statusMsg       = document.getElementById('status-msg')!;
+const statusBranch    = document.getElementById('status-branch')!;
+const statusSave      = document.getElementById('status-save')!;
+const statusPos       = document.getElementById('status-pos')!;
 const dividerEl       = document.getElementById('divider')!;
 const leftPanel       = document.getElementById('left-panel')!;
 const workspace       = document.getElementById('workspace')!;
@@ -88,6 +91,7 @@ text lbl = "hello, desmos" at (0, 1.5)
 `;
 
 const initSettings = loadSettings();
+let autosaveOn = initSettings.autosave;
 
 monaco.editor.defineTheme('desmos-dark', {
   base: 'vs-dark',
@@ -715,6 +719,10 @@ const gitPanel = new GitPanel({
   setStatus,
   confirm: nativeConfirm,
   prompt: nativePrompt,
+  onBranch: branch => {
+    statusBranch.textContent = branch ? `⎇ ${branch}` : '';
+    statusBranch.classList.toggle('hidden', !branch);
+  },
 });
 
 runCompile();
@@ -777,7 +785,24 @@ function refreshSavedState(): void {
     ? 'Unsaved changes — ⌘S to write them to the file'
     : 'This buffer has no file yet — ⌘S to choose one';
   filenameEl.classList.toggle('filename--unsaved', unsaved);
+  refreshSaveFact(unsaved);
 }
+
+// the bar says whether the app writes the file for you, because autosave writes
+// with no dialog and the alternative is to find out from the disk
+function refreshSaveFact(unsaved: boolean): void {
+  const on = autosaveOn && !!currentPath;
+  statusSave.textContent = on
+    ? (unsaved ? 'autosave: saving…' : 'autosave: on')
+    : (unsaved ? 'unsaved' : 'saved');
+  statusSave.title = on
+    ? 'This file is written 1.2 s after you stop typing'
+    : 'Autosave is off — ⌘S to write the file. Turn it on in Settings';
+}
+
+editor.onDidChangeCursorPosition(e => {
+  statusPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+});
 
 function startWatching(path: string): void {
   if (watchedPath && watchedPath !== path) {
@@ -1230,13 +1255,13 @@ document.addEventListener('mousemove', e => {
 // settings
 let settingsPanel: SettingsPanel | null = null;
 let formatOnSave = initSettings.formatOnSave;
-let autosaveOn = initSettings.autosave;
 
 function ensureSettingsPanel(): SettingsPanel {
   if (settingsPanel) return settingsPanel;
   settingsPanel = new SettingsPanel(s => {
     formatOnSave = s.formatOnSave;
     autosaveOn = s.autosave;
+    refreshSavedState();
     gitPanel.applyAutofetch(s);
     applyTheme(s.colorTheme);
     applyUiFont(s.uiFontFamily);
@@ -1473,6 +1498,7 @@ async function restoreSession(): Promise<void> {
 }
 
 void restoreSession();
+refreshSavedState();
 void gitPanel.refreshStatus();
 gitPanel.applyAutofetch(initSettings);
 editor.focus();

@@ -12,6 +12,7 @@ export interface GitPanelOptions {
   setStatus: (msg: string, kind: 'success' | 'error' | 'info') => void;
   confirm: (message: string) => Promise<boolean>;
   prompt: (message: string, defaultValue?: string) => Promise<string | null>;
+  onBranch?: (branch: string | null) => void;
 }
 
 export interface GitAutofetchSettings {
@@ -192,6 +193,8 @@ export class GitPanel {
   private renderStatus(status: GitStatusResult): void {
     this.lastStatus = status;
     this.renderModified(status);
+
+    this.opts.onBranch?.(status.ok ? status.branch : null);
 
     if (!status.ok) {
       this.branchPill.textContent = 'branch: --';
