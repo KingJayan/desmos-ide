@@ -3,7 +3,6 @@ import type { AIConfig, AIMessage, DesmosIdeRPC } from '../src/shared/rpc-schema
 
 type Listener<T extends unknown[]> = (...args: T) => void;
 
-/** registers a listener and hands back the function that removes it again */
 function subscribe<T extends unknown[]>(list: Listener<T>[], cb: Listener<T>): () => void {
   list.push(cb);
   return () => {
@@ -40,7 +39,6 @@ const rpc = Electroview.defineRPC<DesmosIdeRPC>({
   },
 });
 
-// outside the electrobun webview there is no bun bridge, so the ui must still load
 let bridgeReady = false;
 try {
   new Electrobun.Electroview({ rpc });
@@ -49,7 +47,6 @@ try {
   console.warn('electrobun bridge unavailable — file, git and ai actions are disabled', err);
 }
 
-// keeps the electron-era surface so the ui modules need no changes
 export const electronAPI = {
   openFile: () => rpc.request.openFile(),
   saveFile: (path: string | null, content: string) => rpc.request.saveFile({ path, content }),
@@ -105,9 +102,6 @@ export const electronAPI = {
   searchFolder: (root: string, query: string, useRegex = false) =>
     rpc.request.searchFolder({ root, query, useRegex }),
   pickFolder: () => rpc.request.pickFolder().catch(() => null),
-
-  // a webview cannot reach the keychain, so every secret goes over the bridge.
-  // a bridge failure means no secure store, and the caller falls back.
   secretsAvailable: () => rpc.request.secretsAvailable().catch(() => false),
   secretGet: (account: string) => rpc.request.secretGet({ account }).catch(() => null),
   secretSet: (account: string, value: string) =>
@@ -118,5 +112,7 @@ export const electronAPI = {
   unwatchFile: (path: string) => rpc.request.unwatchFile({ path }),
   onFileChanged: (cb: (path: string, content: string) => void) => subscribe(fileChangedCbs, cb),
 };
+
+export type ElectronAPI = typeof electronAPI;
 
 if (bridgeReady) window.electronAPI = electronAPI;
