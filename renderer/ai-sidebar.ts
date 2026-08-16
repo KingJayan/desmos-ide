@@ -205,6 +205,8 @@ export class AISidebar {
   private streaming = false;
   private streamMap = new Map<string, { chat: Chat; accum: string; textEl: HTMLElement | null; bubble: HTMLElement | null }>();
   private copilotAuth: CopilotAuthState | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private ipcOff: (undefined | (() => void))[] = [];
   private copilotModels: string[] | null = null;
   private activeReqId: string | null = null;
 
@@ -636,11 +638,11 @@ export class AISidebar {
 
     this.scrollFabEl.addEventListener('click', () => this.scrollToBottom(true));
 
-    const ro = new ResizeObserver(entries => {
+    this.resizeObserver = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width ?? this.el.offsetWidth;
       this.el.classList.toggle('ai-sidebar--compact', w < 260);
     });
-    ro.observe(this.el);
+    this.resizeObserver.observe(this.el);
   }
 
   private syncChatSelect(): void {
@@ -1105,15 +1107,16 @@ export class AISidebar {
   }
 
   private registerIpc(): void {
-    window.electronAPI?.onAiChunk((reqId, text) => {
+    const off = this.ipcOff;
+    off.push(window.electronAPI?.onAiChunk((reqId, text) => {
       const s = this.streamMap.get(reqId);
       if (!s) return;
       s.accum += text;
       if (s.textEl) s.textEl.textContent = s.accum;
       this.scrollToBottom();
-    });
+    }));
 
-    window.electronAPI?.onAiDone((reqId) => {
+    off.push(window.electronAPI?.onAiDone((reqId) => {
       const s = this.streamMap.get(reqId);
       if (!s) return;
       const full = s.accum;
@@ -1125,9 +1128,9 @@ export class AISidebar {
       this.setLoading(false);
       this.scrollToBottom();
       void this.resolveTitle(s.chat);
-    });
+    }));
 
-    window.electronAPI?.onAiError((reqId, error) => {
+    off.push(window.electronAPI?.onAiError((reqId, error) => {
       const s = this.streamMap.get(reqId);
       if (!s) return;
       this.streamMap.delete(reqId);
@@ -1140,7 +1143,7 @@ export class AISidebar {
         s.textEl.classList.add('ai-error-text');
       }
       this.setLoading(false);
-    });
+    }));
   }
 
   private appendUserBubble(text: string, scroll: boolean): void {
@@ -1404,7 +1407,13 @@ export class AISidebar {
 
   focus(): void { this.inputEl.focus(); }
 
-  dispose(): void {}
+  dispose(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    if (this.copilotAuth?.pollTimer) clearInterval(this.copilotAuth.pollTimer);
+    for (const off of this.ipcOff) off?.();
+    this.ipcOff.length = 0;
+  }
 
   private updateCtxPill(): void {
     if (!this.sendContext || this.contextDisabledForMsg) {
