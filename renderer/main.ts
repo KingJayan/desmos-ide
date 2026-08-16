@@ -1006,7 +1006,7 @@ window.electronAPI?.onMenuSaveAs(() => cmdSave(true));
 window.electronAPI?.onMenuOpenRecent(path => void openPath(path));
 
 window.addEventListener('focus', () => {
-  void gitPanel.refreshOnFocus();
+  void gitPanel.refreshIfStale();
 });
 
 //divider drag
@@ -1110,7 +1110,7 @@ function setSidebarView(next: SidebarView): void {
     aiSelectionListener = null;
   }
   if (next === 'git') {
-    void gitPanel.refreshAll();
+    void gitPanel.refreshIfStale();
   }
 
   editor.layout();

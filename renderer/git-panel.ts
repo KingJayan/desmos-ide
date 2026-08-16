@@ -21,6 +21,9 @@ export interface GitAutofetchSettings {
 
 const el = (id: string): HTMLElement => document.getElementById(id)!;
 
+// every refresh spawns a git process, so repeated focus changes must not spawn one each
+const MIN_GAP_MS = 3000;
+
 export class GitPanel {
   private branchPill = el('git-branch') as HTMLSpanElement;
   private modifiedPill = el('git-modified') as HTMLSpanElement;
@@ -47,7 +50,10 @@ export class GitPanel {
   private modifiedEmpty = el('git-modified-empty');
   private modifiedList = el('git-modified-list');
 
+  private container = el('git-sidebar-container');
+
   private timer: ReturnType<typeof setInterval> | null = null;
+  private lastRefresh = 0;
   private statusInFlight = false;
   private lastStatus: GitStatusResult = {
     ok: false,
@@ -130,13 +136,19 @@ export class GitPanel {
   }
 
   refreshAll(): Promise<unknown> {
+    this.lastRefresh = Date.now();
     return Promise.all([
       this.refreshStatus(), this.refreshBranches(), this.refreshHistory(), this.refreshRemotes(),
     ]);
   }
 
-  refreshOnFocus(): Promise<unknown> {
-    return Promise.all([this.refreshStatus(), this.refreshBranches(), this.refreshRemotes()]);
+  refreshIfStale(): Promise<unknown> {
+    if (Date.now() - this.lastRefresh < MIN_GAP_MS) return Promise.resolve();
+    if (this.container.classList.contains('hidden')) {
+      this.lastRefresh = Date.now();
+      return this.refreshStatus();
+    }
+    return this.refreshAll();
   }
 
   //bg fetch
