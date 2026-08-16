@@ -1,10 +1,11 @@
 import type { ElectrobunConfig } from 'electrobun';
+import pkg from './package.json';
 
 export default {
   app: {
     name: 'desmos-ide',
     identifier: 'dev.desmoside.app',
-    version: '1.2.4',
+    version: pkg.version,
     description: 'an ide for Desmos with a custom dsl',
     fileAssociations: [
       { ext: ['dsmx'], name: 'Desmos DSL Document', role: 'Editor' },

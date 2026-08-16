@@ -1,15 +1,26 @@
 /// <reference types="node" />
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from '../../bun/secrets';
 
 // the value below is a test string, never a real credential
 const ACCOUNT = 'desmos-ide-test-account';
 const VALUE = 'test-value-not-a-secret';
 
-const mac = process.platform === 'darwin';
+// these tests write to the real keychain, so they need a keychain that is unlocked.
+// a build agent often has no login keychain, and that is not a failure of the code
+function keychainUsable(): boolean {
+  if (process.platform !== 'darwin') return false;
+  try {
+    execFileSync('security', ['default-keychain'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-describe('the keychain', { skip: mac ? false : 'macOS only' }, () => {
+describe('the keychain', { skip: keychainUsable() ? false : 'needs an unlocked macOS keychain' }, () => {
   test('reports that it is there', () => {
     assert.equal(secretsAvailable(), true);
   });

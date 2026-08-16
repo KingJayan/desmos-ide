@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # the swift dialog helpers only compile on macOS, and macOS is what the app ships on
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: types
+        run: bun run check
+
+      - name: tests
+        run: bun test src/tests/
+
+      - name: native helpers
+        run: bun run build:native
+
+      - name: view bundle
+        run: bun run build:view
