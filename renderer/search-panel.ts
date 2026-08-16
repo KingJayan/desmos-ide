@@ -12,6 +12,8 @@ export interface SearchPanelOptions {
   folder: () => string | null;
   search: (paths: string[], query: string, useRegex: boolean) => Promise<SearchOutcome>;
   searchFolder: (root: string, query: string, useRegex: boolean) => Promise<SearchOutcome>;
+  /** puts up a folder picker, so search works before any file is open */
+  pickFolder: () => Promise<string | null>;
   onOpen: (hit: SearchHit) => unknown;
 }
 
@@ -27,6 +29,9 @@ export class SearchPanel {
   private inFolder = false;
   private scopeBtn: HTMLButtonElement;
   private open = false;
+  /** a folder the user picked, which outranks the folder of the open file */
+  private chosenFolder: string | null = null;
+  private pickBtn: HTMLButtonElement;
   private debounce: ReturnType<typeof setTimeout> | null = null;
 
   private runId = 0;
@@ -73,6 +78,12 @@ export class SearchPanel {
     this.summary.className = 'search-summary';
     this.summary.setAttribute('role', 'status');
 
+    this.pickBtn = document.createElement('button');
+    this.pickBtn.className = 'search-pick-btn';
+    this.pickBtn.type = 'button';
+    this.pickBtn.textContent = 'Choose a folder…';
+    this.pickBtn.hidden = true;
+
     this.list = document.createElement('ul');
     this.list.className = 'cmd-list';
     this.list.setAttribute('role', 'listbox');
@@ -82,7 +93,7 @@ export class SearchPanel {
     this.input.setAttribute('aria-controls', 'search-list');
     this.input.setAttribute('aria-expanded', 'true');
 
-    modal.append(searchWrap, this.summary, this.list);
+    modal.append(searchWrap, this.summary, this.pickBtn, this.list);
     this.overlay.appendChild(modal);
     document.body.appendChild(this.overlay);
 
@@ -95,6 +106,7 @@ export class SearchPanel {
       this.input.focus();
       this.schedule(0);
     });
+    this.pickBtn.addEventListener('click', () => { void this.chooseFolder(); });
     this.scopeBtn.addEventListener('click', () => {
       this.inFolder = !this.inFolder;
       this.syncScope();
@@ -110,7 +122,25 @@ export class SearchPanel {
     this.open ? this.close() : this.show();
   }
 
+  /** the folder search would walk, whether the user picked it or the open file implies it */
+  private activeFolder(): string | null {
+    return this.chosenFolder ?? this.opts.folder();
+  }
+
+  private async chooseFolder(): Promise<void> {
+    const picked = await this.opts.pickFolder();
+    if (!picked) return;
+    this.chosenFolder = picked;
+    this.inFolder = true;
+    this.scopeBtn.hidden = false;
+    this.syncScope();
+    this.input.focus();
+    void this.run();
+  }
+
   private syncScope(): void {
+    // with no folder in reach, picking one is the only way forward
+    this.pickBtn.hidden = this.activeFolder() !== null;
     this.scopeBtn.classList.toggle('active', this.inFolder);
     this.scopeBtn.setAttribute('aria-pressed', String(this.inFolder));
     this.input.placeholder = this.inFolder ? 'Search this folder…' : 'Search recent files…';
@@ -119,7 +149,7 @@ export class SearchPanel {
 
   show(): void {
     this.open = true;
-    this.scopeBtn.hidden = this.opts.folder() === null;
+    this.scopeBtn.hidden = this.activeFolder() === null;
     if (this.scopeBtn.hidden && this.inFolder) { this.inFolder = false; }
     this.syncScope();
     this.overlay.classList.add('cmd-overlay--visible');
@@ -154,7 +184,7 @@ export class SearchPanel {
 
   private async run(): Promise<void> {
     const query = this.input.value;
-    const folder = this.inFolder ? this.opts.folder() : null;
+    const folder = this.inFolder ? this.activeFolder() : null;
     const paths = this.opts.paths();
     const id = ++this.runId;
 
@@ -164,13 +194,13 @@ export class SearchPanel {
         ? `Searching ${folder.split('/').pop() || folder}`
         : paths.length
           ? `${paths.length} recent ${paths.length === 1 ? 'file' : 'files'}`
-          : 'No recent files to search — open a file first';
+          : 'Nothing to search yet — choose a folder, or open a file';
       this.render();
       return;
     }
     if (!folder && !paths.length) {
       this.hits = [];
-      this.summary.textContent = 'No recent files to search — open a file first';
+      this.summary.textContent = 'Nothing to search yet — choose a folder, or open a file';
       this.render();
       return;
     }

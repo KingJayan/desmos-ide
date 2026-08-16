@@ -6,16 +6,23 @@ type DesmosThemeSpec = {
   text: string;
 };
 
+/*
+ * desmos takes a background and a text colour and derives the rest, the grid
+ * included, so the text colour is the only handle on how heavy the grid looks.
+ * on a light background a text colour dark enough to read makes a grid too dark
+ * to sit behind a curve, so the light themes take a mid grey: it reads against
+ * the background but it does not fight the plot
+ */
 const DESMOS_THEMES: Record<ColorTheme, DesmosThemeSpec> = {
   'desmos-dark': { background: '#24273a', text: '#7f849c' },
-  'catppuccin-latte': { background: '#eff1f5', text: '#7c7f93' },
+  'catppuccin-latte': { background: '#eff1f5', text: '#9ca0b0' },
   'catppuccin-frappe': { background: '#303446', text: '#737994' },
   'catppuccin-macchiato': { background: '#24273a', text: '#8087a2' },
   'github-dark': { background: '#0d1117', text: '#8b949e' },
-  'github-light': { background: '#ffffff', text: '#57606a' },
+  'github-light': { background: '#ffffff', text: '#8c959f' },
   monokai: { background: '#272822', text: '#90908a' },
   'vs-dark': { background: '#1e1e1e', text: '#9da0a6' },
-  'vs-light': { background: '#ffffff', text: '#616161' },
+  'vs-light': { background: '#ffffff', text: '#949494' },
 };
 
 function themeSettings(theme: ColorTheme): { backgroundColor: string; textColor: string } {

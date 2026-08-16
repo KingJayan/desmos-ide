@@ -136,10 +136,13 @@ export class EnhancedPane {
     row.className = 'expr-row';
     row.dataset.id = expr.id;
 
-    const dot = document.createElement('span');
+    // a real button, so the colour is reachable by tab and carries its own focus ring
+    const dot = document.createElement('button');
+    dot.type = 'button';
     dot.className = 'expr-color-dot';
     dot.style.background = expr.color ?? '#888';
-    dot.title = 'click to change color';
+    dot.title = 'change color';
+    dot.setAttribute('aria-label', `Change the color of ${expr.latex || 'this expression'}`);
     dot.addEventListener('click', () => this.cycleColor(expr.id));
 
     const isEditing = this.editingId === expr.id;
@@ -170,11 +173,22 @@ export class EnhancedPane {
       mathEl.className = 'expr-math';
       renderLatex(expr.latex ?? '', mathEl);
       mathEl.title = expr.latex ? `LaTeX: ${expr.latex}` : 'click to edit';
-      mathEl.addEventListener('click', () => {
+      mathEl.tabIndex = 0;
+      mathEl.setAttribute('role', 'button');
+      mathEl.setAttribute('aria-label', `Edit ${expr.latex || 'this empty expression'}`);
+
+      const edit = () => {
         const wasEditing = this.editingId;
         this.editingId = expr.id;
         if (wasEditing) this.refreshRow(wasEditing);
         this.refreshRow(expr.id);
+      };
+      mathEl.addEventListener('click', edit);
+      mathEl.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        // space would otherwise scroll the list away from the row being edited
+        e.preventDefault();
+        edit();
       });
 
       const sliderMatch = /^([a-zA-Z_]\w*)\s*=\s*(-?\d+(?:\.\d*)?)$/.exec(expr.latex ?? '');

@@ -22,9 +22,13 @@ export interface EditorSettings {
   lineNumbers: 'on' | 'off' | 'relative';
   wordWrap:    'off' | 'on';
   formatOnSave: boolean;
+  uiScale: UiScale;
   gitAutofetch: boolean;
   gitAutofetchPeriod: number;
 }
+
+export type UiScale = 'compact' | 'default' | 'large';
+export const UI_SCALES = ['compact', 'default', 'large'] as const;
 
 /** the periods the panel offers, in seconds */
 export const GIT_AUTOFETCH_PERIODS = [60, 180, 300, 900] as const;
@@ -39,6 +43,7 @@ const DEFAULTS: EditorSettings = {
   lineNumbers: 'on',
   wordWrap:    'off',
   formatOnSave: false,
+  uiScale: 'default',
   // off by default: a fetch reaches the network, and that is the user's call to make
   gitAutofetch: false,
   gitAutofetchPeriod: 180,
@@ -99,12 +104,14 @@ function validate(raw: Record<string, unknown>): EditorSettings {
   const wordWrap = VALID_WORD_WRAP.has(raw.wordWrap as string)
     ? (raw.wordWrap as EditorSettings['wordWrap']) : d.wordWrap;
   const formatOnSave = typeof raw.formatOnSave === 'boolean' ? raw.formatOnSave : d.formatOnSave;
+  const uiScale = (UI_SCALES as readonly string[]).includes(raw.uiScale as string)
+    ? (raw.uiScale as UiScale) : d.uiScale;
   const gitAutofetch = typeof raw.gitAutofetch === 'boolean' ? raw.gitAutofetch : d.gitAutofetch;
   const gitAutofetchPeriod = (GIT_AUTOFETCH_PERIODS as readonly number[]).includes(Number(raw.gitAutofetchPeriod))
     ? Number(raw.gitAutofetchPeriod) : d.gitAutofetchPeriod;
   return {
     colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily,
-    minimap, lineNumbers, wordWrap, formatOnSave, gitAutofetch, gitAutofetchPeriod,
+    minimap, lineNumbers, wordWrap, formatOnSave, uiScale, gitAutofetch, gitAutofetchPeriod,
   };
 }
 
@@ -172,6 +179,18 @@ export class SettingsPanel {
                 <option value="vs-dark">VS Dark</option>
                 <option value="vs-light">VS Light</option>
               </select>
+            </div>
+
+            <div class="settings-row">
+              <label class="settings-label" for="s-ui-scale">Interface Size</label>
+              <select class="settings-select" id="s-ui-scale">
+                <option value="compact">Compact</option>
+                <option value="default">Default</option>
+                <option value="large">Large</option>
+              </select>
+            </div>
+            <div class="settings-row settings-hint-row">
+              <span class="settings-hint">Scales the panels, menus and status bar. The editor has its own font size.</span>
             </div>
           </div>
 
@@ -302,6 +321,7 @@ export class SettingsPanel {
     const minimapEl     = overlay.querySelector('#s-minimap')      as HTMLInputElement;
     const wordWrapEl    = overlay.querySelector('#s-word-wrap')    as HTMLInputElement;
     const formatSaveEl  = overlay.querySelector('#s-format-on-save') as HTMLInputElement;
+    const uiScaleEl     = overlay.querySelector('#s-ui-scale')     as HTMLSelectElement;
     const autofetchEl   = overlay.querySelector('#s-git-autofetch') as HTMLInputElement;
     const autofetchPeriodEl = overlay.querySelector('#s-git-autofetch-period') as HTMLSelectElement;
 
@@ -316,6 +336,7 @@ export class SettingsPanel {
     minimapEl.checked   = s.minimap;
     wordWrapEl.checked  = s.wordWrap === 'on';
     formatSaveEl.checked = s.formatOnSave;
+    uiScaleEl.value      = s.uiScale;
     autofetchEl.checked  = s.gitAutofetch;
     autofetchPeriodEl.value = String(s.gitAutofetchPeriod);
     autofetchPeriodEl.disabled = !s.gitAutofetch;
@@ -357,6 +378,10 @@ export class SettingsPanel {
     });
     formatSaveEl.addEventListener('change', () => {
       this.settings.formatOnSave = formatSaveEl.checked;
+      emit();
+    });
+    uiScaleEl.addEventListener('change', () => {
+      this.settings.uiScale = uiScaleEl.value as UiScale;
       emit();
     });
     autofetchEl.addEventListener('change', () => {

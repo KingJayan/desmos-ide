@@ -16,11 +16,12 @@
         <div class="mode-toggle">
           <button id="btn-dsl" class="mode-btn active" title="Write the DSL. This is the file that gets saved.">DSL</button>
           <button id="btn-split" class="mode-btn" title="DSL editor and the expression list side by side">Split</button>
-          <button id="btn-enhanced" class="mode-btn" title="Edit the graph directly, like the Desmos expression list. Bypasses the DSL, so edits here do not go back into the file — export them as JSON.">Enhanced</button>
+          <button id="btn-enhanced" class="mode-btn" title="Edit the graph directly, like the Desmos expression list">Enhanced</button>
         </div>
       </div>
       <div class="toolbar-center">
         <span id="filename">untitled.dsmx</span>
+        <span id="saved-dot" class="hidden" aria-hidden="true"></span>
       </div>
       <div class="toolbar-right">
         <button id="btn-new"  class="toolbar-btn">New</button>
@@ -52,11 +53,8 @@
         </div>
         <div id="pane-divider" class="hidden"></div>
         <div id="enhanced-pane" class="pane hidden">
-          <div id="enhanced-note">
-            edits here change the graph, not the DSL file &mdash; export them as JSON to keep them
-          </div>
           <div id="enhanced-unsaved-bar" class="hidden">
-            <span>unsaved enhanced edits</span>
+            <span>These edits change the graph, not the DSL file &mdash; export them to keep them</span>
             <button id="btn-export-json" class="unsaved-export-btn">export json</button>
           </div>
           <div id="expr-list"></div>

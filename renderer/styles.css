@@ -191,7 +191,7 @@
   justify-content: center;
   gap: 4px;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 0.95rem;
   line-height: 1;
   padding: 4px 12px;
   border: 1px solid transparent;
@@ -233,9 +233,6 @@
   transform: none;
 }
 
-/* ---------------------------------------------------------------- a11y base
-   one keyboard ring for every interactive element, and one guard that stops
-   all motion. individual rules can still add a calmer still state after this. */
 :focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
@@ -251,6 +248,12 @@
   }
 }
 
+html {
+  font-size: 13px;
+}
+html[data-ui-scale='compact'] { font-size: 12px; }
+html[data-ui-scale='large']   { font-size: 15px; }
+
 html, body {
   height: 100%;
 }
@@ -262,7 +265,7 @@ html, body {
   background: var(--base);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 1rem;
   overflow: hidden;
 }
 
@@ -289,13 +292,28 @@ html, body {
   flex: 1;
   text-align: center;
   color: var(--overlay2);
-  font-size: 12px;
+  font-size: 0.95rem;
   pointer-events: none;
   user-select: text;
 }
 
+#saved-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--yellow);
+  vertical-align: middle;
+  pointer-events: auto;
+}
+
+.filename--unsaved {
+  font-style: italic;
+}
+
 .app-name {
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--blue);
   letter-spacing: 0.02em;
@@ -431,7 +449,6 @@ html, body {
 }
 #graph-container { width: 100%; height: 100%; }
 
-/* the bar floats over the graph, so showing it never resizes the calculator */
 #transport {
   position: absolute;
   left: 50%;
@@ -448,7 +465,7 @@ html, body {
   background: color-mix(in srgb, var(--crust) 88%, transparent);
   backdrop-filter: blur(6px);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 0.95rem;
   color: var(--subtext1);
 }
 #transport.hidden { display: none; }
@@ -489,7 +506,7 @@ html, body {
 
 .transport-speed {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 0.9rem;
   padding: 2px 4px;
   border: 1px solid var(--surface0);
   border-radius: var(--radius);
@@ -505,7 +522,7 @@ html, body {
   display: flex;
   align-items: center;
   padding: 0 12px;
-  font-size: 12px;
+  font-size: 0.95rem;
   color: var(--overlay2);
 }
 #status-msg { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.2s; }
@@ -521,7 +538,7 @@ html, body {
   border: 1px solid var(--surface1);
   color: var(--subtext1);
   background: color-mix(in srgb, var(--surface0) 55%, transparent);
-  font-size: 11px;
+  font-size: 0.9rem;
   font-family: var(--font-mono);
   max-width: 32ch;
   overflow: hidden;
@@ -543,7 +560,7 @@ html, body {
   border: 1px solid var(--surface0);
   border-radius: 6px;
   color: var(--overlay1);
-  font-size: 10px;
+  font-size: 0.85rem;
   font-family: var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
@@ -569,7 +586,7 @@ html, body {
 
 .git-modified-panel-title {
   padding: 0;
-  font-size: 10px;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--overlay1);
@@ -577,7 +594,7 @@ html, body {
 
 .git-modified-empty {
   padding: 10px;
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay1);
   display: none;
 }
@@ -600,7 +617,7 @@ html, body {
   padding: 6px 8px;
   border-radius: 5px;
   color: var(--subtext1);
-  font-size: 11px;
+  font-size: 0.9rem;
   font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -623,7 +640,7 @@ html, body {
   background: var(--surface0);
   border-radius: 5px;
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 0.9rem;
 }
 
 .git-panel-btn .lucide {
@@ -663,7 +680,7 @@ html, body {
 
 .git-branch-upstream,
 .git-remote-url {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay1);
 }
 
@@ -674,7 +691,7 @@ html, body {
   overflow: auto;
   max-height: 240px;
   color: var(--subtext1);
-  font-size: 11px;
+  font-size: 0.9rem;
   font-family: var(--font-mono);
   line-height: 1.35;
   display: none;
@@ -722,7 +739,7 @@ html, body {
   padding: 6px 12px;
   background: color-mix(in srgb, var(--yellow) 12%, var(--base));
   border-bottom: 1px solid color-mix(in srgb, var(--yellow) 35%, transparent);
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--yellow);
   flex-shrink: 0;
 }
@@ -734,7 +751,7 @@ html, body {
   border-color: color-mix(in srgb, var(--yellow) 50%, transparent);
   background: color-mix(in srgb, var(--yellow) 15%, transparent);
   color: var(--yellow);
-  font-size: 11px;
+  font-size: 0.9rem;
   white-space: nowrap;
 }
 .unsaved-export-btn:hover { background: color-mix(in srgb, var(--yellow) 28%, transparent); }
@@ -775,7 +792,7 @@ html, body {
 }
 
 .expr-id {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay0);
   font-family: var(--font-mono);
   min-width: 18px;
@@ -788,6 +805,9 @@ html, body {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  padding: 0;
+  border: none;
+  cursor: pointer;
 }
 
 .expr-input {
@@ -796,7 +816,7 @@ html, body {
   border: none;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 1rem;
   outline: none;
   min-width: 0;
   user-select: text;
@@ -808,7 +828,7 @@ html, body {
   border: none;
   color: var(--overlay0);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 1.4rem;
   line-height: 1;
   padding: 0 2px;
   border-radius: 3px;
@@ -883,7 +903,7 @@ html, body {
 
 .sidepanel-title {
   color: var(--subtext1);
-  font-size: 11px;
+  font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -907,7 +927,7 @@ html, body {
   border-radius: 3px;
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 0.9rem;
   padding: 2px 4px;
   cursor: pointer;
   outline: none;
@@ -950,7 +970,7 @@ html, body {
   border: 1px solid var(--surface1);
   color: var(--overlay1);
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 0.85rem;
   border-radius: 4px;
   padding: 2px 4px;
   max-width: 126px;
@@ -960,7 +980,7 @@ html, body {
 .ai-provider-select option { background: var(--mantle); }
 
 .ai-provider-label {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--subtext1);
   max-width: 110px;
   overflow: hidden;
@@ -969,7 +989,6 @@ html, body {
   font-family: var(--font-mono);
 }
 
-/* copilot has no name to show, only a connected state */
 .ai-provider-label--dot {
   width: 7px;
   height: 7px;
@@ -983,7 +1002,7 @@ html, body {
 }
 
 .ai-provider-state {
-  font-size: 10px;
+  font-size: 0.85rem;
   border: 1px solid var(--surface1);
   border-radius: 4px;
   padding: 1px 5px;
@@ -1024,13 +1043,13 @@ html, body {
 }
 
 .ai-empty-hint {
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay0);
 }
 
 .ai-empty-hint kbd {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 0.85rem;
   background: var(--surface0);
   border: 1px solid var(--surface1);
   border-radius: 3px;
@@ -1060,7 +1079,7 @@ html, body {
   color: var(--subtext1);
   border-radius: 6px;
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: 0.9rem;
   font-family: var(--font-ui);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1075,7 +1094,7 @@ html, body {
   background: none;
   border: none;
   color: var(--overlay0);
-  font-size: 10px;
+  font-size: 0.85rem;
   padding: 2px 6px;
   margin-top: 2px;
 }
@@ -1089,7 +1108,7 @@ html, body {
   background: var(--surface0);
   border: 1px solid var(--surface1);
   color: var(--overlay2);
-  font-size: 11px;
+  font-size: 0.9rem;
   font-style: italic;
   max-width: 100%;
   text-align: center;
@@ -1119,7 +1138,7 @@ html, body {
   gap: 8px;
   flex-shrink: 0;
   height: 28px;
-  font-size: 11px;
+  font-size: 0.9rem;
   position: relative;
 }
 
@@ -1144,7 +1163,7 @@ html, body {
   color: var(--text);
   border-radius: 4px;
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 0.12s, color 0.12s;
@@ -1153,14 +1172,14 @@ html, body {
 .ai-provider-chip:hover { border-color: var(--mauve); color: var(--mauve); }
 
 .ai-status-provider-label {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay1);
   font-family: var(--font-mono);
   flex-shrink: 0;
 }
 
 .ai-status-model {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay1);
   font-family: var(--font-mono);
   max-width: 100px;
@@ -1175,7 +1194,7 @@ html, body {
 .ai-status-model:hover { color: var(--mauve); }
 
 .ai-status-memory {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--mauve);
   font-family: var(--font-mono);
   display: none;
@@ -1214,7 +1233,7 @@ html, body {
 }
 
 .ai-msg-meta {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay0);
   opacity: 0;
   transition: opacity 0.2s;
@@ -1232,7 +1251,7 @@ html, body {
   max-width: 90%;
   padding: 8px 11px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.95rem;
   line-height: 1.5;
   color: var(--text);
 }
@@ -1333,7 +1352,7 @@ html, body {
 .ai-error-text { color: var(--red); }
 
 .ai-heading {
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text);
   margin-top: 6px;
@@ -1353,7 +1372,7 @@ html, body {
   border-radius: 3px;
   padding: 1px 5px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--peach);
 }
 
@@ -1365,7 +1384,7 @@ html, body {
 .ai-list-item {
   margin: 2px 0;
   color: var(--text);
-  font-size: 12px;
+  font-size: 0.95rem;
 }
 
 .ai-code-block {
@@ -1387,7 +1406,7 @@ html, body {
 
 .ai-code-lang {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay1);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1414,7 +1433,7 @@ html, body {
 
 .ai-code-block code {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--text);
   white-space: pre;
 }
@@ -1431,7 +1450,7 @@ html, body {
   --btn-press: 0.93;
   padding: 3px 10px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 0.9rem;
 }
 
 .ai-action-btn--insert {
@@ -1456,7 +1475,7 @@ html, body {
 }
 
 .ai-dismissed {
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay0);
   font-style: italic;
 }
@@ -1481,7 +1500,7 @@ html, body {
   border: 1px solid color-mix(in srgb, var(--blue) 25%, transparent);
   border-radius: 4px;
   padding: 3px 6px;
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--blue);
   animation: ctx-pill-in 0.2s ease-out;
 }
@@ -1531,8 +1550,15 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay2);
+}
+
+.ai-config-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--overlay1);
 }
 
 .ai-config-input {
@@ -1541,7 +1567,7 @@ html, body {
   background: var(--base);
   color: var(--text);
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: 0.9rem;
   outline: none;
 }
 .ai-config-input:focus { border-color: var(--mauve); }
@@ -1551,7 +1577,7 @@ html, body {
   background: color-mix(in srgb, var(--mauve) 14%, transparent);
   color: var(--mauve);
   border-radius: 5px;
-  font-size: 11px;
+  font-size: 0.9rem;
   padding: 5px 8px;
   cursor: pointer;
 }
@@ -1576,7 +1602,7 @@ html, body {
   gap: 6px;
   padding: 5px 10px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 0.9rem;
   border-bottom: 1px solid var(--surface0);
   transition: background 0.1s, padding-left 0.12s;
 }
@@ -1586,7 +1612,7 @@ html, body {
 
 .ai-ac-cmd  { color: var(--mauve); font-family: var(--font-mono); font-weight: 600; }
 .ai-ac-arg  { color: var(--peach); font-family: var(--font-mono); }
-.ai-ac-desc { color: var(--overlay1); margin-left: auto; font-size: 10px; }
+.ai-ac-desc { color: var(--overlay1); margin-left: auto; font-size: 0.85rem; }
 
 .ai-compose-wrap {
   background: var(--surface0);
@@ -1604,7 +1630,7 @@ html, body {
   border: none;
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 0.95rem;
   padding: 9px 11px 6px;
   resize: none;
   outline: none;
@@ -1641,7 +1667,7 @@ html, body {
   padding: 2px 6px;
   border-color: var(--surface1);
   color: var(--overlay0);
-  font-size: 10px;
+  font-size: 0.85rem;
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -1659,7 +1685,7 @@ html, body {
 .ai-sidebar--compact .ai-provider-label { display: none; }
 .ai-sidebar--compact .ai-provider-state { display: none; }
 .ai-sidebar--compact .ai-status-memory { display: none; }
-.ai-sidebar--compact .ai-provider-select { max-width: 72px; font-size: 9px; }
+.ai-sidebar--compact .ai-provider-select { max-width: 72px; font-size: 0.8rem; }
 
 .ai-send-btn {
   --btn-press: 0.9;
@@ -1683,14 +1709,14 @@ html, body {
 
 .ai-config-copilot { display: flex; flex-direction: column; gap: 6px; }
 .ai-copilot-row { display: flex; align-items: center; gap: 6px; }
-.ai-copilot-status { font-size: 11px; color: var(--overlay1); flex: 1; }
+.ai-copilot-status { font-size: 0.9rem; color: var(--overlay1); flex: 1; }
 .ai-copilot-status--connected { color: var(--green); }
 .ai-copilot-status--pending { color: var(--yellow); }
 
 .ai-copilot-connect,
 .ai-copilot-disconnect {
   padding: 3px 9px;
-  font-size: 10px;
+  font-size: 0.85rem;
   border-radius: var(--radius);
   border: 1px solid var(--surface1);
   background: transparent;
@@ -1702,12 +1728,12 @@ html, body {
 .ai-copilot-disconnect:hover { border-color: var(--red); color: var(--red); }
 
 .ai-copilot-code-wrap { display: flex; flex-direction: column; gap: 4px; }
-.ai-copilot-instructions { font-size: 11px; color: var(--subtext1); line-height: 1.5; }
+.ai-copilot-instructions { font-size: 0.9rem; color: var(--subtext1); line-height: 1.5; }
 .ai-copilot-link { color: var(--blue); text-decoration: none; }
 .ai-copilot-link:hover { text-decoration: underline; }
 .ai-copilot-user-code {
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--mauve);
@@ -1723,7 +1749,7 @@ html, body {
   border: 1px solid var(--surface1);
   border-radius: var(--radius);
   overflow: hidden;
-  font-size: 11px;
+  font-size: 0.9rem;
 }
 .ai-diff-lines {
   max-height: 180px;
@@ -1734,7 +1760,7 @@ html, body {
 .ai-diff-add,
 .ai-diff-del {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.9rem;
   padding: 1px 8px;
   white-space: pre-wrap;
   word-break: break-all;
@@ -1744,7 +1770,7 @@ html, body {
 .ai-diff-no-change,
 .ai-diff-insert-note {
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay1);
 }
 .ai-diff-btns {
@@ -1811,7 +1837,7 @@ html, body {
 }
 
 .settings-title {
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -1851,7 +1877,7 @@ html, body {
 .settings-group + .settings-group { border-top: 1px solid var(--surface0); }
 
 .settings-group-title {
-  font-size: 10px;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--overlay0);
@@ -1863,7 +1889,7 @@ html, body {
   padding: 0 16px 4px;
 }
 .settings-hint {
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay0);
   font-style: italic;
 }
@@ -1879,7 +1905,7 @@ html, body {
 .settings-row:hover { background: var(--surface0); }
 
 .settings-label {
-  font-size: 12px;
+  font-size: 0.95rem;
   color: var(--subtext1);
   flex-shrink: 0;
 }
@@ -1889,7 +1915,7 @@ html, body {
   border: 1px solid var(--surface1);
   border-radius: var(--radius);
   color: var(--text);
-  font-size: 12px;
+  font-size: 0.95rem;
   font-family: var(--font-ui);
   padding: 4px 8px;
   outline: none;
@@ -1929,7 +1955,7 @@ html, body {
 .settings-range:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; border-radius: 2px; }
 
 .settings-range-val {
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay2);
   font-family: var(--font-mono);
   min-width: 28px;
@@ -2017,7 +2043,7 @@ html, body {
 
 .outline-empty {
   padding: 14px 12px;
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay1);
 }
 .outline-empty--hidden { display: none; }
@@ -2046,7 +2072,7 @@ html, body {
 .outline-item:active { background: var(--surface1); }
 
 .outline-badge {
-  font-size: 9px;
+  font-size: 0.8rem;
   font-weight: 700;
   font-family: var(--font-mono);
   border-radius: 3px;
@@ -2066,7 +2092,7 @@ html, body {
 
 .outline-name {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 0.95rem;
   color: var(--text);
   flex: 1;
   overflow: hidden;
@@ -2075,7 +2101,7 @@ html, body {
 }
 
 .outline-line {
-  font-size: 10px;
+  font-size: 0.85rem;
   color: var(--overlay0);
   font-family: var(--font-mono);
   flex-shrink: 0;
@@ -2098,7 +2124,7 @@ html, body {
 .expr-math-placeholder {
   color: var(--overlay0);
   font-style: italic;
-  font-size: 12px;
+  font-size: 0.95rem;
   font-family: var(--font-ui);
 }
 
@@ -2151,7 +2177,7 @@ html, body {
 
 .cmd-search-icon {
   color: var(--blue);
-  font-size: 18px;
+  font-size: 1.4rem;
   font-weight: 300;
   line-height: 1;
   flex-shrink: 0;
@@ -2166,7 +2192,7 @@ html, body {
   outline: none;
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 1.1rem;
   caret-color: var(--blue);
 }
 .cmd-input::placeholder { color: var(--overlay0); }
@@ -2201,7 +2227,7 @@ html, body {
 }
 
 .cmd-item-label {
-  font-size: 13px;
+  font-size: 1rem;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -2210,7 +2236,7 @@ html, body {
 .cmd-item--active .cmd-item-label { color: var(--blue); }
 
 .cmd-item-desc {
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay1);
   white-space: nowrap;
   overflow: hidden;
@@ -2218,7 +2244,7 @@ html, body {
 }
 
 .cmd-item-kb {
-  font-size: 11px;
+  font-size: 0.9rem;
   font-family: var(--font-mono);
   color: var(--overlay0);
   background: var(--surface0);
@@ -2233,7 +2259,7 @@ html, body {
   padding: 24px 16px;
   text-align: center;
   color: var(--overlay0);
-  font-size: 13px;
+  font-size: 1rem;
   font-style: italic;
 }
 
@@ -2258,7 +2284,7 @@ html, body {
 }
 .inline-slider-bound {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 0.8rem;
   color: var(--overlay0);
   min-width: 16px;
   text-align: center;
@@ -2295,7 +2321,7 @@ html, body {
 }
 .inline-slider-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--mauve);
   min-width: 28px;
@@ -2349,7 +2375,7 @@ html, body {
 .expr-slider-track:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.05); }
 .expr-slider-badge {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--blue);
   min-width: 26px;
@@ -2385,7 +2411,7 @@ html, body {
 
 .ai-model-item {
   padding: 5px 8px;
-  font-size: 11px;
+  font-size: 0.9rem;
   font-family: var(--font-mono);
   color: var(--subtext1);
   cursor: pointer;
@@ -2404,7 +2430,7 @@ html, body {
 
 .ai-model-empty {
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay0);
   font-style: italic;
 }
@@ -2420,7 +2446,7 @@ html, body {
 
 .search-modal .cmd-search-icon {
   transform: none;
-  font-size: 17px;
+  font-size: 1.3rem;
 }
 
 .search-regex-btn {
@@ -2428,7 +2454,7 @@ html, body {
   border-color: var(--surface1);
   color: var(--overlay0);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.9rem;
   padding: 2px 7px;
 }
 .search-regex-btn.active {
@@ -2437,9 +2463,21 @@ html, body {
   background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
 
+.search-pick-btn {
+  align-self: flex-start;
+  margin: 0 12px 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--blue);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--blue);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
 .search-summary {
   padding: 7px 16px;
-  font-size: 11px;
+  font-size: 0.9rem;
   color: var(--overlay1);
   border-bottom: 1px solid var(--surface0);
   flex-shrink: 0;
@@ -2447,16 +2485,7 @@ html, body {
 
 .search-hit-text {
   font-family: var(--font-mono);
-  font-size: 12px;
-}
-
-#enhanced-note {
-  padding: 7px 14px;
-  font-size: 11px;
-  color: var(--overlay1);
-  background: color-mix(in srgb, var(--blue) 7%, transparent);
-  border-bottom: 1px solid var(--surface0);
-  flex-shrink: 0;
+  font-size: 0.95rem;
 }
 
 .graph-linked-line {

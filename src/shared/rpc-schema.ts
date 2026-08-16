@@ -72,6 +72,7 @@ export type DesmosIdeRPC = {
       readFileAt: { params: { path: string }; response: FileResult<{ path: string; content: string }> };
       searchFiles: { params: { paths: string[]; query: string; useRegex: boolean }; response: SearchResult };
       searchFolder: { params: { root: string; query: string; useRegex: boolean }; response: SearchResult };
+      pickFolder: { params: void; response: string | null };
 
       secretsAvailable: { params: void; response: boolean };
       secretGet: { params: { account: string }; response: string | null };

@@ -97,6 +97,16 @@ async function saveDialogFallback(opts: SaveDialogOptions): Promise<string | nul
   return join(dir, ensureExtension(basename(opts.defaultName), opts.extension));
 }
 
+// lets search reach a folder before any file is open, which is the state a fresh install is in
+export async function showFolderDialog(): Promise<string | null> {
+  const picked = await Utils.openFileDialog({
+    canChooseFiles: false,
+    canChooseDirectory: true,
+    allowsMultipleSelection: false,
+  });
+  return picked.filter(Boolean)[0] ?? null;
+}
+
 export async function showOpenDialog(opts: OpenDialogOptions): Promise<string | null> {
   const picked = await Utils.openFileDialog({
     canChooseFiles: true,

@@ -18,7 +18,7 @@ import { EnhancedPane } from './enhanced';
 import { Transport } from './transport';
 import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings } from './settings';
-import type { ColorTheme, EditorSettings } from './settings';
+import type { ColorTheme, EditorSettings, UiScale } from './settings';
 import { compileStatus, errorsByPhase } from './compile-status';
 import { CommandPalette } from './command-palette';
 import type { PaletteCommand } from './command-palette';
@@ -52,6 +52,7 @@ const btnNew          = document.getElementById('btn-new')      as HTMLButtonEle
 const btnOpen         = document.getElementById('btn-open')     as HTMLButtonElement;
 const btnSave         = document.getElementById('btn-save')     as HTMLButtonElement;
 const filenameEl      = document.getElementById('filename')!;
+const savedDotEl      = document.getElementById('saved-dot')!;
 const statusMsg       = document.getElementById('status-msg')!;
 const gitBranchEl     = document.getElementById('git-branch') as HTMLSpanElement;
 const gitSummaryMsg   = document.getElementById('git-summary-msg')!;
@@ -384,8 +385,14 @@ function applyUiFont(fontFamily: string): void {
   document.documentElement.style.setProperty('--font-ui', fontFamily);
 }
 
+// every ui font size is a rem, so this one attribute resizes the whole interface
+function applyUiScale(scale: UiScale): void {
+  document.documentElement.setAttribute('data-ui-scale', scale);
+}
+
 applyTheme(initSettings.colorTheme);
 applyUiFont(initSettings.uiFontFamily);
+applyUiScale(initSettings.uiScale);
 monaco.editor.setTheme(initSettings.editorTheme);
 
 
@@ -463,10 +470,23 @@ function renderOutline(symbols: SymbolInfo[]): void {
     li.appendChild(badge);
     li.appendChild(name);
     li.appendChild(lineNum);
-    li.addEventListener('click', () => {
+
+    // the row acts as a button, so the outline is reachable without a mouse
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+    li.setAttribute('aria-label', `${sym.kind} ${sym.name}, line ${sym.line}`);
+
+    const jump = () => {
       editor.revealLineInCenter(sym.line);
       editor.setPosition({ lineNumber: sym.line, column: sym.col });
       editor.focus();
+    };
+    li.addEventListener('click', jump);
+    li.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      // space would otherwise scroll the panel out from under the selection
+      e.preventDefault();
+      jump();
     });
     outlineList.appendChild(li);
   }
@@ -510,8 +530,6 @@ const BUILTIN_SIGS: Record<string, string> = {
 };
 
 // makes ⇧⌥F and the "Format Code" palette entry real
-// makes ⇧⌥F and the "Format Code" palette entry real, and gives format-on-save
-// something to call
 monaco.languages.registerDocumentFormattingEditProvider(LANGUAGE_ID, {
   provideDocumentFormattingEdits(model) {
     const formatted = formatDsl(model.getValue());
@@ -646,6 +664,7 @@ function runCompile(): void {
 editor.onDidChangeModelContent(() => {
   if (compileTimer !== null) clearTimeout(compileTimer);
   compileTimer = setTimeout(runCompile, 280);
+  refreshSavedState();
   schedulePersist();
 });
 
@@ -1053,7 +1072,24 @@ function setFilename(p: string | null): Promise<unknown> {
   currentPath = p;
   if (p) rememberRecent(p);
   filenameEl.textContent = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
+  refreshSavedState();
   return Promise.resolve(window.electronAPI?.setGitContext(p)).then(refreshGitPanels);
+}
+
+let savedSource: string | null = null;
+
+function markSaved(content: string): void {
+  savedSource = content;
+  refreshSavedState();
+}
+
+function refreshSavedState(): void {
+  const unsaved = savedSource === null || editor.getValue() !== savedSource;
+  savedDotEl.classList.toggle('hidden', !unsaved);
+  savedDotEl.title = currentPath
+    ? 'Unsaved changes — ⌘S to write them to the file'
+    : 'This buffer has no file yet — ⌘S to choose one';
+  filenameEl.classList.toggle('filename--unsaved', unsaved);
 }
 
 function refreshGitPanels(): Promise<unknown> {
@@ -1079,6 +1115,7 @@ window.electronAPI?.onFileChanged((changedPath, content) => {
   if (changedPath !== currentPath) return;
   if (content === editor.getValue()) return;
   editor.setValue(content);
+  markSaved(content);
   setStatus('↻ Reloaded from disk', 'info');
   runCompile();
 });
@@ -1094,6 +1131,7 @@ async function cmdNew(): Promise<void> {
   if (!(await enhancedDirtyGuard())) return;
   stopWatching();
   editor.setValue(DEFAULT_SRC);
+  savedSource = null;
   void setFilename(null);
   setStatus('New file', 'info');
   applyMode('dsl');
@@ -1109,6 +1147,7 @@ async function cmdOpen(): Promise<void> {
     return;
   }
   editor.setValue(result.content);
+  markSaved(result.content);
   void setFilename(result.path);
   startWatching(result.path);
   applyMode(mode === 'enhanced' ? 'dsl' : mode);
@@ -1122,15 +1161,14 @@ async function cmdSave(saveAs = false): Promise<void> {
     return;
   }
   if (formatOnSave) await formatDocument();
-  const result = await window.electronAPI?.saveFile(
-    saveAs ? null : currentPath,
-    editor.getValue(),
-  );
+  const sent = editor.getValue();
+  const result = await window.electronAPI?.saveFile(saveAs ? null : currentPath, sent);
   if (!result) return;
   if (result.ok) {
+    markSaved(sent);
     void setFilename(result.path);
     startWatching(result.path);
-    setStatus('Saved', 'success');
+    setStatus(`Saved to ${result.path}`, 'success');
     persistSession();
   } else if (!result.canceled) {
     setStatus(result.message, 'error');
@@ -1177,8 +1215,9 @@ async function autosave(): Promise<void> {
   if (!currentPath || mode === 'enhanced' || autosaving) return;
   autosaving = true;
   try {
-    const result = await window.electronAPI?.saveFile(currentPath, editor.getValue());
-    if (result?.ok) setStatus('Autosaved', 'info');
+    const sent = editor.getValue();
+    const result = await window.electronAPI?.saveFile(currentPath, sent);
+    if (result?.ok) { markSaved(sent); setStatus('Autosaved', 'info'); }
     else if (result && !result.canceled) setStatus(result.message, 'error');
   } finally {
     autosaving = false;
@@ -1206,6 +1245,7 @@ async function openPath(path: string, at?: { line: number; col: number }): Promi
     return false;
   }
   editor.setValue(result.content);
+  markSaved(result.content);
   void setFilename(result.path);
   startWatching(result.path);
   if (mode === 'enhanced') applyMode('dsl');
@@ -1557,6 +1597,7 @@ function ensureSettingsPanel(): SettingsPanel {
     applyGitAutofetch(s);
     applyTheme(s.colorTheme);
     applyUiFont(s.uiFontFamily);
+    applyUiScale(s.uiScale);
     monaco.editor.setTheme(s.editorTheme);
     editor.updateOptions({
       fontSize:    s.fontSize,
@@ -1584,6 +1625,7 @@ const searchPanel = new SearchPanel({
     window.electronAPI?.searchFiles(paths, query, useRegex) ?? NO_BRIDGE,
   searchFolder: (root, query, useRegex) =>
     window.electronAPI?.searchFolder(root, query, useRegex) ?? NO_BRIDGE,
+  pickFolder: () => window.electronAPI?.pickFolder() ?? Promise.resolve(null),
   onOpen: hit => openPath(hit.path, { line: hit.line, col: hit.col }),
 });
 

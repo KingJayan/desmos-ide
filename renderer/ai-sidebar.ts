@@ -422,6 +422,7 @@ export class AISidebar {
             </div>
           </div>
           <div class="ai-config-standard">
+            <p class="ai-config-hint">The model and base url are filled in already. Paste a key to start, or pick Ollama to run a local model with no key at all.</p>
             <label class="ai-config-row">
               <span>model</span>
               <select class="ai-config-input ai-config-model"></select>
@@ -434,6 +435,7 @@ export class AISidebar {
               <span>api key</span>
               <input class="ai-config-input ai-config-key" type="password" spellcheck="false" />
             </label>
+            <p class="ai-config-hint ai-config-key-note"></p>
           </div>
           <button class="ai-config-save" type="button">save</button>
         </div>
@@ -453,6 +455,13 @@ export class AISidebar {
     this.cfgBaseUrlEl = this.el.querySelector('.ai-config-baseurl')!;
     this.cfgApiKeyEl = this.el.querySelector('.ai-config-key')!;
     this.cfgSaveEl = this.el.querySelector('.ai-config-save')!;
+    // says where the key lands, which depends on whether a keychain answered
+    const keyNote = this.el.querySelector('.ai-config-key-note') as HTMLElement;
+    void this.secrets.load().then(() => {
+      keyNote.textContent = this.secrets.secure
+        ? 'The key is kept in the system keychain, not in the app.'
+        : 'No keychain answered, so the key stays in this app\u2019s local storage.';
+    });
     this.cfgCopilotEl = this.el.querySelector('.ai-config-copilot')!;
     this.scrollFabEl  = this.el.querySelector('.ai-scroll-fab')!;
     this.scrollFabDotEl = this.el.querySelector('.ai-scroll-fab-dot')!;

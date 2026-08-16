@@ -51,6 +51,7 @@ interface Window {
       | { ok: true; hits: Array<{ path: string; line: number; col: number; text: string }>; scanned: number }
       | { ok: false; errorCode: string; message: string }
     >;
+    pickFolder(): Promise<string | null>;
     secretsAvailable(): Promise<boolean>;
     secretGet(account: string): Promise<string | null>;
     secretSet(account: string, value: string): Promise<boolean>;

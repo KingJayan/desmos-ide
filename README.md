@@ -17,9 +17,11 @@
 - **timeline** — declare a `time` clock and a bar under the graph gives play, pause, speed and scrub
 - **animation presets** — `ease`, `pulse`, `bounce`, `wobble` and `orbit` shape the clock
 - **3d projection** — `camera` and `project(x, y, z)` put a 3D scene on the 2D graph
+- **search** — ⇧⌘F across the recent files, or across a folder you choose
 - **source control** — branches, history and remotes for the repo the open file lives in
 - **themes** — Catppuccin, GitHub Dark/Light, Monokai, VS Dark/Light
 - **customizable editor** — font, font size, minimap, line numbers, word wrap
+- **interface size** — compact, default or large, for the panels and the status bar
 - **file operations** — open and save `.dsmx` files through native dialogs
 - **AI sidebar** — chat to generate or modify expressions, streamed. Works with any
   OpenAI-compatible endpoint, OpenRouter, a local Ollama, or GitHub Copilot

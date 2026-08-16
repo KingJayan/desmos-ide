@@ -2,7 +2,7 @@ import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/b
 import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
 import { exportJson, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
-import { showConfirm, showPrompt } from './dialogs';
+import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
 import { searchFolder, searchPaths } from './search';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import {
@@ -27,6 +27,7 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       openFile: () => openFile(),
       saveFile: ({ path, content }) => saveFile(path, content),
       exportJson: ({ content }) => exportJson(content),
+      pickFolder: () => showFolderDialog(),
       watchFile: ({ path }) => {
         watchFile(path, (changedPath, content) =>
           rpc.send.fileChanged({ path: changedPath, content }));

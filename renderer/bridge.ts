@@ -101,6 +101,7 @@ export const electronAPI = {
     rpc.request.searchFiles({ paths, query, useRegex }),
   searchFolder: (root: string, query: string, useRegex = false) =>
     rpc.request.searchFolder({ root, query, useRegex }),
+  pickFolder: () => rpc.request.pickFolder().catch(() => null),
 
   // a webview cannot reach the keychain, so every secret goes over the bridge.
   // a bridge failure means no secure store, and the caller falls back.
