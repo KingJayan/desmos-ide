@@ -162,16 +162,16 @@ export class SettingsPanel {
     overlay.innerHTML = `
       <div class="settings-modal">
         <div class="settings-header">
-          <span class="settings-title" id="settings-dialog-title">Settings</span>
+          <span class="settings-title" id="settings-dialog-title">settings</span>
           <button class="settings-close" aria-label="Close settings"><i data-lucide="x" aria-hidden="true"></i></button>
         </div>
         <div class="settings-body">
 
           <div class="settings-group">
-            <div class="settings-group-title">App Theme</div>
+            <div class="settings-group-title">app theme</div>
 
             <div class="settings-row">
-              <label class="settings-label">Color Theme</label>
+              <label class="settings-label">color theme</label>
               <select class="settings-select" id="s-color-theme">
                 <option value="desmos-dark">Catppuccin Mocha</option>
                 <option value="catppuccin-latte">Catppuccin Latte</option>
@@ -186,7 +186,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label" for="s-ui-scale">Interface Size</label>
+              <label class="settings-label" for="s-ui-scale">interface size</label>
               <select class="settings-select" id="s-ui-scale">
                 <option value="compact">Compact</option>
                 <option value="default">Default</option>
@@ -199,13 +199,13 @@ export class SettingsPanel {
           </div>
 
           <div class="settings-group">
-            <div class="settings-group-title">Editor Theme</div>
+            <div class="settings-group-title">editor theme</div>
             <div class="settings-row settings-hint-row">
               <span class="settings-hint">Applies to DSL editor and Enhanced view</span>
             </div>
 
             <div class="settings-row">
-              <label class="settings-label">Syntax Theme</label>
+              <label class="settings-label">syntax theme</label>
               <select class="settings-select" id="s-editor-theme">
                 <option value="desmos-dark">Catppuccin Mocha</option>
                 <option value="catppuccin-latte">Catppuccin Latte</option>
@@ -220,7 +220,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label">Font Size</label>
+              <label class="settings-label">font size</label>
               <div class="settings-range-wrap">
                 <input type="range" class="settings-range" id="s-font-size" min="12" max="20" step="1" />
                 <span class="settings-range-val" id="s-font-size-val"></span>
@@ -228,7 +228,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label">UI Font</label>
+              <label class="settings-label">ui font</label>
               <select class="settings-select" id="s-ui-font-family">
                 <option value='"Avenir Next", "SF Pro Text", "Segoe UI", sans-serif'>Avenir Next</option>
                 <option value='"Segoe UI", "Helvetica Neue", Arial, sans-serif'>Segoe UI</option>
@@ -239,7 +239,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label">Code Font</label>
+              <label class="settings-label">code font</label>
               <select class="settings-select" id="s-code-font-family">
                 <option value='"JetBrains Mono", "Cascadia Code", Consolas, monospace'>JetBrains Mono</option>
                 <option value='"Cascadia Code", Consolas, monospace'>Cascadia Code</option>
@@ -251,10 +251,10 @@ export class SettingsPanel {
           </div>
 
           <div class="settings-group">
-            <div class="settings-group-title">Editor</div>
+            <div class="settings-group-title">editor</div>
 
             <div class="settings-row">
-              <label class="settings-label">Line Numbers</label>
+              <label class="settings-label">line numbers</label>
               <select class="settings-select" id="s-line-numbers">
                 <option value="on">On</option>
                 <option value="relative">Relative</option>
@@ -263,7 +263,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label" for="s-minimap">Minimap</label>
+              <label class="settings-label" for="s-minimap">minimap</label>
               <label class="settings-toggle" aria-label="Minimap">
                 <input type="checkbox" id="s-minimap" class="settings-toggle-input" />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
@@ -271,7 +271,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label" for="s-word-wrap">Word Wrap</label>
+              <label class="settings-label" for="s-word-wrap">word wrap</label>
               <label class="settings-toggle" aria-label="Word Wrap">
                 <input type="checkbox" id="s-word-wrap" class="settings-toggle-input" />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
@@ -279,7 +279,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label" for="s-format-on-save">Format On Save</label>
+              <label class="settings-label" for="s-format-on-save">format on save</label>
               <label class="settings-toggle" aria-label="Format On Save">
                 <input type="checkbox" id="s-format-on-save" class="settings-toggle-input" />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
@@ -287,7 +287,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label" for="s-autosave">Autosave</label>
+              <label class="settings-label" for="s-autosave">autosave</label>
               <label class="settings-toggle" aria-label="Autosave">
                 <input type="checkbox" id="s-autosave" class="settings-toggle-input" />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
@@ -299,13 +299,13 @@ export class SettingsPanel {
           </div>
 
           <div class="settings-group">
-            <div class="settings-group-title">Git</div>
+            <div class="settings-group-title">git</div>
             <div class="settings-row settings-hint-row">
               <span class="settings-hint">Background fetch keeps the ahead/behind count current. It uses the network.</span>
             </div>
 
             <div class="settings-row">
-              <label class="settings-label" for="s-git-autofetch">Auto Fetch</label>
+              <label class="settings-label" for="s-git-autofetch">auto fetch</label>
               <label class="settings-toggle" aria-label="Auto Fetch">
                 <input type="checkbox" id="s-git-autofetch" class="settings-toggle-input" />
                 <span class="settings-toggle-track" aria-hidden="true"></span>
@@ -313,7 +313,7 @@ export class SettingsPanel {
             </div>
 
             <div class="settings-row">
-              <label class="settings-label" for="s-git-autofetch-period">Fetch Every</label>
+              <label class="settings-label" for="s-git-autofetch-period">fetch every</label>
               <select class="settings-select" id="s-git-autofetch-period">
                 <option value="60">1 minute</option>
                 <option value="180">3 minutes</option>

@@ -1222,7 +1222,7 @@ monaco.languages.registerCodeLensProvider(LANGUAGE_ID, {
         range: new monaco.Range(m.startLineNumber, 1, m.startLineNumber, 1),
         command: {
           id: fixErrCmdId!,
-          title: '⚡ Fix error',
+          title: '⚡ fix error',
           arguments: [m.message, model.getLineContent(m.startLineNumber)],
         },
       });
@@ -1239,7 +1239,7 @@ editor.onDidChangeModelDecorations(() => {
 // "Optimize expression" context menu action (requires selection)
 editor.addAction({
   id: 'ai.optimize',
-  label: 'AI: Optimize expression',
+  label: 'ai: optimize expression',
   contextMenuGroupId: 'ai',
   contextMenuOrder: 1,
   precondition: 'editorHasSelection',
@@ -1328,41 +1328,41 @@ const searchPanel = new SearchPanel({
 const baseCommands: PaletteCommand[] = [
   {
     id: 'file.new',
-    label: 'New File',
+    label: 'new file',
     description: 'Clear the editor and start fresh',
     keybinding: '⌘N',
     action: () => cmdNew(),
   },
   {
     id: 'file.open',
-    label: 'Open File…',
+    label: 'open file…',
     description: 'Open a .dsmx file from disk',
     keybinding: '⌘O',
     action: () => cmdOpen(),
   },
   {
     id: 'file.save',
-    label: 'Save File',
+    label: 'save file',
     description: 'Save the current DSL file',
     keybinding: '⌘S',
     action: () => cmdSave(),
   },
   {
     id: 'file.saveas',
-    label: 'Save File As…',
+    label: 'save file as…',
     description: 'Save to a new location',
     action: () => cmdSave(true),
   },
   {
     id: 'file.exporttex',
-    label: 'Export TeX Figure…',
+    label: 'export tex figure…',
     description: 'Write the graph as a standalone pgfplots document',
     keybinding: '⌘⇧T',
     action: () => cmdExportTex(),
   },
   {
     id: 'graph.reset',
-    label: 'Reset Graph',
+    label: 'reset graph',
     description: 'Clear all expressions from the graph',
     action: () => {
       graph.update([]);
@@ -1373,7 +1373,7 @@ const baseCommands: PaletteCommand[] = [
   },
   {
     id: 'graph.export-image',
-    label: 'Export as Image',
+    label: 'export as image',
     description: 'Download the current graph as a PNG',
     action: async () => {
       try {
@@ -1391,70 +1391,70 @@ const baseCommands: PaletteCommand[] = [
   },
   {
     id: 'editor.format',
-    label: 'Format Code',
+    label: 'format code',
     description: 'Auto-format the DSL source',
     keybinding: '⇧⌥F',
     action: () => runEditorAction('editor.action.formatDocument'),
   },
   {
     id: 'editor.find',
-    label: 'Find',
+    label: 'find',
     description: 'Open the find widget',
     keybinding: '⌘F',
     action: () => runEditorAction('actions.find'),
   },
   {
     id: 'editor.replace',
-    label: 'Find & Replace',
+    label: 'find & replace',
     description: 'Open find & replace widget',
     keybinding: '⌘H',
     action: () => runEditorAction('editor.action.startFindReplaceAction'),
   },
   {
     id: 'mode.dsl',
-    label: 'Switch to DSL Mode',
+    label: 'switch to dsl mode',
     description: 'Show only the DSL editor',
     action: () => applyMode('dsl'),
   },
   {
     id: 'mode.split',
-    label: 'Switch to Split Mode',
+    label: 'switch to split mode',
     description: 'Show DSL editor and Enhanced pane side by side',
     action: () => applyMode('split'),
   },
   {
     id: 'mode.enhanced',
-    label: 'Switch to Enhanced Mode',
+    label: 'switch to enhanced mode',
     description: 'Edit the expressions the way Desmos does — every edit goes back into the DSL',
     action: () => applyMode('enhanced'),
   },
   {
     id: 'sidebar.git',
-    label: 'Toggle Source Control Sidebar',
+    label: 'toggle source control sidebar',
     description: 'Open or close the Git panel',
     action: () => setSidebarView(sidebarView === 'git' ? null : 'git'),
   },
   {
     id: 'sidebar.ai',
-    label: 'Toggle AI Assistant Sidebar',
+    label: 'toggle ai assistant sidebar',
     description: 'Open or close the AI chat panel',
     action: () => setSidebarView(sidebarView === 'ai' ? null : 'ai'),
   },
   {
     id: 'sidebar.outline',
-    label: 'Toggle Outline Sidebar',
+    label: 'toggle outline sidebar',
     description: 'Open or close the symbol outline',
     action: () => setSidebarView(sidebarView === 'outline' ? null : 'outline'),
   },
   {
     id: 'compile.run',
-    label: 'Recompile',
+    label: 'recompile',
     description: 'Manually trigger a DSL recompile',
     action: () => { runCompile(); setStatus('Recompiling…', 'info'); },
   },
   {
     id: 'editor.rename',
-    label: 'Rename Symbol (F2)',
+    label: 'rename symbol (f2)',
     description: 'Rename the symbol under the cursor throughout the file',
     keybinding: 'F2',
     action: () => {
@@ -1464,7 +1464,7 @@ const baseCommands: PaletteCommand[] = [
   },
   {
     id: 'file.search',
-    label: 'Search in Recent Files',
+    label: 'search in recent files',
     description: 'Find text across the files you have opened',
     keybinding: '⇧⌘F',
     action: () => searchPanel.show(),
@@ -1485,7 +1485,7 @@ function refreshPaletteCommands(): void {
       const { name, hint } = recentLabel(f.path, paths);
       return {
         id: `file.recent:${f.path}`,
-        label: `Open Recent: ${name}`,
+        label: `open recent: ${name}`,
         description: hint || f.path,
         action: () => void openPath(f.path),
       };

@@ -415,8 +415,8 @@ export class AISidebar {
             <div class="ai-copilot-row">
               <span class="ai-copilot-status"></span>
               <button class="ai-copilot-connect" type="button">Sign in</button>
-              <button class="ai-copilot-cancel" type="button" hidden>Cancel</button>
-              <button class="ai-copilot-disconnect" type="button" hidden>Disconnect</button>
+              <button class="ai-copilot-cancel" type="button" hidden>cancel</button>
+              <button class="ai-copilot-disconnect" type="button" hidden>disconnect</button>
             </div>
             <div class="ai-copilot-code-wrap" hidden>
               <p class="ai-copilot-instructions">Open <a class="ai-copilot-link" href="#" id="ai-copilot-verif-link">github.com/login/device</a> and enter:</p>
@@ -1256,15 +1256,15 @@ export class AISidebar {
 
     const insertBtn = document.createElement('button');
     insertBtn.className = 'ai-action-btn ai-action-btn--insert';
-    insertBtn.textContent = 'Insert';
+    insertBtn.textContent = 'insert';
 
     const replaceBtn = document.createElement('button');
     replaceBtn.className = 'ai-action-btn ai-action-btn--replace';
-    replaceBtn.textContent = 'Replace';
+    replaceBtn.textContent = 'replace';
 
     const denyBtn = document.createElement('button');
     denyBtn.className = 'ai-action-btn ai-action-btn--deny';
-    denyBtn.textContent = 'Dismiss';
+    denyBtn.textContent = 'dismiss';
 
     if (this.autoApprove) {
       insertBtn.addEventListener('click', () => {
