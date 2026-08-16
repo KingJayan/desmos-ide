@@ -1,0 +1,119 @@
+{
+  "_generated": "by scripts/build-grammar.ts from the compiler tables — do not edit",
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Desmos DSL",
+  "scopeName": "source.dsmx",
+  "fileTypes": [
+    "dsmx"
+  ],
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#keyword"
+    },
+    {
+      "include": "#builtin"
+    },
+    {
+      "include": "#call"
+    },
+    {
+      "include": "#operator"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "include": "#identifier"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.dsmx",
+      "match": "//.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.dsmx",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.dsmx"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.dsmx"
+        }
+      }
+    },
+    "number": {
+      "name": "constant.numeric.dsmx",
+      "match": "(?:\\b\\d+(?:\\.\\d+)?|\\.\\d+)(?:[eE][+-]?\\d+)?\\b"
+    },
+    "keyword": {
+      "name": "keyword.control.dsmx",
+      "match": "\\b(?:elevation|azimuth|polygon|project|segment|camera|circle|domain|mirror|period|region|spiral|alias|curve|debug|group|point|where|else|expr|grid|line|loop|step|text|then|time|wave|for|map|as|at|fn|if|in)\\b"
+    },
+    "builtin": {
+      "name": "support.function.dsmx",
+      "match": "\\b(?:gradient|polygon|project|arccos|arcsin|arctan|bounce|slider|wobble|floor|orbit|pulse|round|ceil|ease|sign|sqrt|abs|cos|exp|hsv|log|max|min|mod|rgb|sin|tan|ln)\\b"
+    },
+    "call": {
+      "name": "entity.name.function.dsmx",
+      "match": "[a-zA-Z_\\u03b1-\\u03c9][a-zA-Z_\\u03b1-\\u03c90-9]*(?=\\s*\\()"
+    },
+    "operator": {
+      "patterns": [
+        {
+          "name": "keyword.operator.range.dsmx",
+          "match": "\\.\\.\\.|\\.\\."
+        },
+        {
+          "name": "keyword.operator.arrow.dsmx",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.comparison.dsmx",
+          "match": ">=|<=|!=|=="
+        },
+        {
+          "name": "keyword.operator.dsmx",
+          "match": "[+\\-*/^=<>!]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.section.braces.dsmx",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.section.brackets.dsmx",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.section.parens.dsmx",
+          "match": "[()]"
+        },
+        {
+          "name": "punctuation.separator.dsmx",
+          "match": "[,:]"
+        }
+      ]
+    },
+    "identifier": {
+      "name": "variable.other.dsmx",
+      "match": "[a-zA-Z_\\u03b1-\\u03c9][a-zA-Z_\\u03b1-\\u03c90-9]*"
+    }
+  }
+}

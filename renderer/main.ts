@@ -11,6 +11,7 @@ import { builtinSignature } from '../src/compiler/builtins';
 import { formatDsl } from '../src/compiler/format';
 import { findRenameEdits, isValidIdent } from '../src/compiler/rename';
 import CompileWorker from './compile.worker?worker';
+import { compileToTex } from '../src/index';
 import type { CompileResult, SymbolInfo, ExprSource } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
@@ -879,6 +880,32 @@ async function cmdSave(saveAs = false): Promise<void> {
   }
 }
 
+async function cmdExportTex(): Promise<void> {
+  const name = currentPath?.replace(/^.*\//, '').replace(/\.dsmx$/, '') ?? 'figure';
+  const result = compileToTex(editor.getValue(), {
+    title: currentPath?.replace(/^.*\//, '') ?? 'an unsaved file',
+    viewport: graph.viewport() ?? undefined,
+  });
+
+  if (!result.success) {
+    setStatus(`Cannot export: ${result.errors[0]?.message ?? 'the source does not compile'}`, 'error');
+    return;
+  }
+
+  const saved = await window.electronAPI?.exportTex(result.tex, `${name}.tex`);
+  if (!saved) return;
+  if (saved.ok) {
+    setStatus(
+      result.skipped.length
+        ? `Exported without ${result.skipped.map(s => s.name).join(', ')} — ${result.skipped[0].reason}`
+        : `Exported to ${saved.path}`,
+      result.skipped.length ? 'info' : 'success',
+    );
+  } else if (!saved.canceled) {
+    setStatus(saved.message, 'error');
+  }
+}
+
 btnNew.addEventListener('click',  () => cmdNew());
 btnOpen.addEventListener('click', () => cmdOpen());
 btnSave.addEventListener('click', () => cmdSave());
@@ -1056,6 +1083,7 @@ window.electronAPI?.onMenuNew(cmdNew);
 window.electronAPI?.onMenuOpen(cmdOpen);
 window.electronAPI?.onMenuSave(() => cmdSave());
 window.electronAPI?.onMenuSaveAs(() => cmdSave(true));
+window.electronAPI?.onMenuExportTex(() => void cmdExportTex());
 window.electronAPI?.onMenuOpenRecent(path => void openPath(path));
 
 window.addEventListener('focus', () => {
@@ -1324,6 +1352,13 @@ const baseCommands: PaletteCommand[] = [
     label: 'Save File As…',
     description: 'Save to a new location',
     action: () => cmdSave(true),
+  },
+  {
+    id: 'file.exporttex',
+    label: 'Export TeX Figure…',
+    description: 'Write the graph as a standalone pgfplots document',
+    keybinding: '⌘⇧T',
+    action: () => cmdExportTex(),
   },
   {
     id: 'graph.reset',

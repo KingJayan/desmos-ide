@@ -5,7 +5,10 @@ import { parse, ParseError } from './compiler/parser';
 import { optimize } from './compiler/optimizer';
 import { codegenWithSourceMap, ClockInfo, DesmosState, DesmosExpr, ExprSource } from './compiler/codegen';
 import { analyze } from './compiler/analyze';
+import { toTex, TexOptions, TexResult } from './compiler/tex';
 import type { Program, Statement, Expr } from './compiler/types';
+
+export type { TexOptions, TexResult, TexSkip, TexViewport } from './compiler/tex';
 
 export { registerLanguage, LANGUAGE_ID, errorToMarker } from './monaco/language';
 export type { DesmosState, DesmosExpr, DesmosSlider, ExprSource } from './compiler/codegen';
@@ -226,4 +229,14 @@ export function compile(src: string): CompileResult {
 export function compileToList(src: string): DesmosExpr[] | null {
   const r = compile(src);
   return r.success ? r.state.expressions.list : null;
+}
+
+export type TexSuccess = { success: true } & TexResult;
+
+export function compileToTex(src: string, opts: TexOptions = {}): TexSuccess | CompileFailure {
+  const result = compile(src);
+  if (!result.success) return result;
+
+  const { ast } = parse(tokenize(src));
+  return { success: true, ...toTex(optimize(ast), opts) };
 }

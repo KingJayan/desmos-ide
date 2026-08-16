@@ -138,6 +138,12 @@ export class DesmosGraph {
     });
   }
 
+  viewport(): { xmin: number; xmax: number; ymin: number; ymax: number } | null {
+    const m = this.calc.graphpaperBounds?.mathCoordinates;
+    if (!m) return null;
+    return { xmin: m.left, xmax: m.right, ymin: m.bottom, ymax: m.top };
+  }
+
   setTheme(theme: ColorTheme): void {
     this.theme = theme;
     this.calc.updateSettings(themeSettings(theme));

@@ -7,11 +7,13 @@ interface Window {
   electronAPI?: {
     openFile(): Promise<{ ok: true; path: string; content: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
     saveFile(path: string | null, content: string): Promise<{ ok: true; path: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
+    exportTex(content: string, defaultName: string): Promise<{ ok: true; path: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
     exportJson(content: string): Promise<{ ok: true; path: string } | { ok: false; canceled?: boolean; errorCode: string; message: string }>;
     onMenuNew(cb: () => void): () => void;
     onMenuOpen(cb: () => void): () => void;
     onMenuSave(cb: () => void): () => void;
     onMenuSaveAs(cb: () => void): () => void;
+    onMenuExportTex(cb: () => void): () => void;
     onMenuOpenRecent(cb: (path: string) => void): () => void;
     setRecentFiles(paths: string[]): Promise<void>;
     aiChat(

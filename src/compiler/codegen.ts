@@ -28,7 +28,7 @@ function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }
 
-function resolveColor(expr: T.Expr | undefined): string | null {
+export function resolveColor(expr: T.Expr | undefined): string | null {
   if (!expr) return null;
   if (expr.type === 'StringLit') {
     if (expr.value.startsWith('#')) return expr.value;

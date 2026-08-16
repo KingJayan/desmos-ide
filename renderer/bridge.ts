@@ -16,8 +16,8 @@ const aiChunkCbs: Listener<[string, string]>[] = [];
 const aiDoneCbs: Listener<[string]>[] = [];
 const aiErrorCbs: Listener<[string, string]>[] = [];
 const fileChangedCbs: Listener<[string, string]>[] = [];
-const menuCbs: Record<'new' | 'open' | 'save' | 'saveAs', Listener<[]>[]> = {
-  new: [], open: [], save: [], saveAs: [],
+const menuCbs: Record<'new' | 'open' | 'save' | 'saveAs' | 'exportTex', Listener<[]>[]> = {
+  new: [], open: [], save: [], saveAs: [], exportTex: [],
 };
 const menuRecentCbs: Listener<[string]>[] = [];
 
@@ -34,6 +34,7 @@ const rpc = Electroview.defineRPC<DesmosIdeRPC>({
       menuOpen: () => menuCbs.open.forEach(cb => cb()),
       menuSave: () => menuCbs.save.forEach(cb => cb()),
       menuSaveAs: () => menuCbs.saveAs.forEach(cb => cb()),
+      menuExportTex: () => menuCbs.exportTex.forEach(cb => cb()),
       menuOpenRecent: ({ path }) => menuRecentCbs.forEach(cb => cb(path)),
     },
   },
@@ -53,11 +54,13 @@ export const electronAPI = {
   openFile: () => rpc.request.openFile(),
   saveFile: (path: string | null, content: string) => rpc.request.saveFile({ path, content }),
   exportJson: (content: string) => rpc.request.exportJson({ content }),
+  exportTex: (content: string, defaultName: string) => rpc.request.exportTex({ content, defaultName }),
 
   onMenuNew: (cb: () => void) => subscribe(menuCbs.new, cb),
   onMenuOpen: (cb: () => void) => subscribe(menuCbs.open, cb),
   onMenuSave: (cb: () => void) => subscribe(menuCbs.save, cb),
   onMenuSaveAs: (cb: () => void) => subscribe(menuCbs.saveAs, cb),
+  onMenuExportTex: (cb: () => void) => subscribe(menuCbs.exportTex, cb),
   onMenuOpenRecent: (cb: (path: string) => void) => subscribe(menuRecentCbs, cb),
 
   aiChat: (reqId: string, messages: AIMessage[], config: AIConfig, memories: string[]) =>

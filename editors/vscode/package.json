@@ -1,0 +1,35 @@
+{
+  "_generated": "by scripts/build-grammar.ts from the compiler tables — do not edit",
+  "name": "desmos-dsl",
+  "displayName": "Desmos DSL",
+  "description": "Syntax highlighting for .dsmx files.",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "desmos-dsl",
+        "aliases": [
+          "Desmos DSL",
+          "dsmx"
+        ],
+        "extensions": [
+          ".dsmx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "desmos-dsl",
+        "scopeName": "source.dsmx",
+        "path": "./syntaxes/desmos-dsl.tmLanguage.json"
+      }
+    ]
+  }
+}

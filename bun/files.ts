@@ -69,10 +69,13 @@ export async function saveFile(path: string | null, content: string): Promise<Fi
   }
 }
 
-export async function exportJson(content: string): Promise<FileResult<{ path: string }>> {
+async function exportAs(
+  content: string,
+  dialog: { defaultName: string; extension: string; prompt: string },
+): Promise<FileResult<{ path: string }>> {
   if (typeof content !== 'string') return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Content must be a string.' };
   try {
-    const path = await showSaveDialog({ defaultName: 'expressions.json', extension: 'json', prompt: 'Export expressions' });
+    const path = await showSaveDialog(dialog);
     if (!path) return CANCELED;
     await withRetry(() => writeFile(path, content, 'utf-8'));
     return { ok: true, path };
@@ -81,11 +84,18 @@ export async function exportJson(content: string): Promise<FileResult<{ path: st
   }
 }
 
+export function exportJson(content: string): Promise<FileResult<{ path: string }>> {
+  return exportAs(content, { defaultName: 'expressions.json', extension: 'json', prompt: 'Export expressions' });
+}
+
+export function exportTex(content: string, defaultName: string): Promise<FileResult<{ path: string }>> {
+  return exportAs(content, { defaultName, extension: 'tex', prompt: 'Export a pgfplots figure' });
+}
+
 type WatcherEntry = { watcher: FSWatcher; debounce: ReturnType<typeof setTimeout> | null };
 const fileWatchers = new Map<string, WatcherEntry>();
 
-// autosave writes the open file every time typing stops, and the watcher on that same
-// file then reports our own write back to the editor. that round trip carries no news
+// autosave when typing stops
 const selfWrites = new Map<string, string>();
 
 function noteSelfWrite(path: string, content: string): void {

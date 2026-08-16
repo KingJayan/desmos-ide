@@ -67,6 +67,7 @@ export type DesmosIdeRPC = {
       openFile: { params: void; response: FileResult<{ path: string; content: string }> };
       saveFile: { params: { path: string | null; content: string }; response: FileResult<{ path: string }> };
       exportJson: { params: { content: string }; response: FileResult<{ path: string }> };
+      exportTex: { params: { content: string; defaultName: string }; response: FileResult<{ path: string }> };
       watchFile: { params: { path: string }; response: void };
       unwatchFile: { params: { path: string }; response: void };
       readFileAt: { params: { path: string }; response: FileResult<{ path: string; content: string }> };
@@ -120,6 +121,7 @@ export type DesmosIdeRPC = {
       menuOpen: void;
       menuSave: void;
       menuSaveAs: void;
+      menuExportTex: void;
       menuOpenRecent: { path: string };
     };
   };

@@ -24,15 +24,25 @@ const check = (ok: boolean, what: string): void => {
   if (!ok) problems.push(what);
 };
 
+let stage = 'launching webkit';
+const watchdog = setTimeout(() => {
+  console.error(`\nsmoke gave up while ${stage}`);
+  process.exit(1);
+}, 5 * 60_000);
+
 const browser = await webkit.launch();
+stage = 'opening a page';
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
 
 const consoleErrors: string[] = [];
 page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 page.on('pageerror', e => consoleErrors.push(String(e)));
 
+stage = 'loading the page';
 await page.goto(`http://localhost:${server.port}/`);
+stage = 'waiting for the editor';
 await page.waitForSelector('#editor-container .monaco-editor', { timeout: 20_000 });
+stage = 'checking the page';
 
 check(await page.locator('#status-msg').getAttribute('aria-live') === 'polite', 'status is announced');
 check(await page.locator('#status-msg').getAttribute('role') === 'status', 'status has a role');
@@ -98,6 +108,7 @@ check(wroteBack, 'an enhanced edit lands in the DSL file');
 
 check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: ${consoleErrors[0]}` : ''}`);
 
+clearTimeout(watchdog);
 await browser.close();
 server.stop(true);
 
