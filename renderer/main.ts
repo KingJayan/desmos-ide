@@ -506,10 +506,6 @@ function handleCompileResult(result: CompileResult): void {
   setStatus(msg, kind);
 }
 
-const BUILTIN_SIGS: Record<string, string> = {
-  gradient: 'gradient(from, to) → color',
-};
-
 // makes ⇧⌥F and the "Format Code" palette entry real
 monaco.languages.registerDocumentFormattingEditProvider(LANGUAGE_ID, {
   provideDocumentFormattingEdits(model) {
@@ -525,7 +521,7 @@ monaco.languages.registerHoverProvider(LANGUAGE_ID, {
     if (!word) return null;
     const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
 
-    const sig = builtinSignature(word.word) ?? BUILTIN_SIGS[word.word];
+    const sig = builtinSignature(word.word);
     if (sig) {
       return { range, contents: [{ value: `\`\`\`\n${sig}\n\`\`\``, isTrusted: true }] };
     }

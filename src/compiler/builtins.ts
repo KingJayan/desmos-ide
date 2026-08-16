@@ -91,16 +91,22 @@ export const BUILTINS: readonly BuiltinFn[] = [
   { name: 'polygon', signature: 'polygon(p1, p2, ...) → polygon', snippet: '(${1:p})' },
 ];
 
+// callable only in an `as { }` block, so the analyzer must not accept them as expressions
+export const STYLE_FNS: readonly BuiltinFn[] = [
+  { name: 'gradient', signature: 'gradient(from, to) → color' },
+];
+
 export const ANIMATION_PRESETS = ['ease', 'pulse', 'bounce', 'wobble', 'orbit'] as const;
 
 export const BUILTIN_NAMES: readonly string[] = BUILTINS.map(b => b.name);
 
 const BY_NAME = new Map(BUILTINS.map(b => [b.name, b]));
+const SIGS = new Map([...BUILTINS, ...STYLE_FNS].map(b => [b.name, b.signature]));
 
 export function isBuiltin(name: string): boolean {
   return BY_NAME.has(name);
 }
 
 export function builtinSignature(name: string): string | undefined {
-  return BY_NAME.get(name)?.signature;
+  return SIGS.get(name);
 }
