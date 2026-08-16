@@ -2,7 +2,9 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { mkdir, readdir, rm, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { createHash } from 'crypto';
 import { join } from 'path';
 import { KEYWORDS } from '../src/compiler/lexer';
 import { BUILTIN_NAMES, STYLE_FNS } from '../src/compiler/builtins';
@@ -14,8 +16,6 @@ const ROOT = join(import.meta.dir, '..');
 const SOURCE_DIR = join(ROOT, 'bun', 'native');
 const QUICKLOOK_DIR = join(SOURCE_DIR, 'quicklook');
 const OUT_DIR = join(ROOT, 'dist', 'native');
-// the extension is not copied into the bundle by electrobun, it is installed into
-// Contents/PlugIns by scripts/release.sh, so it is built outside dist/native
 const QL_OUT_DIR = join(ROOT, 'dist', 'quicklook');
 const APPEX = join(QL_OUT_DIR, 'DsmxQuickLook.appex');
 
@@ -26,7 +26,24 @@ if (process.platform !== 'darwin') {
 
 await mkdir(OUT_DIR, { recursive: true });
 
-// --- the dialog helpers, one binary each -----------------------------------
+// staleness
+
+// if compile if unchanged
+const { stdout: swiftVersion } = await execFileAsync('swiftc', ['--version']);
+const TARGET_ARCH = process.arch === 'arm64' ? 'arm64' : 'x86_64';
+
+const hashOf = (parts: string[]): string => {
+  const h = createHash('sha256').update(swiftVersion).update(TARGET_ARCH);
+  for (const p of parts) h.update(p);
+  return h.digest('hex');
+};
+
+const upToDate = async (stamp: string, hash: string, outputs: string[]): Promise<boolean> => {
+  if (!outputs.every(o => existsSync(o))) return false;
+  return (await readFile(stamp, 'utf8').catch(() => '')) === hash;
+};
+
+// dialog helpers
 
 const sources = (await readdir(SOURCE_DIR, { withFileTypes: true }))
   .filter(e => e.isFile() && e.name.endsWith('.swift'))
@@ -39,14 +56,21 @@ if (sources.length === 0) {
 
 for (const file of sources) {
   const name = file.replace(/\.swift$/, '');
-  await execFileAsync('swiftc', ['-O', join(SOURCE_DIR, file), '-o', join(OUT_DIR, name)]);
+  const out = join(OUT_DIR, name);
+  const stamp = join(OUT_DIR, `.${name}.stamp`);
+  const hash = hashOf([await readFile(join(SOURCE_DIR, file), 'utf8')]);
+
+  if (await upToDate(stamp, hash, [out])) {
+    console.log(`build-native: ${name} is up to date`);
+    continue;
+  }
+
+  await execFileAsync('swiftc', ['-O', join(SOURCE_DIR, file), '-o', out]);
+  await writeFile(stamp, hash);
   console.log(`build-native: ${name}`);
 }
 
-// --- the quick look extension ----------------------------------------------
-
-// the preview colours the same words the editor does, so its tables come from the
-// compiler tables and are never edited by hand
+// quick look ext
 const swiftSet = (names: readonly string[]) =>
   `[\n${[...names].map(n => `  ${JSON.stringify(n)},`).join('\n')}\n]`;
 
@@ -57,32 +81,44 @@ let KEYWORDS: Set<String> = ${swiftSet([...KEYWORDS])}
 let BUILTINS: Set<String> = ${swiftSet([...BUILTIN_NAMES, ...STYLE_FNS.map(f => f.name)])}
 `;
 
-const GEN_DIR = join(QL_OUT_DIR, '.gen');
-await mkdir(GEN_DIR, { recursive: true });
-await writeFile(join(GEN_DIR, 'Tables.swift'), tables);
-
 const qlSources = (await readdir(QUICKLOOK_DIR))
   .filter(f => f.endsWith('.swift'))
   .map(f => join(QUICKLOOK_DIR, f));
 
-await rm(APPEX, { recursive: true, force: true });
-await mkdir(join(APPEX, 'Contents', 'MacOS'), { recursive: true });
-
-await execFileAsync('swiftc', [
-  '-O',
-  '-parse-as-library',
-  '-module-name', 'DsmxQuickLook',
-  '-target', `${process.arch === 'arm64' ? 'arm64' : 'x86_64'}-apple-macos12.0`,
-  '-framework', 'QuickLookUI',
-  // an app extension is entered through NSExtensionMain, not main()
-  '-Xlinker', '-e', '-Xlinker', '_NSExtensionMain',
-  ...qlSources,
-  join(GEN_DIR, 'Tables.swift'),
-  '-o', join(APPEX, 'Contents', 'MacOS', 'DsmxQuickLook'),
+const plistTemplate = await readFile(join(QUICKLOOK_DIR, 'Info.plist'), 'utf8');
+const qlBinary = join(APPEX, 'Contents', 'MacOS', 'DsmxQuickLook');
+const qlPlist = join(APPEX, 'Contents', 'Info.plist');
+const qlStamp = join(QL_OUT_DIR, '.appex.stamp');
+const qlHash = hashOf([
+  tables,
+  ...(await Promise.all(qlSources.map(f => readFile(f, 'utf8')))),
+  plistTemplate,
+  pkg.version,
 ]);
 
-const plist = (await Bun.file(join(QUICKLOOK_DIR, 'Info.plist')).text())
-  .replaceAll('__VERSION__', pkg.version);
-await writeFile(join(APPEX, 'Contents', 'Info.plist'), plist);
+if (await upToDate(qlStamp, qlHash, [qlBinary, qlPlist])) {
+  console.log('build-native: DsmxQuickLook.appex is up to date');
+} else {
+  const GEN_DIR = join(QL_OUT_DIR, '.gen');
+  await mkdir(GEN_DIR, { recursive: true });
+  await writeFile(join(GEN_DIR, 'Tables.swift'), tables);
 
-console.log('build-native: DsmxQuickLook.appex');
+  await rm(APPEX, { recursive: true, force: true });
+  await mkdir(join(APPEX, 'Contents', 'MacOS'), { recursive: true });
+
+  await execFileAsync('swiftc', [
+    '-O',
+    '-parse-as-library',
+    '-module-name', 'DsmxQuickLook',
+    '-target', `${TARGET_ARCH}-apple-macos12.0`,
+    '-framework', 'QuickLookUI',
+    '-Xlinker', '-e', '-Xlinker', '_NSExtensionMain',
+    ...qlSources,
+    join(GEN_DIR, 'Tables.swift'),
+    '-o', qlBinary,
+  ]);
+
+  await writeFile(qlPlist, plistTemplate.replaceAll('__VERSION__', pkg.version));
+  await writeFile(qlStamp, qlHash);
+  console.log('build-native: DsmxQuickLook.appex');
+}

@@ -22,14 +22,6 @@ jobs:
         with:
           bun-version: 1.3.14
 
-      - name: Cache Bun
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
-
       - run: bun install --frozen-lockfile
 
       - name: types
@@ -38,22 +30,31 @@ jobs:
       - name: tests
         run: bun test src/tests/
 
+      - name: view bundle
+        run: bunx vite build
+
+      - name: Cache native helpers
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist/native
+            dist/quicklook
+          key: native-${{ runner.os }}-${{ hashFiles('bun/native/**', 'src/compiler/builtins.ts', 'src/compiler/lexer.ts', 'package.json') }}
+
       - name: native helpers
         run: bun run build:native
 
-      - name: view bundle
-        run: bun run build:view
-
       - name: Cache Playwright
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/ms-playwright
-          key: playwright-webkit-${{ runner.os }}-v1
-          restore-keys: |
-            playwright-webkit-${{ runner.os }}-
+          key: playwright-webkit-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install WebKit
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: bunx playwright install webkit
+        timeout-minutes: 5
 
       - name: smoke
         run: bun run e2e/smoke.ts
