@@ -9,7 +9,17 @@ import {
   buildSystemText,
   toProviderErrorMessage,
 } from '../../bun/ai';
-import { setGitContext, getGitStatus } from '../../bun/git';
+import {
+  setGitContext,
+  getGitStatus,
+  gitCheckoutBranch,
+  gitCreateBranch,
+  gitFetch,
+  gitPull,
+  gitPush,
+  gitRemoteAdd,
+  gitRemoteRemove,
+} from '../../bun/git';
 
 const repoFile = fileURLToPath(new URL('../../package.json', import.meta.url));
 
@@ -160,5 +170,43 @@ describe('git — the panel follows the open file', () => {
     assert.equal((await getGitStatus()).ok, false);
     setGitContext(repoFile);
     assert.equal((await getGitStatus()).ok, true);
+  });
+});
+
+describe('git — names that would reach git as options', () => {
+  // the repo is real here, so a name that got through would run a real command
+  const dashed = '--upload-pack=touch /tmp/desmos-ide-should-not-exist';
+
+  const calls: Array<[string, () => Promise<{ ok: boolean; errorCode?: string }>]> = [
+    ['checkout',      () => gitCheckoutBranch(dashed)],
+    ['create branch', () => gitCreateBranch(dashed)],
+    ['remote add',    () => gitRemoteAdd(dashed, 'https://example.invalid/x.git')],
+    ['remote url',    () => gitRemoteAdd('origin2', dashed)],
+    ['remote remove', () => gitRemoteRemove(dashed)],
+    ['fetch',         () => gitFetch(dashed)],
+    ['pull',          () => gitPull(dashed)],
+    ['push',          () => gitPush(undefined, dashed)],
+  ];
+
+  for (const [label, run] of calls) {
+    test(`${label} refuses a leading dash`, async () => {
+      setGitContext(repoFile);
+      const result = await run();
+      assert.equal(result.ok, false, label);
+      assert.equal(result.errorCode, 'BAD_PAYLOAD', label);
+    });
+  }
+
+  test('an empty name is still refused', async () => {
+    const result = await gitCheckoutBranch('   ');
+    assert.equal(result.ok, false);
+    assert.equal((result as { errorCode: string }).errorCode, 'BAD_PAYLOAD');
+  });
+
+  test('a plain name is not refused by the check', async () => {
+    setGitContext(repoFile);
+    const result = await gitRemoteRemove('no-such-remote-here');
+    // git itself answers; the point is that the guard let it through
+    assert.notEqual((result as { errorCode?: string }).errorCode, 'BAD_PAYLOAD');
   });
 });

@@ -79,6 +79,25 @@ async function runGit(repoPath: string, args: string[], timeout = 2400): Promise
   return stdout;
 }
 
+/**
+ * execFile takes an argv array, so no shell reads these names. git itself still
+ * reads a leading dash as one of its own options, and a branch or a remote is never
+ * allowed to start with one, so the name is refused before git sees it
+ */
+function badName(label: string, value: string | undefined): GitErr | null {
+  const v = (value ?? '').trim();
+  if (!v) return { ok: false, errorCode: 'BAD_PAYLOAD', message: `${label} is required.` };
+  if (v.startsWith('-')) {
+    return { ok: false, errorCode: 'BAD_PAYLOAD', message: `${label} cannot start with '-'.` };
+  }
+  return null;
+}
+
+/** the same check for a value that is allowed to be absent */
+function badOptional(label: string, value: string | undefined): GitErr | null {
+  return value === undefined ? null : badName(label, value);
+}
+
 // every command shares the same resolve-repo-then-run-or-map-error shape
 async function inRepo<T>(fn: (repoPath: string) => Promise<T>): Promise<T | GitErr> {
   const repoPath = await resolveGitRepoPath();
@@ -160,7 +179,8 @@ export async function getGitRemotes(): Promise<GitRemotesResult> {
 }
 
 export async function gitCheckoutBranch(name: string): Promise<GitActionResult> {
-  if (!name.trim()) return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Branch name is required.' };
+  const bad = badName('Branch name', name);
+  if (bad) return bad;
   return inRepo(async repoPath => {
     await runGit(repoPath, ['checkout', name.trim()], 4200);
     return { ok: true as const, message: `Switched to ${name.trim()}` };
@@ -168,7 +188,8 @@ export async function gitCheckoutBranch(name: string): Promise<GitActionResult> 
 }
 
 export async function gitCreateBranch(name: string): Promise<GitActionResult> {
-  if (!name.trim()) return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Branch name is required.' };
+  const bad = badName('Branch name', name);
+  if (bad) return bad;
   return inRepo(async repoPath => {
     await runGit(repoPath, ['checkout', '-b', name.trim()], 4200);
     return { ok: true as const, message: `Created and switched to ${name.trim()}` };
@@ -176,9 +197,8 @@ export async function gitCreateBranch(name: string): Promise<GitActionResult> {
 }
 
 export async function gitRemoteAdd(name: string, url: string): Promise<GitActionResult> {
-  if (!name.trim() || !url.trim()) {
-    return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Remote name and URL are required.' };
-  }
+  const bad = badName('Remote name', name) ?? badName('Remote URL', url);
+  if (bad) return bad;
   return inRepo(async repoPath => {
     await runGit(repoPath, ['remote', 'add', name.trim(), url.trim()]);
     return { ok: true as const, message: `Added remote ${name.trim()}` };
@@ -186,7 +206,8 @@ export async function gitRemoteAdd(name: string, url: string): Promise<GitAction
 }
 
 export async function gitRemoteRemove(name: string): Promise<GitActionResult> {
-  if (!name.trim()) return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Remote name is required.' };
+  const bad = badName('Remote name', name);
+  if (bad) return bad;
   return inRepo(async repoPath => {
     await runGit(repoPath, ['remote', 'remove', name.trim()]);
     return { ok: true as const, message: `Removed remote ${name.trim()}` };
@@ -194,6 +215,8 @@ export async function gitRemoteRemove(name: string): Promise<GitActionResult> {
 }
 
 export async function gitFetch(remote?: string): Promise<GitActionResult> {
+  const bad = badOptional('Remote name', remote);
+  if (bad) return bad;
   return inRepo(async repoPath => {
     await runGit(repoPath, remote ? ['fetch', remote] : ['fetch', '--all', '--prune'], 10000);
     return { ok: true as const, message: remote ? `Fetched ${remote}` : 'Fetched all remotes' };
@@ -201,6 +224,8 @@ export async function gitFetch(remote?: string): Promise<GitActionResult> {
 }
 
 export async function gitPull(remote?: string, branch?: string): Promise<GitActionResult> {
+  const bad = badOptional('Remote name', remote) ?? badOptional('Branch name', branch);
+  if (bad) return bad;
   return inRepo(async repoPath => {
     const args = ['pull'];
     if (remote) args.push(remote);
@@ -214,6 +239,8 @@ export async function gitPull(remote?: string, branch?: string): Promise<GitActi
 }
 
 export async function gitPush(remote?: string, branch?: string, setUpstream?: boolean): Promise<GitActionResult> {
+  const bad = badOptional('Remote name', remote) ?? badOptional('Branch name', branch);
+  if (bad) return bad;
   return inRepo(async repoPath => {
     const args = ['push'];
     if (setUpstream && remote && branch) args.push('-u');
