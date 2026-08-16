@@ -71,6 +71,12 @@ export type DesmosIdeRPC = {
       unwatchFile: { params: { path: string }; response: void };
       readFileAt: { params: { path: string }; response: FileResult<{ path: string; content: string }> };
       searchFiles: { params: { paths: string[]; query: string; useRegex: boolean }; response: SearchResult };
+      searchFolder: { params: { root: string; query: string; useRegex: boolean }; response: SearchResult };
+
+      secretsAvailable: { params: void; response: boolean };
+      secretGet: { params: { account: string }; response: string | null };
+      secretSet: { params: { account: string; value: string }; response: boolean };
+      secretDelete: { params: { account: string }; response: boolean };
 
       aiCompact: { params: { messages: AIMessage[]; config: AIConfig; memories: string[] }; response: string };
       aiTitle: { params: { messages: AIMessage[]; config: AIConfig }; response: string };

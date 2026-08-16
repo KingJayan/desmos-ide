@@ -1,13 +1,17 @@
 import type { SearchHit } from '../src/shared/rpc-schema';
 import { iconEl } from './icons';
 
+type SearchOutcome =
+  | { ok: true; hits: SearchHit[]; scanned: number }
+  | { ok: false; errorCode: string; message: string };
+
 export interface SearchPanelOptions {
   /** the paths to search, newest first */
   paths: () => string[];
-  search: (paths: string[], query: string, useRegex: boolean) => Promise<
-    | { ok: true; hits: SearchHit[]; scanned: number }
-    | { ok: false; errorCode: string; message: string }
-  >;
+  /** the folder to walk, normally the one holding the open file */
+  folder: () => string | null;
+  search: (paths: string[], query: string, useRegex: boolean) => Promise<SearchOutcome>;
+  searchFolder: (root: string, query: string, useRegex: boolean) => Promise<SearchOutcome>;
   onOpen: (hit: SearchHit) => unknown;
 }
 
@@ -20,6 +24,8 @@ export class SearchPanel {
   private hits: SearchHit[] = [];
   private activeIdx = 0;
   private useRegex = false;
+  private inFolder = false;
+  private scopeBtn: HTMLButtonElement;
   private open = false;
   private debounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -54,7 +60,14 @@ export class SearchPanel {
     this.regexBtn.title = 'Use a regular expression';
     this.regexBtn.setAttribute('aria-pressed', 'false');
 
-    searchWrap.append(icon, this.input, this.regexBtn);
+    this.scopeBtn = document.createElement('button');
+    this.scopeBtn.className = 'search-regex-btn';
+    this.scopeBtn.type = 'button';
+    this.scopeBtn.textContent = 'folder';
+    this.scopeBtn.title = 'Search the folder of the open file';
+    this.scopeBtn.setAttribute('aria-pressed', 'false');
+
+    searchWrap.append(icon, this.input, this.scopeBtn, this.regexBtn);
 
     this.summary = document.createElement('div');
     this.summary.className = 'search-summary';
@@ -82,6 +95,12 @@ export class SearchPanel {
       this.input.focus();
       this.schedule(0);
     });
+    this.scopeBtn.addEventListener('click', () => {
+      this.inFolder = !this.inFolder;
+      this.syncScope();
+      this.input.focus();
+      this.schedule(0);
+    });
     this.overlay.addEventListener('mousedown', e => {
       if (e.target === this.overlay) this.close();
     });
@@ -91,8 +110,18 @@ export class SearchPanel {
     this.open ? this.close() : this.show();
   }
 
+  private syncScope(): void {
+    this.scopeBtn.classList.toggle('active', this.inFolder);
+    this.scopeBtn.setAttribute('aria-pressed', String(this.inFolder));
+    this.input.placeholder = this.inFolder ? 'Search this folder…' : 'Search recent files…';
+    this.input.setAttribute('aria-label', this.input.placeholder);
+  }
+
   show(): void {
     this.open = true;
+    this.scopeBtn.hidden = this.opts.folder() === null;
+    if (this.scopeBtn.hidden && this.inFolder) { this.inFolder = false; }
+    this.syncScope();
     this.overlay.classList.add('cmd-overlay--visible');
     this.overlay.setAttribute('aria-hidden', 'false');
     // re-runs so the summary reflects the recent list as it is now, not as it was
@@ -125,25 +154,31 @@ export class SearchPanel {
 
   private async run(): Promise<void> {
     const query = this.input.value;
+    const folder = this.inFolder ? this.opts.folder() : null;
     const paths = this.opts.paths();
     const id = ++this.runId;
 
     if (!query.trim()) {
       this.hits = [];
-      this.summary.textContent = paths.length
-        ? `${paths.length} recent ${paths.length === 1 ? 'file' : 'files'}`
-        : 'No recent files to search — open a file first';
+      this.summary.textContent = folder
+        ? `Searching ${folder.split('/').pop() || folder}`
+        : paths.length
+          ? `${paths.length} recent ${paths.length === 1 ? 'file' : 'files'}`
+          : 'No recent files to search — open a file first';
       this.render();
       return;
     }
-    if (!paths.length) {
+    if (!folder && !paths.length) {
       this.hits = [];
       this.summary.textContent = 'No recent files to search — open a file first';
       this.render();
       return;
     }
 
-    const result = await this.opts.search(paths, query, this.useRegex);
+    if (folder) this.summary.textContent = 'Searching…';
+    const result = folder
+      ? await this.opts.searchFolder(folder, query, this.useRegex)
+      : await this.opts.search(paths, query, this.useRegex);
     if (id !== this.runId) return;
 
     if (!result.ok) {

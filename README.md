@@ -45,7 +45,7 @@ bun demo       # run the compiler in the terminal, no app shell
 | window opens blank | run `bun run build:view` (serves built `dist/`) |
 | AI sidebar does nothing | open the provider popover and set a model + API key |
 | source control panel is empty | it follows the open file; save the file inside a repo first |
-| ⇧⌘F finds nothing | only searches the recent files; open a file first |
+| ⇧⌘F finds nothing | it searches the recent files by default; press `folder` to search the whole folder of the open file |
 
 or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
 

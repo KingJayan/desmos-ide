@@ -3,7 +3,8 @@ import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
 import { exportJson, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
 import { showConfirm, showPrompt } from './dialogs';
-import { searchPaths } from './search';
+import { searchFolder, searchPaths } from './search';
+import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import {
   getGitBranches, getGitHistory, getGitRemotes, getGitStatus,
   gitCheckoutBranch, gitCreateBranch, gitFetch, gitPull, gitPush,
@@ -33,6 +34,12 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       unwatchFile: ({ path }) => unwatchFile(path),
       readFileAt: ({ path }) => readFileAt(path),
       searchFiles: ({ paths, query, useRegex }) => searchPaths(paths, query, useRegex),
+      searchFolder: ({ root, query, useRegex }) => searchFolder(root, query, useRegex),
+
+      secretsAvailable: () => secretsAvailable(),
+      secretGet: ({ account }) => getSecret(account),
+      secretSet: ({ account, value }) => setSecret(account, value),
+      secretDelete: ({ account }) => deleteSecret(account),
 
       aiCompact: ({ messages, config, memories }) =>
         compactConversation(sanitizeMessages(messages), sanitizeConfig(config), sanitizeMemories(memories)),

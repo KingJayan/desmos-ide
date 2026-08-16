@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   pushRecent, removeRecent, recentLabel, parseRecent, parseSession, RECENT_LIMIT,
 } from '../../renderer/session';
-import { buildMatcher, findMatches, searchPaths } from '../../bun/search';
+import { buildMatcher, collectFiles, findMatches, searchFolder, searchPaths } from '../../bun/search';
 import { fileURLToPath } from 'node:url';
 
 describe('recent files', () => {
@@ -101,11 +101,23 @@ describe('search across recent files', () => {
     assert.equal(findMatches(src, buildMatcher('SLIDER', false)!, '/f').length, 1);
   });
 
-  test('reports one hit per line, with the column', () => {
+  test('reports every occurrence, with the column', () => {
     const hits = findMatches(src, buildMatcher('a', false)!, '/f');
-    assert.deepEqual(hits.map(h => h.line), [1, 2, 3]);
+    assert.deepEqual(hits.map(h => h.line), [1, 2, 3, 3, 3]);
     assert.equal(hits[0].col, 1);
     assert.equal(hits[1].col, 5);
+    assert.deepEqual(hits.slice(2).map(h => h.col), [4, 14, 20]);
+  });
+
+  test('counts two matches on one line as two', () => {
+    const hits = findMatches('y = sin(x) + sin(y)', buildMatcher('sin', false)!, '/f');
+    assert.equal(hits.length, 2);
+    assert.deepEqual(hits.map(h => h.col), [5, 14]);
+  });
+
+  test('a pattern that can match empty still terminates', () => {
+    const hits = findMatches('abc', buildMatcher('x*', true)!, '/f', 10);
+    assert.ok(hits.length <= 10);
   });
 
   test('honours the hit limit', () => {
@@ -118,6 +130,11 @@ describe('search across recent files', () => {
     const first = findMatches(src, m, '/one');
     const second = findMatches(src, m, '/two');
     assert.deepEqual(first.map(h => h.line), second.map(h => h.line));
+  });
+
+  test('the hit limit still holds when one line matches many times', () => {
+    const line = 'x '.repeat(50);
+    assert.equal(findMatches(line, buildMatcher('x', false)!, '/f', 7).length, 7);
   });
 
   test('trims long lines for display only', () => {
@@ -152,5 +169,51 @@ describe('searching real files', () => {
     assert.equal(r.ok, false);
     if (r.ok) return;
     assert.equal(r.errorCode, 'BAD_QUERY');
+  });
+});
+
+describe('searching a folder', () => {
+  const repo = fileURLToPath(new URL('../../', import.meta.url));
+  const exampleDir = fileURLToPath(new URL('../../example/', import.meta.url));
+
+  test('walks the folder and finds the example', async () => {
+    const files = await collectFiles(exampleDir);
+    assert.ok(files.some(f => f.endsWith('demo.dsmx')), files.join(', '));
+  });
+
+  test('skips node_modules and other build output', async () => {
+    const files = await collectFiles(repo);
+    assert.equal(files.filter(f => f.includes('/node_modules/')).length, 0);
+    assert.equal(files.filter(f => f.includes('/dist/')).length, 0);
+  });
+
+  test('skips dot directories', async () => {
+    const files = await collectFiles(repo);
+    assert.equal(files.filter(f => f.includes('/.git/')).length, 0);
+  });
+
+  test('only collects searchable extensions', async () => {
+    const files = await collectFiles(repo);
+    assert.ok(files.length > 0);
+    assert.ok(files.every(f => /\.(dsmx|json|txt|md)$/.test(f)), 'unexpected extension');
+  });
+
+  test('finds a term anywhere under the folder', async () => {
+    const r = await searchFolder(exampleDir, 'slider', false);
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.ok(r.hits.length > 0);
+  });
+
+  test('a folder that does not exist gives no hits, not an error', async () => {
+    const r = await searchFolder('/no/such/folder', 'x', false);
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.hits.length, 0);
+  });
+
+  test('an empty root is refused', async () => {
+    const r = await searchFolder('', 'x', false);
+    assert.equal(r.ok, false);
   });
 });
