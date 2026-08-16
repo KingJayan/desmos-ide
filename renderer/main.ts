@@ -17,7 +17,8 @@ import { DesmosGraph } from './desmos';
 import { EnhancedPane } from './enhanced';
 import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings } from './settings';
-import type { ColorTheme } from './settings';
+import type { ColorTheme, EditorSettings } from './settings';
+import { compileStatus, errorsByPhase } from './compile-status';
 import { CommandPalette } from './command-palette';
 import type { PaletteCommand } from './command-palette';
 import { InlineSliderManager } from './inline-sliders';
@@ -484,19 +485,13 @@ function handleCompileResult(result: CompileResult): void {
     }
     sliderManager.update(editor.getValue());
     renderOutline(result.symbols);
-    const warnNote = result.warnings.length ? ` · ${result.warnings.length} warning(s)` : '';
-    setStatus(`✓ ${result.state.expressions.list.length} expression(s)${warnNote}`, result.warnings.length ? 'info' : 'success');
   } else {
-    const syntaxMarkers = result.errors.filter(e => e.phase === 1).flatMap(e => { const m = errorToMarker(e); return m ? [m] : []; });
-    const semanticMarkers = result.errors.filter(e => e.phase === 2).flatMap(e => { const m = errorToMarker(e); return m ? [m] : []; });
-    monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', syntaxMarkers);
-    monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', semanticMarkers);
-    const first = result.errors[0];
-    const msg = result.errors.length === 1
-      ? `✗ ${first.message}`
-      : `✗ ${result.errors.length} errors — ${first.message}`;
-    setStatus(msg, 'error');
+    const { syntax, semantic } = errorsByPhase(result.errors, errorToMarker);
+    monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', syntax);
+    monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', semantic);
   }
+  const { msg, kind } = compileStatus(result);
+  setStatus(msg, kind);
 }
 
 const BUILTIN_SIGS: Record<string, string> = {
@@ -646,6 +641,7 @@ window.addEventListener('unload', () => {
   activeWorker?.terminate();
   activeWorker = null;
   stopWatching();
+  enhanced?.dispose();
   if (gitRefreshTimer) {
     clearInterval(gitRefreshTimer);
     gitRefreshTimer = null;
@@ -978,12 +974,21 @@ async function refreshGitRemotes(): Promise<void> {
   }
 }
 
-function startGitStatusRefresh(): void {
-  void refreshGitStatus();
-  if (gitRefreshTimer) clearInterval(gitRefreshTimer);
-  gitRefreshTimer = setInterval(() => {
-    void refreshGitStatus();
-  }, 9000);
+// a fetch reaches the network, so it never runs behind a hidden window
+async function autofetchTick(): Promise<void> {
+  if (document.visibilityState !== 'visible') return;
+  const action = await window.electronAPI?.gitFetch();
+  if (!action?.ok) return;
+  await Promise.all([refreshGitStatus(), refreshGitBranches()]);
+}
+
+function applyGitAutofetch(s: Pick<EditorSettings, 'gitAutofetch' | 'gitAutofetchPeriod'>): void {
+  if (gitRefreshTimer) {
+    clearInterval(gitRefreshTimer);
+    gitRefreshTimer = null;
+  }
+  if (!s.gitAutofetch) return;
+  gitRefreshTimer = setInterval(() => { void autofetchTick(); }, s.gitAutofetchPeriod * 1000);
 }
 
 runCompile();
@@ -1183,7 +1188,6 @@ async function openPath(path: string, at?: { line: number; col: number }): Promi
   const result = await window.electronAPI?.readFileAt(path);
   if (!result) return false;
   if (!result.ok) {
-    // a recent file that has been moved is not worth offering again
     forgetRecent(path);
     setStatus(result.message, 'error');
     return false;
@@ -1201,7 +1205,7 @@ async function openPath(path: string, at?: { line: number; col: number }): Promi
   return true;
 }
 
-// runs the registered formatter through monaco so the edit lands on the undo stack
+// runs the registered formatter through monaco
 function formatDocument(): Promise<void> {
   const action = editor.getAction('editor.action.formatDocument');
   return action ? Promise.resolve(action.run()).then(() => undefined) : Promise.resolve();
@@ -1537,6 +1541,7 @@ function ensureSettingsPanel(): SettingsPanel {
   if (settingsPanel) return settingsPanel;
   settingsPanel = new SettingsPanel(s => {
     formatOnSave = s.formatOnSave;
+    applyGitAutofetch(s);
     applyTheme(s.colorTheme);
     applyUiFont(s.uiFontFamily);
     monaco.editor.setTheme(s.editorTheme);
@@ -1770,7 +1775,8 @@ async function restoreSession(): Promise<void> {
 }
 
 void restoreSession();
-startGitStatusRefresh();
+void refreshGitStatus();
+applyGitAutofetch(initSettings);
 editor.focus();
 
 window.addEventListener('beforeunload', () => {

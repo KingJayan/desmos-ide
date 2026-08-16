@@ -22,7 +22,12 @@ export interface EditorSettings {
   lineNumbers: 'on' | 'off' | 'relative';
   wordWrap:    'off' | 'on';
   formatOnSave: boolean;
+  gitAutofetch: boolean;
+  gitAutofetchPeriod: number;
 }
+
+/** the periods the panel offers, in seconds */
+export const GIT_AUTOFETCH_PERIODS = [60, 180, 300, 900] as const;
 
 const DEFAULTS: EditorSettings = {
   colorTheme:  'desmos-dark',
@@ -34,6 +39,9 @@ const DEFAULTS: EditorSettings = {
   lineNumbers: 'on',
   wordWrap:    'off',
   formatOnSave: false,
+  // off by default: a fetch reaches the network, and that is the user's call to make
+  gitAutofetch: false,
+  gitAutofetchPeriod: 180,
 };
 
 const STORAGE_KEY = 'desmos-ide-settings';
@@ -91,7 +99,13 @@ function validate(raw: Record<string, unknown>): EditorSettings {
   const wordWrap = VALID_WORD_WRAP.has(raw.wordWrap as string)
     ? (raw.wordWrap as EditorSettings['wordWrap']) : d.wordWrap;
   const formatOnSave = typeof raw.formatOnSave === 'boolean' ? raw.formatOnSave : d.formatOnSave;
-  return { colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily, minimap, lineNumbers, wordWrap, formatOnSave };
+  const gitAutofetch = typeof raw.gitAutofetch === 'boolean' ? raw.gitAutofetch : d.gitAutofetch;
+  const gitAutofetchPeriod = (GIT_AUTOFETCH_PERIODS as readonly number[]).includes(Number(raw.gitAutofetchPeriod))
+    ? Number(raw.gitAutofetchPeriod) : d.gitAutofetchPeriod;
+  return {
+    colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily,
+    minimap, lineNumbers, wordWrap, formatOnSave, gitAutofetch, gitAutofetchPeriod,
+  };
 }
 
 export function loadSettings(): EditorSettings {
@@ -249,6 +263,31 @@ export class SettingsPanel {
               </label>
             </div>
           </div>
+
+          <div class="settings-group">
+            <div class="settings-group-title">Git</div>
+            <div class="settings-row settings-hint-row">
+              <span class="settings-hint">Background fetch keeps the ahead/behind count current. It uses the network.</span>
+            </div>
+
+            <div class="settings-row">
+              <label class="settings-label" for="s-git-autofetch">Auto Fetch</label>
+              <label class="settings-toggle" aria-label="Auto Fetch">
+                <input type="checkbox" id="s-git-autofetch" class="settings-toggle-input" />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="settings-row">
+              <label class="settings-label" for="s-git-autofetch-period">Fetch Every</label>
+              <select class="settings-select" id="s-git-autofetch-period">
+                <option value="60">1 minute</option>
+                <option value="180">3 minutes</option>
+                <option value="300">5 minutes</option>
+                <option value="900">15 minutes</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -263,6 +302,8 @@ export class SettingsPanel {
     const minimapEl     = overlay.querySelector('#s-minimap')      as HTMLInputElement;
     const wordWrapEl    = overlay.querySelector('#s-word-wrap')    as HTMLInputElement;
     const formatSaveEl  = overlay.querySelector('#s-format-on-save') as HTMLInputElement;
+    const autofetchEl   = overlay.querySelector('#s-git-autofetch') as HTMLInputElement;
+    const autofetchPeriodEl = overlay.querySelector('#s-git-autofetch-period') as HTMLSelectElement;
 
     const s = this.settings;
     colorThemeEl.value  = s.colorTheme;
@@ -275,6 +316,9 @@ export class SettingsPanel {
     minimapEl.checked   = s.minimap;
     wordWrapEl.checked  = s.wordWrap === 'on';
     formatSaveEl.checked = s.formatOnSave;
+    autofetchEl.checked  = s.gitAutofetch;
+    autofetchPeriodEl.value = String(s.gitAutofetchPeriod);
+    autofetchPeriodEl.disabled = !s.gitAutofetch;
 
     const emit = () => { saveSettings(this.settings); this.onChange({ ...this.settings }); };
 
@@ -313,6 +357,16 @@ export class SettingsPanel {
     });
     formatSaveEl.addEventListener('change', () => {
       this.settings.formatOnSave = formatSaveEl.checked;
+      emit();
+    });
+    autofetchEl.addEventListener('change', () => {
+      this.settings.gitAutofetch = autofetchEl.checked;
+      // the period says nothing while nothing fetches
+      autofetchPeriodEl.disabled = !autofetchEl.checked;
+      emit();
+    });
+    autofetchPeriodEl.addEventListener('change', () => {
+      this.settings.gitAutofetchPeriod = Number(autofetchPeriodEl.value);
       emit();
     });
 
