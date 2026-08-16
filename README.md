@@ -9,22 +9,18 @@
 
 ## features
 
-- **DSL editor** — write math in a clean language; the compiler outputs Desmos expressions in real time
-- **live graph** — Desmos graph updates as you type, diffed by expression ID to avoid flicker
-- **formatter** — ⇧⌥F, or turn on format-on-save in settings
-- **persistence** — autosaves the open file, and reopens it where you left off
-- **inline sliders** — drag a `slider(...)` declaration right in the editor just like Desmos
-- **timeline** — declare a `time` clock and a bar under the graph gives play, pause, speed and scrub
-- **animation presets** — `ease`, `pulse`, `bounce`, `wobble` and `orbit` shape the clock
-- **3d projection** — `camera` and `project(x, y, z)` put a 3D scene on the 2D graph
-- **search** — ⇧⌘F across the recent files, or across a folder you choose
-- **source control** — branches, history and remotes for the repo the open file lives in
-- **themes** — Catppuccin, GitHub Dark/Light, Monokai, VS Dark/Light
-- **customizable editor** — font, font size, minimap, line numbers, word wrap
-- **interface size** — compact, default or large, for the panels and the status bar
-- **file operations** — open and save `.dsmx` files through native dialogs
-- **AI sidebar** — chat to generate or modify expressions, streamed. Works with any
-  OpenAI-compatible endpoint, OpenRouter, a local Ollama, or GitHub Copilot
+* **native DSL** — write clean math that compiles to Desmos in real time
+* **live graph** — fast updates as you type via expression id diffing
+* **formatter** — ⇧⌥F or format-on-save
+* **persistence** — reopens your files exactly where you left off; autosave is opt-in
+* **timeline** — declare a `time` clock for play, pause, speed, and scrub controls
+* **anim presets** — shape the clock with `ease`, `pulse`, `bounce`, `wobble`, and `orbit`
+* **3d projection** — map 3D scenes to 2D using `camera` and `project(x, y, z)`
+* **glob search** — ⇧⌘F across recent files or a chosen folder
+* **source control** — Git branches, history, and remotes for the active file's repo
+* **custom editor** — configure fonts, minimap, line numbers, word wrap, and themes
+* **file ops** — open and save native `.dsmx` files
+* **ai sidebar** — streamed chat for dsl/expr generation with OpenAI, OpenRouter, Ollama, or Copilot
 
 ## syntax
 
@@ -36,11 +32,11 @@ see an [example file](example/demo.dsmx)
 
 ```bash
 bun i
-bun dev        # build the view, then launch the app
-bun dev:hmr    # vite dev server + app, for renderer hot reload
-bun run build  # production build → build/<channel>-<platform>/
-bun test       # compiler and editor tests
-bun demo       # run the compiler in the terminal, no app shell
+bun dev        # build then launch
+bun dev:hmr    # vite dev server + app for renderer hmr
+bun run build  # prod build → build/<channel>-<platform>/
+bun test       # compiler + editor tests
+bun demo       # run compiler in the terminal, w/o app shell
 ```
 
 ## troubleshooting
@@ -49,8 +45,7 @@ bun demo       # run the compiler in the terminal, no app shell
 |---|---|
 | window opens blank | run `bun run build:view` (serves built `dist/`) |
 | AI sidebar does nothing | open the provider popover and set a model + API key |
-| source control panel is empty | it follows the open file; save the file inside a repo first |
-| ⇧⌘F finds nothing | it searches the recent files by default; press `folder` to search the whole folder of the open file |
+| source control panel is empty | follows the open file; save the file inside a repo first |
 
 or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
 

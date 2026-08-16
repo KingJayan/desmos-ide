@@ -22,6 +22,7 @@ export interface EditorSettings {
   lineNumbers: 'on' | 'off' | 'relative';
   wordWrap:    'off' | 'on';
   formatOnSave: boolean;
+  autosave: boolean;
   uiScale: UiScale;
   gitAutofetch: boolean;
   gitAutofetchPeriod: number;
@@ -43,6 +44,8 @@ const DEFAULTS: EditorSettings = {
   lineNumbers: 'on',
   wordWrap:    'off',
   formatOnSave: false,
+  // off by default: autosave writes the file with no dialog and no undo of the write
+  autosave: false,
   uiScale: 'default',
   // off by default: a fetch reaches the network, and that is the user's call to make
   gitAutofetch: false,
@@ -104,6 +107,7 @@ function validate(raw: Record<string, unknown>): EditorSettings {
   const wordWrap = VALID_WORD_WRAP.has(raw.wordWrap as string)
     ? (raw.wordWrap as EditorSettings['wordWrap']) : d.wordWrap;
   const formatOnSave = typeof raw.formatOnSave === 'boolean' ? raw.formatOnSave : d.formatOnSave;
+  const autosave = typeof raw.autosave === 'boolean' ? raw.autosave : d.autosave;
   const uiScale = (UI_SCALES as readonly string[]).includes(raw.uiScale as string)
     ? (raw.uiScale as UiScale) : d.uiScale;
   const gitAutofetch = typeof raw.gitAutofetch === 'boolean' ? raw.gitAutofetch : d.gitAutofetch;
@@ -111,7 +115,7 @@ function validate(raw: Record<string, unknown>): EditorSettings {
     ? Number(raw.gitAutofetchPeriod) : d.gitAutofetchPeriod;
   return {
     colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily,
-    minimap, lineNumbers, wordWrap, formatOnSave, uiScale, gitAutofetch, gitAutofetchPeriod,
+    minimap, lineNumbers, wordWrap, formatOnSave, autosave, uiScale, gitAutofetch, gitAutofetchPeriod,
   };
 }
 
@@ -281,6 +285,17 @@ export class SettingsPanel {
                 <span class="settings-toggle-track" aria-hidden="true"></span>
               </label>
             </div>
+
+            <div class="settings-row">
+              <label class="settings-label" for="s-autosave">Autosave</label>
+              <label class="settings-toggle" aria-label="Autosave">
+                <input type="checkbox" id="s-autosave" class="settings-toggle-input" />
+                <span class="settings-toggle-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="settings-row settings-hint-row">
+              <span class="settings-hint">Writes the open file about a second after you stop typing. Untitled buffers are never given a file.</span>
+            </div>
           </div>
 
           <div class="settings-group">
@@ -321,6 +336,7 @@ export class SettingsPanel {
     const minimapEl     = overlay.querySelector('#s-minimap')      as HTMLInputElement;
     const wordWrapEl    = overlay.querySelector('#s-word-wrap')    as HTMLInputElement;
     const formatSaveEl  = overlay.querySelector('#s-format-on-save') as HTMLInputElement;
+    const autosaveEl    = overlay.querySelector('#s-autosave')     as HTMLInputElement;
     const uiScaleEl     = overlay.querySelector('#s-ui-scale')     as HTMLSelectElement;
     const autofetchEl   = overlay.querySelector('#s-git-autofetch') as HTMLInputElement;
     const autofetchPeriodEl = overlay.querySelector('#s-git-autofetch-period') as HTMLSelectElement;
@@ -336,6 +352,7 @@ export class SettingsPanel {
     minimapEl.checked   = s.minimap;
     wordWrapEl.checked  = s.wordWrap === 'on';
     formatSaveEl.checked = s.formatOnSave;
+    autosaveEl.checked   = s.autosave;
     uiScaleEl.value      = s.uiScale;
     autofetchEl.checked  = s.gitAutofetch;
     autofetchPeriodEl.value = String(s.gitAutofetchPeriod);
@@ -378,6 +395,10 @@ export class SettingsPanel {
     });
     formatSaveEl.addEventListener('change', () => {
       this.settings.formatOnSave = formatSaveEl.checked;
+      emit();
+    });
+    autosaveEl.addEventListener('change', () => {
+      this.settings.autosave = autosaveEl.checked;
       emit();
     });
     uiScaleEl.addEventListener('change', () => {

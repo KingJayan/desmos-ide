@@ -54,3 +54,28 @@ describe('the interface size setting', () => {
     assert.equal(loadSettings().uiScale, 'default');
   });
 });
+
+describe('the autosave setting', () => {
+  beforeEach(() => store.clear());
+
+  test('is off until it is asked for', () => {
+    assert.equal(loadSettings().autosave, false);
+  });
+
+  test('a settings file written before it existed does not turn it on', () => {
+    stored({ colorTheme: 'github-light' });
+    assert.equal(loadSettings().autosave, false);
+  });
+
+  test('survives a round trip', () => {
+    stored({ autosave: true });
+    assert.equal(loadSettings().autosave, true);
+  });
+
+  test('a non-boolean value falls back instead of writing files', () => {
+    for (const bad of ['true', 1, null, {}]) {
+      stored({ autosave: bad });
+      assert.equal(loadSettings().autosave, false, JSON.stringify(bad));
+    }
+  });
+});
