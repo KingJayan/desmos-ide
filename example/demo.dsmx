@@ -3,7 +3,7 @@ x = 3
 b = 4
 a = slider(3, 0, 10, step=0.1, speed=1, loop)   // step=, speed= kwargs; loop flag auto-plays
 fn hyp(x, y) = sqrt(x^2 + y^2)                  // inlined at every call site
-alias r = hyp(a, b)                              // named alias — identical to assignment
+alias hyp_r = hyp(a, b)                              // named alias — identical to assignment
 
 // geometry
 point p (1, 2)
@@ -18,7 +18,7 @@ polygon tri = [(0,0),(1,0),(0,1)]
 pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)  // list comprehension
 curve ring (t in 0..6.28) { (cos(t), sin(t)) }      // parametric
 pts2 = (cos(t), sin(t)) for t in 0..6.28            // for-comprehension
-region r = y > x^2
+region above = y > x^2
 
 // conditionals
 v = x^2 where x > 0 else -x                    // where/else
@@ -36,7 +36,7 @@ expr {
 }
 
 // debug — compile-time only, no output emitted
-debug r
+debug hyp_r
 debug hyp(a, b)
 
 // text and folders
@@ -44,9 +44,9 @@ text lbl = "hello" at (1, 2)
 group g as "My Folder"
 
 // built-in generators
-spiral s = spiral(turns=5, spacing=0.2)
+spiral coil = spiral(turns=5, spacing=0.2)
 wave w = wave(freq=2, amp=1, phase=0)
-grid g = grid(10, 10)
+grid mesh = grid(10, 10)
 
 // the clock — one per file, and the timeline bar under the graph drives it
 time T = 0..6.28 period 4000                    // period is ms for one sweep
@@ -67,4 +67,4 @@ corner = project(1, 1, h)                       // project(x, y, z); z defaults 
 // optional styling
 point p2 (0, 0) as { color red pointSize 12 }
 region r2 = y < x as { color blue opacity 0.3 fill }
-curve c (t in 0..6.28) { (cos(t), sin(t)) } as gradient("blue", "red")
+curve unit (t in 0..6.28) { (cos(t), sin(t)) } as gradient("blue", "red")

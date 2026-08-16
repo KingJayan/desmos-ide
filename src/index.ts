@@ -15,7 +15,8 @@ export type SymbolKind =
   | 'var' | 'fn' | 'alias'
   | 'point' | 'circle' | 'line'
   | 'curve' | 'region' | 'polygon' | 'segment'
-  | 'text' | 'group';
+  | 'text' | 'group'
+  | 'spiral' | 'wave' | 'grid' | 'time' | 'camera';
 
 export interface SymbolInfo {
   name: string;
@@ -76,6 +77,11 @@ function stmtSymbol(stmt: Statement): SymbolInfo | null {
     case 'SegmentDecl':return { name: stmt.name, kind: 'segment', line: p.line, col: p.col };
     case 'TextDecl':   return { name: stmt.name, kind: 'text',    line: p.line, col: p.col };
     case 'GroupDecl':  return { name: stmt.name, kind: 'group',   line: p.line, col: p.col };
+    case 'SpiralDecl': return { name: stmt.name, kind: 'spiral',  line: p.line, col: p.col };
+    case 'WaveDecl':   return { name: stmt.name, kind: 'wave',    line: p.line, col: p.col };
+    case 'GridDecl':   return { name: stmt.name, kind: 'grid',    line: p.line, col: p.col };
+    case 'TimeDecl':   return { name: stmt.name, kind: 'time',    line: p.line, col: p.col };
+    case 'CameraDecl': return { name: stmt.name, kind: 'camera',  line: p.line, col: p.col };
     default:           return null;
   }
 }
