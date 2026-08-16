@@ -1,5 +1,7 @@
 import { createIcons, ArrowDown, Plus } from 'lucide';
 import { iconSvg } from './icons';
+import { escapeHtml } from './escape';
+import { SecretStore } from './secret-store';
 
 type ConvMessage = { role: 'user' | 'assistant'; content: string };
 type ApplyAction = { type: 'insert' | 'replace'; code: string };
@@ -184,11 +186,56 @@ function lineDiff(before: string, after: string): DiffLine[] {
   return result;
 }
 
+/** the keys an older version wrote into localStorage in the clear */
+function legacyKeys(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem('ai-provider-configs');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<Record<AIProvider, { apiKey?: unknown }>>;
+    const out: Record<string, string> = {};
+    for (const p of PROVIDERS) {
+      const key = parsed[p.id]?.apiKey;
+      if (typeof key === 'string' && key) out[p.id] = key;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function createSecretStore(): SecretStore {
+  const api = () => window.electronAPI;
+  return new SecretStore(
+    {
+      available: () => api()?.secretsAvailable() ?? Promise.resolve(false),
+      get: account => api()?.secretGet(account) ?? Promise.resolve(null),
+      set: (account, value) => api()?.secretSet(account, value) ?? Promise.resolve(false),
+      remove: account => api()?.secretDelete(account) ?? Promise.resolve(false),
+      legacy: legacyKeys,
+      clearLegacy: () => {
+        // rewrite the stored configs with the keys taken out
+        try {
+          const raw = localStorage.getItem('ai-provider-configs');
+          if (!raw) return;
+          const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
+          for (const entry of Object.values(parsed)) {
+            if (entry && typeof entry === 'object') entry.apiKey = '';
+          }
+          localStorage.setItem('ai-provider-configs', JSON.stringify(parsed));
+        } catch {
+        }
+      },
+    },
+    PROVIDERS.map(p => p.id),
+  );
+}
+
 export class AISidebar {
   private chats: Chat[] = [];
   private activeChat!: Chat;
   private provider: AIProvider;
   private providerConfigs: ProviderConfigMap;
+  private secrets: SecretStore;
   private memories: string[] = [];
   private sendContext: boolean;
   private autoApprove: boolean;
@@ -238,14 +285,20 @@ export class AISidebar {
     this.el = container;
     this.provider = this.loadProvider();
     this.providerConfigs = this.loadProviderConfigs();
+    this.secrets = createSecretStore();
     this.sendContext = localStorage.getItem('ai-send-context') !== 'false';
     this.autoApprove = localStorage.getItem('ai-auto-approve') === 'true';
     this.loadState();
     this.render();
     this.registerIpc();
     this.renderMessages();
-    const copilotToken = this.getProviderConfig('github-copilot').apiKey;
-    if (copilotToken) this.fetchCopilotModels(copilotToken);
+    // the keychain is asynchronous, so the keys arrive after the first paint
+    void this.secrets.load().then(() => {
+      for (const p of PROVIDERS) this.providerConfigs[p.id].apiKey = this.secrets.get(p.id);
+      this.syncProviderUi();
+      const copilotToken = this.getProviderConfig('github-copilot').apiKey;
+      if (copilotToken) this.fetchCopilotModels(copilotToken);
+    });
   }
 
   private loadProvider(): AIProvider {
@@ -281,7 +334,15 @@ export class AISidebar {
 
   private saveProviderConfigs(): void {
     localStorage.setItem('ai-provider', this.provider);
-    localStorage.setItem('ai-provider-configs', JSON.stringify(this.providerConfigs));
+    // the key is written to the keychain instead, and must not go to disk here
+    const onDisk = Object.fromEntries(
+      PROVIDERS.map(p => {
+        const cfg = this.providerConfigs[p.id];
+        void this.secrets.set(p.id, cfg.apiKey);
+        return [p.id, this.secrets.secure ? { ...cfg, apiKey: '' } : cfg];
+      }),
+    );
+    localStorage.setItem('ai-provider-configs', JSON.stringify(onDisk));
   }
 
   private getProviderConfig(provider = this.provider): ProviderConfig {
@@ -625,7 +686,7 @@ export class AISidebar {
     this.chatSelectEl.innerHTML = this.chats
       .map(c => {
         const label = this.pendingTitles.has(c.id) ? 'Naming chat…' : c.title;
-        return `<option value="${c.id}"${c.id === this.activeChat.id ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+        return `<option value="${escapeHtml(c.id)}"${c.id === this.activeChat.id ? ' selected' : ''}>${escapeHtml(label)}</option>`;
       })
       .join('');
     this.chatSelectEl.classList.toggle('ai-chat-select--pending', this.pendingTitles.has(this.activeChat.id));
@@ -716,7 +777,7 @@ export class AISidebar {
 
   private populateProviderSelect(): void {
     this.cfgProviderEl.innerHTML = PROVIDERS
-      .map(p => `<option value="${p.id}"${p.id === this.provider ? ' selected' : ''}>${escapeHtml(p.label)}</option>`)
+      .map(p => `<option value="${escapeHtml(p.id)}"${p.id === this.provider ? ' selected' : ''}>${escapeHtml(p.label)}</option>`)
       .join('');
   }
 
@@ -1558,6 +1619,3 @@ function truncateAtWord(raw: string, max = 40): string {
   return `${space > 12 ? cut.slice(0, space) : cut}…`;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
