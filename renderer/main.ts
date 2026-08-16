@@ -286,7 +286,6 @@ const editor = monaco.editor.create(editorContainer, {
 
 const graph = new DesmosGraph(graphContainer);
 
-// the timeline bar drives the one `time` clock the source declares
 const transport = new Transport(document.getElementById('transport')!, {
   setPlaying: (id, playing) => graph.setClockPlaying(id, playing),
   setPeriod:  (id, period)  => graph.setClockPeriod(id, period),
@@ -294,8 +293,6 @@ const transport = new Transport(document.getElementById('transport')!, {
   watch:      (name, cb)    => graph.watchClock(name, cb),
 });
 
-// clicking a curve on the graph puts the cursor on the line that drew it, and
-// moving the cursor selects that curve back on the graph
 let sourceMap: ExprSource[] = [];
 const linkedLine = editor.createDecorationsCollection();
 
@@ -316,41 +313,70 @@ const graphLink = new GraphLink({
 
 graph.onSelectionChange(id => graphLink.onGraphSelected(id));
 
-/* edits on the graph sync back */
-graph.onExpressionEdited(exprs => {
+/** the lines a statement owns: its own down to the line before the next one */
+function stmtRange(at: ExprSource): monaco.Range {
+  const nextLine = sourceMap
+    .filter(e => e.line > at.line)
+    .reduce((min, e) => Math.min(min, e.line), model.getLineCount() + 1);
+  let endLine = Math.min(Math.max(at.line, nextLine - 1), model.getLineCount());
+
+  //keep blanklines
+  while (endLine > at.line && model.getLineContent(endLine).trim() === '') endLine--;
+  return new monaco.Range(at.line, 1, endLine, model.getLineMaxColumn(endLine));
+}
+
+function freshName(taken: Set<string>): string {
+  for (let i = 1; ; i++) {
+    const name = `e${i}`;
+    if (!taken.has(name)) { taken.add(name); return name; }
+  }
+}
+
+function writeBackToDsl(exprs: DesmosExpr[], removedIds: string[] = []): string[] {
   const edits: monaco.editor.IIdentifiedSingleEditOperation[] = [];
   const refused: string[] = [];
+  const taken = new Set(sourceMap.map(e => e.id));
+  const appended: string[] = [];
+
+  for (const id of removedIds) {
+    const at = sourceMap.find(e => e.id === id);
+    if (at) edits.push({ range: stmtRange(at), text: '' });
+  }
 
   for (const expr of exprs) {
-    const at = sourceMap.find(e => e.id === expr.id);
-    if (!at) continue;
+    const at = expr.id ? sourceMap.find(e => e.id === expr.id) : undefined;
 
-    const statement = decompile(expr, expr.id);
-    if (!statement) { refused.push(expr.id); continue; }
+    if (!at) {
+      if (!expr.latex?.trim()) continue;
+      const statement = decompile(expr, freshName(taken));
+      if (!statement) { refused.push(expr.id ?? '?'); continue; }
+      appended.push(statement);
+      continue;
+    }
 
-    const nextLine = sourceMap
-      .filter(e => e.line > at.line)
-      .reduce((min, e) => Math.min(min, e.line), model.getLineCount() + 1);
-    let endLine = Math.min(Math.max(at.line, nextLine - 1), model.getLineCount());
+    const statement = decompile(expr, at.id);
+    if (!statement) { refused.push(at.id); continue; }
 
-    //keep blanklines
-    while (endLine > at.line && model.getLineContent(endLine).trim() === '') endLine--;
-
-    const original = model.getValueInRange(
-      new monaco.Range(at.line, 1, endLine, model.getLineMaxColumn(endLine)),
-    );
+    const range = stmtRange(at);
+    const original = model.getValueInRange(range);
     const indent = /^\s*/.exec(original)?.[0] ?? '';
     const style = / as \{[^}]*\}\s*$/.exec(original)?.[0] ?? '';
 
-    edits.push({
-      range: new monaco.Range(at.line, 1, endLine, model.getLineMaxColumn(endLine)),
-      text: indent + statement + style.trimEnd(),
-    });
+    edits.push({ range, text: indent + statement + style.trimEnd() });
   }
 
-  if (edits.length) {
-    editor.executeEdits('graph-writeback', edits);
+  if (appended.length) {
+    const last = model.getLineCount();
+    const at = new monaco.Range(last, model.getLineMaxColumn(last), last, model.getLineMaxColumn(last));
+    edits.push({ range: at, text: `\n${appended.join('\n')}` });
   }
+
+  if (edits.length) editor.executeEdits('graph-writeback', edits);
+  return refused;
+}
+
+graph.onExpressionEdited(exprs => {
+  const refused = writeBackToDsl(exprs.filter(e => sourceMap.some(s => s.id === e.id)));
   if (refused.length) {
     setStatus(`Cannot write back as DSL: ${refused.join(', ')}`, 'error');
   }
@@ -367,7 +393,6 @@ function applyUiFont(fontFamily: string): void {
   document.documentElement.style.setProperty('--font-ui', fontFamily);
 }
 
-// every ui font size is a rem, so this one attribute resizes the whole interface
 function applyUiScale(scale: UiScale): void {
   document.documentElement.setAttribute('data-ui-scale', scale);
 }
@@ -386,17 +411,35 @@ function setEnhancedDirty(dirty: boolean): void {
   enhancedUnsavedBar.classList.toggle('hidden', !dirty);
 }
 
+let enhancedSeen: DesmosExpr[] = [];
+const same = (a: DesmosExpr, b: DesmosExpr): boolean => JSON.stringify(a) === JSON.stringify(b);
+
 function ensureEnhancedPane(): EnhancedPane {
   if (enhanced) return enhanced;
   enhanced = new EnhancedPane(
     document.getElementById('expr-list')!,
     document.getElementById('btn-add-expr') as HTMLButtonElement,
-    (list: DesmosExpr[], dirty: boolean) => {
-      graph.update(list);
-      setEnhancedDirty(dirty);
+    (list: DesmosExpr[]) => {
+      const removed = enhancedSeen.filter(p => !list.some(e => e.id === p.id)).map(p => p.id!);
+      const changed = list.filter(e => !enhancedSeen.some(p => same(p, e)));
+      enhancedSeen = list.map(e => ({ ...e }));
+
+      const refused = writeBackToDsl(changed, removed);
+      if (refused.length) {
+        graph.update(list);
+        setStatus(`Kept on the graph only: ${refused.join(', ')}`, 'info');
+      }
+      setEnhancedDirty(refused.length > 0);
     },
   );
   return enhanced;
+}
+
+function syncEnhanced(): void {
+  const pane = ensureEnhancedPane();
+  if (pane.isEditing) return;
+  pane.syncFromGraph(graph.currentList());
+  enhancedSeen = pane.getList();
 }
 
 btnExportJson.addEventListener('click', async () => {
@@ -487,13 +530,9 @@ function handleCompileResult(result: CompileResult): void {
     monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', []);
     monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', []);
     monaco.editor.setModelMarkers(model, 'desmos-dsl', result.warnings);
-    if (mode !== 'enhanced') {
-      graph.update(result.state.expressions.list);
-    }
+    graph.update(result.state.expressions.list);
     sourceMap = result.sourceMap;
-    if (mode === 'split') {
-      ensureEnhancedPane().syncFromGraph(graph.currentList());
-    }
+    if (mode === 'split' || mode === 'enhanced') syncEnhanced();
     sliderManager.update(editor.getValue());
     renderOutline(result.symbols);
     transport.setClock(result.clock);
@@ -701,22 +740,15 @@ function applyMode(m: Mode): void {
   if (m !== 'split') { dslPane.style.height = ''; dslPane.style.flex = ''; }
 
   if (showEnhanced) {
-    ensureEnhancedPane().syncFromGraph(graph.currentList());
+    syncEnhanced();
     setEnhancedDirty(false);
   }
   if (showDsl) editor.layout();
 }
 
-async function setMode(m: Mode): Promise<void> {
-  if (m !== 'enhanced' && mode === 'enhanced' && enhanced?.isDirty) {
-    if (!(await nativeConfirm('Leave Enhanced mode? Edits made here are not in the DSL file and will be lost.'))) return;
-  }
-  applyMode(m);
-}
-
-btnDsl.addEventListener('click', () => setMode('dsl'));
-btnSplit.addEventListener('click', () => setMode('split'));
-btnEnhanced.addEventListener('click', () => setMode('enhanced'));
+btnDsl.addEventListener('click', () => applyMode('dsl'));
+btnSplit.addEventListener('click', () => applyMode('split'));
+btnEnhanced.addEventListener('click', () => applyMode('enhanced'));
 
 //file ops
 let currentPath: string | null = null;
@@ -807,10 +839,6 @@ async function cmdOpen(): Promise<void> {
 }
 
 async function cmdSave(saveAs = false): Promise<void> {
-  if (mode === 'enhanced') {
-    setStatus('Enhanced mode edits the graph, not the file — switch to DSL to save, or Export JSON', 'error');
-    return;
-  }
   if (formatOnSave) await formatDocument();
   const sent = editor.getValue();
   const result = await window.electronAPI?.saveFile(saveAs ? null : currentPath, sent);
@@ -863,7 +891,7 @@ function persistSession(): void {
 // writes straight to the open file. an untitled buffer is never given a path
 // behind the user's back, so it only rides along in the restored session.
 async function autosave(): Promise<void> {
-  if (!autosaveOn || !currentPath || mode === 'enhanced' || autosaving) return;
+  if (!autosaveOn || !currentPath || autosaving) return;
   autosaving = true;
   try {
     const sent = editor.getValue();
@@ -1326,19 +1354,19 @@ const baseCommands: PaletteCommand[] = [
     id: 'mode.dsl',
     label: 'Switch to DSL Mode',
     description: 'Show only the DSL editor',
-    action: () => setMode('dsl'),
+    action: () => applyMode('dsl'),
   },
   {
     id: 'mode.split',
     label: 'Switch to Split Mode',
     description: 'Show DSL editor and Enhanced pane side by side',
-    action: () => setMode('split'),
+    action: () => applyMode('split'),
   },
   {
     id: 'mode.enhanced',
     label: 'Switch to Enhanced Mode',
-    description: 'Edit the graph directly, bypassing the DSL — export as JSON to keep the edits',
-    action: () => setMode('enhanced'),
+    description: 'Edit the expressions the way Desmos does — every edit goes back into the DSL',
+    action: () => applyMode('enhanced'),
   },
   {
     id: 'sidebar.git',

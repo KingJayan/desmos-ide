@@ -12,6 +12,14 @@
 }
 #enhanced-unsaved-bar.hidden { display: none; }
 
+#enhanced-hint {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--surface0);
+  font-size: 0.85rem;
+  color: var(--overlay1);
+  flex-shrink: 0;
+}
+
 .unsaved-export-btn {
   --btn-accent: var(--yellow);
   padding: 2px 10px;

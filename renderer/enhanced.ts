@@ -43,6 +43,8 @@ export class EnhancedPane {
 
   get isDirty(): boolean { return this.dirty; }
 
+  get isEditing(): boolean { return this.editingId !== null; }
+
   clearDirty(): void { this.dirty = false; }
 
   getList(): DesmosExpr[] { return [...this.list]; }
