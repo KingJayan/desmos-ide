@@ -25,6 +25,7 @@ import type { PaletteCommand } from './command-palette';
 import { InlineSliderManager } from './inline-sliders';
 import { SearchPanel } from './search-panel';
 import { GraphLink } from './graph-link';
+import { GitPanel } from './git-panel';
 import { decompile } from '../src/compiler/decompile';
 import type { Mode } from './session';
 import {
@@ -54,26 +55,6 @@ const btnSave         = document.getElementById('btn-save')     as HTMLButtonEle
 const filenameEl      = document.getElementById('filename')!;
 const savedDotEl      = document.getElementById('saved-dot')!;
 const statusMsg       = document.getElementById('status-msg')!;
-const gitBranchEl     = document.getElementById('git-branch') as HTMLSpanElement;
-const gitSummaryMsg   = document.getElementById('git-summary-msg')!;
-const gitRefreshStatusBtn = document.getElementById('git-refresh-status') as HTMLButtonElement;
-const gitBranchPanelTitle = document.getElementById('git-branch-panel-title')!;
-const gitBranchEmpty  = document.getElementById('git-branch-empty')!;
-const gitBranchList   = document.getElementById('git-branch-list')!;
-const gitBranchRefreshBtn = document.getElementById('git-branch-refresh') as HTMLButtonElement;
-const gitBranchCreateBtn = document.getElementById('git-branch-create') as HTMLButtonElement;
-const gitHistoryEmpty = document.getElementById('git-history-empty')!;
-const gitHistoryContent = document.getElementById('git-history-content')!;
-const gitHistoryRefreshBtn = document.getElementById('git-history-refresh') as HTMLButtonElement;
-const gitRemotePanelTitle = document.getElementById('git-remote-panel-title')!;
-const gitRemoteEmpty  = document.getElementById('git-remote-empty')!;
-const gitRemoteList   = document.getElementById('git-remote-list')!;
-const gitRemoteRefreshBtn = document.getElementById('git-remote-refresh') as HTMLButtonElement;
-const gitRemoteAddBtn = document.getElementById('git-remote-add') as HTMLButtonElement;
-const gitModifiedEl   = document.getElementById('git-modified') as HTMLSpanElement;
-const gitModifiedPanelTitle = document.getElementById('git-modified-panel-title')!;
-const gitModifiedEmpty = document.getElementById('git-modified-empty')!;
-const gitModifiedList = document.getElementById('git-modified-list')!;
 const dividerEl       = document.getElementById('divider')!;
 const leftPanel       = document.getElementById('left-panel')!;
 const workspace       = document.getElementById('workspace')!;
@@ -674,13 +655,13 @@ window.addEventListener('unload', () => {
   stopWatching();
   enhanced?.dispose();
   transport.dispose();
-  if (gitRefreshTimer) {
-    clearInterval(gitRefreshTimer);
-    gitRefreshTimer = null;
-  }
+  gitPanel.dispose();
 });
 
 function setStatus(msg: string, kind: 'success' | 'error' | 'info' = 'info'): void {
+  // the status bar is the only channel for a failed write or a refused edit, so an
+  // error interrupts the screen reader while the rest waits for a pause
+  statusMsg.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
   statusMsg.textContent = msg;
   statusMsg.className = kind;
 }
@@ -694,334 +675,11 @@ function nativePrompt(message: string, defaultValue = ''): Promise<string | null
     ?? Promise.resolve(prompt(message, defaultValue));
 }
 
-type GitStatusResult =
-  | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }
-  | { ok: false; errorCode: string; message: string };
-type GitBranchesResult =
-  | { ok: true; currentBranch: string; branches: Array<{ name: string; current: boolean; upstream: string | null; tracking: string | null }> }
-  | { ok: false; errorCode: string; message: string };
-type GitHistoryResult =
-  | { ok: true; lines: string[] }
-  | { ok: false; errorCode: string; message: string };
-type GitRemotesResult =
-  | { ok: true; remotes: Array<{ name: string; fetchUrl: string; pushUrl: string }> }
-  | { ok: false; errorCode: string; message: string };
-type GitActionResult =
-  | { ok: true; message: string }
-  | { ok: false; errorCode: string; message: string };
-
-let gitRefreshTimer: ReturnType<typeof setInterval> | null = null;
-let gitRefreshInFlight = false;
-let gitLastStatus: GitStatusResult = {
-  ok: false,
-  errorCode: 'INIT',
-  message: 'Loading Git status...',
-};
-
-function renderGitModifiedPanel(status: GitStatusResult): void {
-  gitModifiedList.innerHTML = '';
-
-  if (!status.ok) {
-    gitModifiedPanelTitle.textContent = 'Git status';
-    gitModifiedEmpty.textContent = status.message;
-    gitModifiedEmpty.classList.add('git-modified-empty--show');
-    return;
-  }
-
-  gitModifiedPanelTitle.textContent = status.modifiedCount === 1 ? '1 modified file' : `${status.modifiedCount} modified files`;
-  if (status.modifiedCount === 0) {
-    gitModifiedEmpty.textContent = 'Working tree clean';
-    gitModifiedEmpty.classList.add('git-modified-empty--show');
-    return;
-  }
-
-  gitModifiedEmpty.classList.remove('git-modified-empty--show');
-  for (const file of status.modifiedFiles) {
-    const li = document.createElement('li');
-    li.textContent = file;
-    li.title = file;
-    gitModifiedList.appendChild(li);
-  }
-}
-
-function setGitPillState(kind: 'clean' | 'dirty' | 'unknown'): void {
-  gitBranchEl.classList.remove('git-pill--clean', 'git-pill--dirty', 'git-pill--unknown');
-  gitModifiedEl.classList.remove('git-pill--clean', 'git-pill--dirty', 'git-pill--unknown');
-  gitBranchEl.classList.add(`git-pill--${kind}`);
-  gitModifiedEl.classList.add(`git-pill--${kind}`);
-}
-
-function renderGitStatus(status: GitStatusResult): void {
-  gitLastStatus = status;
-  renderGitModifiedPanel(status);
-
-  if (!status.ok) {
-    gitBranchEl.textContent = 'branch: --';
-    gitModifiedEl.textContent = 'git unavailable';
-    gitSummaryMsg.textContent = status.message;
-    setGitPillState('unknown');
-    return;
-  }
-
-  gitBranchEl.textContent = `branch: ${status.branch}`;
-  gitModifiedEl.textContent = status.modifiedCount === 1 ? '1 modified' : `${status.modifiedCount} modified`;
-  gitSummaryMsg.textContent = status.modifiedCount
-    ? status.modifiedFiles.slice(0, 12).join(' | ')
-    : 'Working tree clean';
-  setGitPillState(status.modifiedCount > 0 ? 'dirty' : 'clean');
-}
-
-function renderGitBranches(result: GitBranchesResult): void {
-  gitBranchList.innerHTML = '';
-
-  if (!result.ok) {
-    gitBranchPanelTitle.textContent = 'Branches';
-    gitBranchEmpty.textContent = result.message;
-    gitBranchEmpty.classList.add('git-modified-empty--show');
-    return;
-  }
-
-  gitBranchPanelTitle.textContent = `Branches (${result.branches.length})`;
-  if (result.branches.length === 0) {
-    gitBranchEmpty.textContent = 'No branches found';
-    gitBranchEmpty.classList.add('git-modified-empty--show');
-    return;
-  }
-
-  gitBranchEmpty.classList.remove('git-modified-empty--show');
-  for (const branch of result.branches) {
-    const li = document.createElement('li');
-    const row = document.createElement('div');
-    row.className = 'git-branch-row';
-
-    const meta = document.createElement('div');
-    meta.className = 'git-branch-meta';
-    const name = document.createElement('div');
-    name.className = 'git-branch-name';
-    name.textContent = branch.current ? `* ${branch.name}` : branch.name;
-    name.title = branch.name;
-    meta.appendChild(name);
-
-    if (branch.upstream) {
-      const upstream = document.createElement('div');
-      upstream.className = 'git-branch-upstream';
-      upstream.textContent = branch.tracking
-        ? `${branch.upstream} (${branch.tracking})`
-        : branch.upstream;
-      meta.appendChild(upstream);
-    }
-
-    row.appendChild(meta);
-
-    if (!branch.current) {
-      const actions = document.createElement('div');
-      actions.className = 'git-inline-actions';
-      const checkout = document.createElement('button');
-      checkout.type = 'button';
-      checkout.className = 'git-panel-btn';
-      checkout.textContent = 'Checkout';
-      checkout.addEventListener('click', async e => {
-        e.stopPropagation();
-        const action = await window.electronAPI?.gitCheckoutBranch(branch.name);
-        handleGitActionResult(action);
-        await Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory()]);
-      });
-      actions.appendChild(checkout);
-      row.appendChild(actions);
-    }
-
-    li.appendChild(row);
-    gitBranchList.appendChild(li);
-  }
-}
-
-function renderGitHistory(result: GitHistoryResult): void {
-  if (!result.ok) {
-    gitHistoryEmpty.textContent = result.message;
-    gitHistoryEmpty.classList.add('git-modified-empty--show');
-    gitHistoryContent.classList.remove('git-history-content--show');
-    gitHistoryContent.textContent = '';
-    return;
-  }
-
-  if (result.lines.length === 0) {
-    gitHistoryEmpty.textContent = 'No history found';
-    gitHistoryEmpty.classList.add('git-modified-empty--show');
-    gitHistoryContent.classList.remove('git-history-content--show');
-    gitHistoryContent.textContent = '';
-    return;
-  }
-
-  gitHistoryEmpty.classList.remove('git-modified-empty--show');
-  gitHistoryContent.classList.add('git-history-content--show');
-  gitHistoryContent.textContent = result.lines.join('\n');
-}
-
-function renderGitRemotes(result: GitRemotesResult): void {
-  gitRemoteList.innerHTML = '';
-
-  if (!result.ok) {
-    gitRemotePanelTitle.textContent = 'Remotes';
-    gitRemoteEmpty.textContent = result.message;
-    gitRemoteEmpty.classList.add('git-modified-empty--show');
-    return;
-  }
-
-  gitRemotePanelTitle.textContent = `Remotes (${result.remotes.length})`;
-
-  if (result.remotes.length === 0) {
-    gitRemoteEmpty.textContent = 'No remotes configured';
-    gitRemoteEmpty.classList.add('git-modified-empty--show');
-    return;
-  }
-
-  gitRemoteEmpty.classList.remove('git-modified-empty--show');
-  for (const remote of result.remotes) {
-    const li = document.createElement('li');
-    const row = document.createElement('div');
-    row.className = 'git-remote-row';
-
-    const meta = document.createElement('div');
-    meta.className = 'git-remote-meta';
-    const name = document.createElement('div');
-    name.className = 'git-branch-name';
-    name.textContent = remote.name;
-    meta.appendChild(name);
-    const fetchUrl = document.createElement('div');
-    fetchUrl.className = 'git-remote-url';
-    fetchUrl.textContent = `fetch: ${remote.fetchUrl || '--'}`;
-    meta.appendChild(fetchUrl);
-    const pushUrl = document.createElement('div');
-    pushUrl.className = 'git-remote-url';
-    pushUrl.textContent = `push: ${remote.pushUrl || '--'}`;
-    meta.appendChild(pushUrl);
-    row.appendChild(meta);
-
-    const actions = document.createElement('div');
-    actions.className = 'git-inline-actions';
-
-    const fetchBtn = document.createElement('button');
-    fetchBtn.type = 'button';
-    fetchBtn.className = 'git-panel-btn';
-    fetchBtn.textContent = 'Fetch';
-    fetchBtn.addEventListener('click', async e => {
-      e.stopPropagation();
-      const action = await window.electronAPI?.gitFetch(remote.name);
-      handleGitActionResult(action);
-      await Promise.all([refreshGitStatus(), refreshGitHistory()]);
-    });
-
-    const pullBtn = document.createElement('button');
-    pullBtn.type = 'button';
-    pullBtn.className = 'git-panel-btn';
-    pullBtn.textContent = 'Pull';
-    pullBtn.addEventListener('click', async e => {
-      e.stopPropagation();
-      const branch = gitLastStatus.ok ? gitLastStatus.branch : undefined;
-      const action = await window.electronAPI?.gitPull(remote.name, branch);
-      handleGitActionResult(action);
-      await Promise.all([refreshGitStatus(), refreshGitHistory()]);
-    });
-
-    const pushBtn = document.createElement('button');
-    pushBtn.type = 'button';
-    pushBtn.className = 'git-panel-btn';
-    pushBtn.textContent = 'Push';
-    pushBtn.addEventListener('click', async e => {
-      e.stopPropagation();
-      const branch = gitLastStatus.ok ? gitLastStatus.branch : undefined;
-      const action = await window.electronAPI?.gitPush(remote.name, branch);
-      handleGitActionResult(action);
-      await Promise.all([refreshGitStatus(), refreshGitHistory()]);
-    });
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'git-panel-btn';
-    removeBtn.textContent = 'Remove';
-    removeBtn.addEventListener('click', async e => {
-      e.stopPropagation();
-      if (!(await nativeConfirm(`Remove remote ${remote.name}?`))) return;
-      const action = await window.electronAPI?.gitRemoteRemove(remote.name);
-      handleGitActionResult(action);
-      await refreshGitRemotes();
-    });
-
-    actions.appendChild(fetchBtn);
-    actions.appendChild(pullBtn);
-    actions.appendChild(pushBtn);
-    actions.appendChild(removeBtn);
-    row.appendChild(actions);
-    li.appendChild(row);
-    gitRemoteList.appendChild(li);
-  }
-}
-
-function handleGitActionResult(result: GitActionResult | undefined): void {
-  if (!result) return;
-  if (result.ok) {
-    setStatus(result.message, 'success');
-  } else {
-    setStatus(result.message, 'error');
-  }
-}
-
-async function refreshGitStatus(): Promise<void> {
-  if (gitRefreshInFlight) return;
-  gitRefreshInFlight = true;
-  try {
-    const result = await window.electronAPI?.gitStatus();
-    if (result) renderGitStatus(result);
-  } catch (err) {
-    renderGitStatus({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
-  } finally {
-    gitRefreshInFlight = false;
-  }
-}
-
-async function refreshGitBranches(): Promise<void> {
-  try {
-    const result = await window.electronAPI?.gitBranches();
-    if (result) renderGitBranches(result);
-  } catch (err) {
-    renderGitBranches({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
-  }
-}
-
-async function refreshGitHistory(): Promise<void> {
-  try {
-    const result = await window.electronAPI?.gitHistory(50);
-    if (result) renderGitHistory(result);
-  } catch (err) {
-    renderGitHistory({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
-  }
-}
-
-async function refreshGitRemotes(): Promise<void> {
-  try {
-    const result = await window.electronAPI?.gitRemotes();
-    if (result) renderGitRemotes(result);
-  } catch (err) {
-    renderGitRemotes({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
-  }
-}
-
-// a fetch reaches the network, so it never runs behind a hidden window
-async function autofetchTick(): Promise<void> {
-  if (document.visibilityState !== 'visible') return;
-  const action = await window.electronAPI?.gitFetch();
-  if (!action?.ok) return;
-  await Promise.all([refreshGitStatus(), refreshGitBranches()]);
-}
-
-function applyGitAutofetch(s: Pick<EditorSettings, 'gitAutofetch' | 'gitAutofetchPeriod'>): void {
-  if (gitRefreshTimer) {
-    clearInterval(gitRefreshTimer);
-    gitRefreshTimer = null;
-  }
-  if (!s.gitAutofetch) return;
-  gitRefreshTimer = setInterval(() => { void autofetchTick(); }, s.gitAutofetchPeriod * 1000);
-}
+const gitPanel = new GitPanel({
+  setStatus,
+  confirm: nativeConfirm,
+  prompt: nativePrompt,
+});
 
 runCompile();
 
@@ -1073,7 +731,7 @@ function setFilename(p: string | null): Promise<unknown> {
   if (p) rememberRecent(p);
   filenameEl.textContent = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
   refreshSavedState();
-  return Promise.resolve(window.electronAPI?.setGitContext(p)).then(refreshGitPanels);
+  return Promise.resolve(window.electronAPI?.setGitContext(p)).then(() => gitPanel.refreshAll());
 }
 
 let savedSource: string | null = null;
@@ -1090,10 +748,6 @@ function refreshSavedState(): void {
     ? 'Unsaved changes — ⌘S to write them to the file'
     : 'This buffer has no file yet — ⌘S to choose one';
   filenameEl.classList.toggle('filename--unsaved', unsaved);
-}
-
-function refreshGitPanels(): Promise<unknown> {
-  return Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory(), refreshGitRemotes()]);
 }
 
 function startWatching(path: string): void {
@@ -1212,7 +866,7 @@ function persistSession(): void {
 // writes straight to the open file. an untitled buffer is never given a path
 // behind the user's back, so it only rides along in the restored session.
 async function autosave(): Promise<void> {
-  if (!currentPath || mode === 'enhanced' || autosaving) return;
+  if (!autosaveOn || !currentPath || mode === 'enhanced' || autosaving) return;
   autosaving = true;
   try {
     const sent = editor.getValue();
@@ -1351,49 +1005,7 @@ window.electronAPI?.onMenuSaveAs(() => cmdSave(true));
 window.electronAPI?.onMenuOpenRecent(path => void openPath(path));
 
 window.addEventListener('focus', () => {
-  void Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitRemotes()]);
-});
-
-gitRefreshStatusBtn.addEventListener('click', () => {
-  void refreshGitPanels();
-});
-
-gitBranchRefreshBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  void refreshGitBranches();
-});
-
-gitHistoryRefreshBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  void refreshGitHistory();
-});
-
-gitRemoteRefreshBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  void refreshGitRemotes();
-});
-
-gitBranchCreateBtn.addEventListener('click', async e => {
-  e.stopPropagation();
-  const raw = await nativePrompt('New branch name:');
-  const name = raw?.trim();
-  if (!name) return;
-  const action = await window.electronAPI?.gitCreateBranch(name);
-  handleGitActionResult(action);
-  await Promise.all([refreshGitStatus(), refreshGitBranches(), refreshGitHistory()]);
-});
-
-gitRemoteAddBtn.addEventListener('click', async e => {
-  e.stopPropagation();
-  const nameRaw = await nativePrompt('Remote name:', 'origin');
-  const name = nameRaw?.trim();
-  if (!name) return;
-  const urlRaw = await nativePrompt(`Remote URL for ${name}:`);
-  const url = urlRaw?.trim();
-  if (!url) return;
-  const action = await window.electronAPI?.gitRemoteAdd(name, url);
-  handleGitActionResult(action);
-  await refreshGitRemotes();
+  void gitPanel.refreshOnFocus();
 });
 
 //divider drag
@@ -1497,7 +1109,7 @@ function setSidebarView(next: SidebarView): void {
     aiSelectionListener = null;
   }
   if (next === 'git') {
-    void refreshGitPanels();
+    void gitPanel.refreshAll();
   }
 
   editor.layout();
@@ -1589,12 +1201,14 @@ document.addEventListener('mousemove', e => {
 // settings
 let settingsPanel: SettingsPanel | null = null;
 let formatOnSave = initSettings.formatOnSave;
+let autosaveOn = initSettings.autosave;
 
 function ensureSettingsPanel(): SettingsPanel {
   if (settingsPanel) return settingsPanel;
   settingsPanel = new SettingsPanel(s => {
     formatOnSave = s.formatOnSave;
-    applyGitAutofetch(s);
+    autosaveOn = s.autosave;
+    gitPanel.applyAutofetch(s);
     applyTheme(s.colorTheme);
     applyUiFont(s.uiFontFamily);
     applyUiScale(s.uiScale);
@@ -1830,8 +1444,8 @@ async function restoreSession(): Promise<void> {
 }
 
 void restoreSession();
-void refreshGitStatus();
-applyGitAutofetch(initSettings);
+void gitPanel.refreshStatus();
+gitPanel.applyAutofetch(initSettings);
 editor.focus();
 
 window.addEventListener('beforeunload', () => {
