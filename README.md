@@ -14,6 +14,9 @@
 - **formatter** — ⇧⌥F, or turn on format-on-save in settings
 - **persistence** — autosaves the open file, and reopens it where you left off
 - **inline sliders** — drag a `slider(...)` declaration right in the editor just like Desmos
+- **timeline** — declare a `time` clock and a bar under the graph gives play, pause, speed and scrub
+- **animation presets** — `ease`, `pulse`, `bounce`, `wobble` and `orbit` shape the clock
+- **3d projection** — `camera` and `project(x, y, z)` put a 3D scene on the 2D graph
 - **source control** — branches, history and remotes for the repo the open file lives in
 - **themes** — Catppuccin, GitHub Dark/Light, Monokai, VS Dark/Light
 - **customizable editor** — font, font size, minimap, line numbers, word wrap

@@ -48,6 +48,22 @@ spiral s = spiral(turns=5, spacing=0.2)
 wave w = wave(freq=2, amp=1, phase=0)
 grid g = grid(10, 10)
 
+// the clock — one per file, and the timeline bar under the graph drives it
+time T = 0..6.28 period 4000                    // period is ms for one sweep
+// time T2 = 0..1 mirror                        // mirror turns around instead of jumping back
+
+// animation presets — each shapes a 0-1 sweep
+e = ease(T)                                     // smoothstep, starts and ends at rest
+pu = pulse(T)                                   // 0 -> 1 -> 0
+bo = bounce(T)                                  // a bounce off zero
+wo = wobble(T, 2)                               // one sine cycle, amplitude 2
+orb = orbit(T, 3)                               // a point going round a circle
+
+// 3d — the camera angles are ordinary variables, so animating one turns the scene
+camera cam = azimuth(T), elevation(0.5)
+h = 1
+corner = project(1, 1, h)                       // project(x, y, z); z defaults to 0
+
 // optional styling
 point p2 (0, 0) as { color red pointSize 12 }
 region r2 = y < x as { color blue opacity 0.3 fill }
