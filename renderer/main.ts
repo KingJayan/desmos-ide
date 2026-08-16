@@ -26,6 +26,7 @@ import { InlineSliderManager } from './inline-sliders';
 import { SearchPanel } from './search-panel';
 import { GraphLink } from './graph-link';
 import { GitPanel } from './git-panel';
+import { typingElsewhere } from './keys';
 import { decompile } from '../src/compiler/decompile';
 import type { Mode } from './session';
 import {
@@ -937,6 +938,7 @@ window.addEventListener('keydown', e => {
   if (!mod) return;
 
   const k = e.key.toLowerCase();
+  const elsewhere = typingElsewhere(e.target);
 
   if (!e.shiftKey && !e.altKey && k === 'n') {
     e.preventDefault();
@@ -957,12 +959,14 @@ window.addEventListener('keydown', e => {
   }
 
   if (!e.shiftKey && !e.altKey && k === 'f') {
+    if (elsewhere) return;
     e.preventDefault();
     runEditorAction('actions.find');
     return;
   }
 
   if (!e.altKey && k === 'h') {
+    if (elsewhere) return;
     e.preventDefault();
     runEditorAction('editor.action.startFindReplaceAction');
     return;
@@ -975,6 +979,7 @@ window.addEventListener('keydown', e => {
   }
 
   if (e.altKey && k === 'r') {
+    if (elsewhere) return;
     e.preventDefault();
     runFindWithRegex();
     return;
