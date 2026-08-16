@@ -62,6 +62,7 @@ export async function saveFile(path: string | null, content: string): Promise<Fi
       if (!savePath) return CANCELED;
     }
     await withRetry(() => writeFile(savePath!, content, 'utf-8'));
+    noteSelfWrite(savePath, content);
     return { ok: true, path: savePath };
   } catch (err) {
     return fileError(err);
@@ -83,12 +84,21 @@ export async function exportJson(content: string): Promise<FileResult<{ path: st
 type WatcherEntry = { watcher: FSWatcher; debounce: ReturnType<typeof setTimeout> | null };
 const fileWatchers = new Map<string, WatcherEntry>();
 
+// autosave writes the open file every time typing stops, and the watcher on that same
+// file then reports our own write back to the editor. that round trip carries no news
+const selfWrites = new Map<string, string>();
+
+function noteSelfWrite(path: string, content: string): void {
+  if (fileWatchers.has(path)) selfWrites.set(path, content);
+}
+
 export function unwatchFile(path: string): void {
   const entry = fileWatchers.get(path);
   if (!entry) return;
   if (entry.debounce) clearTimeout(entry.debounce);
   entry.watcher.close();
   fileWatchers.delete(path);
+  selfWrites.delete(path);
 }
 
 export function unwatchAll(): void {
@@ -104,7 +114,10 @@ export function watchFile(path: string, onChange: (path: string, content: string
     if (entry.debounce) clearTimeout(entry.debounce);
     entry.debounce = setTimeout(async () => {
       try {
-        onChange(path, await readFile(path, 'utf-8'));
+        const content = await readFile(path, 'utf-8');
+        if (selfWrites.get(path) === content) return;
+        selfWrites.delete(path);
+        onChange(path, content);
       } catch {}
     }, 250);
   });
