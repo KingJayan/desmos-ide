@@ -78,6 +78,17 @@ describe('the git panel does not spawn a process per window focus', () => {
     assert.deepEqual(calls.sort(), ['branches', 'history', 'remotes', 'status']);
   });
 
+  test('opening the panel fills it, however recent the last look', async () => {
+    const p = panel();
+    container.classList.add('hidden');
+    await p.refreshIfStale();
+    calls = [];
+
+    container.classList.remove('hidden');
+    await p.refreshIfStale();
+    assert.deepEqual(calls.sort(), ['branches', 'history', 'remotes', 'status']);
+  });
+
   test('a button press is never held back', async () => {
     const p = panel();
     await p.refreshAll();

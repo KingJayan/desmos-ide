@@ -55,6 +55,7 @@ export class GitPanel {
 
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastRefresh = 0;
+  private filled = false;
   private statusInFlight = false;
   private lastStatus: GitStatusResult = {
     ok: false,
@@ -138,14 +139,18 @@ export class GitPanel {
 
   refreshAll(): Promise<unknown> {
     this.lastRefresh = Date.now();
+    this.filled = true;
     return Promise.all([
       this.refreshStatus(), this.refreshBranches(), this.refreshHistory(), this.refreshRemotes(),
     ]);
   }
 
   refreshIfStale(): Promise<unknown> {
+    const onScreen = !this.container.classList.contains('hidden');
+    // the sections still say "loading", so a first look must fill them
+    if (onScreen && !this.filled) return this.refreshAll();
     if (Date.now() - this.lastRefresh < MIN_GAP_MS) return Promise.resolve();
-    if (this.container.classList.contains('hidden')) {
+    if (!onScreen) {
       this.lastRefresh = Date.now();
       return this.refreshStatus();
     }
