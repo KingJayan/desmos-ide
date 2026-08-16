@@ -52,6 +52,10 @@ await page.waitForFunction(
 );
 check(true, 'a compile error is announced as assertive');
 
+await page.keyboard.press('ArrowRight');
+check(/^Ln \d+, Col \d+$/.test((await page.locator('#status-pos').textContent()) ?? ''), 'the bar says where the cursor is');
+check(((await page.locator('#status-save').textContent()) ?? '').length > 0, 'the bar says how the file is saved');
+
 await page.click('#btn-sidebar-ai');
 await page.waitForSelector('#ai-panel:not(.hidden)');
 const aiInput = page.locator('#ai-panel textarea').first();
@@ -67,6 +71,30 @@ await page.click('#editor-container .monaco-editor');
 await page.keyboard.press('Meta+F');
 await page.waitForSelector('#editor-container .find-widget.visible', { timeout: 5000 });
 check(true, 'find opens from the editor');
+
+await page.keyboard.press('Escape');
+await page.click('#editor-container .monaco-editor');
+await page.keyboard.press('Meta+A');
+await page.keyboard.type('a = 1');
+await page.waitForFunction(
+  () => document.getElementById('status-msg')?.textContent?.includes('1 expression') ?? false,
+  null, { timeout: 10_000 },
+);
+
+await page.click('#btn-enhanced');
+await page.waitForSelector('#expr-list .expr-row');
+await page.click('#btn-add-expr');
+await page.keyboard.type('y=2x');
+await page.keyboard.press('Enter');
+await page.click('#btn-dsl');
+// monaco renders its spaces as nbsp, so the text has to be normalised first
+let wroteBack = false;
+for (let i = 0; i < 20 && !wroteBack; i++) {
+  const shown = ((await page.locator('#editor-container').textContent()) ?? '').replace(/\u00a0/g, ' ');
+  wroteBack = shown.includes('2 * x');
+  if (!wroteBack) await page.waitForTimeout(250);
+}
+check(wroteBack, 'an enhanced edit lands in the DSL file');
 
 check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: ${consoleErrors[0]}` : ''}`);
 
