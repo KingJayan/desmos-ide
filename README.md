@@ -36,6 +36,7 @@ bun dev        # build then launch
 bun dev:hmr    # vite dev server + app for renderer hmr
 bun run build  # prod build → build/<channel>-<platform>/
 bun test       # compiler + editor tests
+bun test:e2e   # webkit over built app
 bun demo       # run compiler in the terminal, w/o app shell
 ```
 
