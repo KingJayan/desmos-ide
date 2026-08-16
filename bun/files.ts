@@ -56,11 +56,11 @@ export async function readFileAt(path: string): Promise<FileResult<{ path: strin
 export async function saveFile(path: string | null, content: string): Promise<FileResult<{ path: string }>> {
   if (typeof content !== 'string') return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Content must be a string.' };
   let savePath = path;
-  if (!savePath) {
-    savePath = await showSaveDialog({ defaultName: 'untitled.dsmx', extension: 'dsmx', prompt: 'Save DSL file' });
-    if (!savePath) return CANCELED;
-  }
   try {
+    if (!savePath) {
+      savePath = await showSaveDialog({ defaultName: 'untitled.dsmx', extension: 'dsmx', prompt: 'Save DSL file' });
+      if (!savePath) return CANCELED;
+    }
     await withRetry(() => writeFile(savePath!, content, 'utf-8'));
     return { ok: true, path: savePath };
   } catch (err) {
@@ -70,9 +70,9 @@ export async function saveFile(path: string | null, content: string): Promise<Fi
 
 export async function exportJson(content: string): Promise<FileResult<{ path: string }>> {
   if (typeof content !== 'string') return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Content must be a string.' };
-  const path = await showSaveDialog({ defaultName: 'expressions.json', extension: 'json', prompt: 'Export expressions' });
-  if (!path) return CANCELED;
   try {
+    const path = await showSaveDialog({ defaultName: 'expressions.json', extension: 'json', prompt: 'Export expressions' });
+    if (!path) return CANCELED;
     await withRetry(() => writeFile(path, content, 'utf-8'));
     return { ok: true, path };
   } catch (err) {

@@ -5,8 +5,9 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "bun build:view && electrobun dev",
-    "dev:hmr": "DESMOS_IDE_DEV=1 concurrently -k \"vite\" \"electrobun dev\"",
-    "build:view": "vite build",
+    "dev:hmr": "bun run build:native && DESMOS_IDE_DEV=1 concurrently -k \"vite\" \"electrobun dev\"",
+    "build:view": "vite build && bun run build:native",
+    "build:native": "bun run scripts/build-native.ts",
     "build": "bun build:view && electrobun build",
     "check": "tsc --noEmit",
     "demo": "bun run src/demo.ts",

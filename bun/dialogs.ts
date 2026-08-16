@@ -1,18 +1,18 @@
 import { Utils } from 'electrobun/bun';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { basename, extname, join, dirname } from 'path';
-import { existsSync, statSync, mkdirSync } from 'fs';
+import { basename, extname, join } from 'path';
+import { existsSync } from 'fs';
 
 const execFileAsync = promisify(execFile);
 
-async function ensureNativeBinary(name: string): Promise<string> {
-  const source = join(__dirname, 'native', `${name}.swift`);
-  const binary = join(__dirname, '..', 'build', 'native', name);
-  const stale = !existsSync(binary) || statSync(binary).mtimeMs < statSync(source).mtimeMs;
-  if (stale) {
-    mkdirSync(dirname(binary), { recursive: true });
-    await execFileAsync('swiftc', ['-O', source, '-o', binary]);
+/**
+ * scripts/build-native.ts compiles these before the bundle
+ */
+function nativeBinary(name: string): string {
+  const binary = join(__dirname, 'native', name);
+  if (!existsSync(binary)) {
+    throw new Error(`native helper "${name}" is missing; run "bun run build:native"`);
   }
   return binary;
 }
@@ -39,7 +39,13 @@ function ensureExtension(path: string, extension: string): string {
 export async function showSaveDialog(opts: SaveDialogOptions): Promise<string | null> {
   if (process.platform !== 'darwin') return saveDialogFallback(opts);
 
-  const binary = await ensureNativeBinary('savepanel');
+  let binary: string;
+  try {
+    binary = nativeBinary('savepanel');
+  } catch {
+    return saveDialogFallback(opts);
+  }
+
   try {
     const { stdout } = await execFileAsync(binary, [opts.prompt, opts.defaultName], {
       maxBuffer: 256 * 1024,
@@ -57,7 +63,7 @@ export async function showSaveDialog(opts: SaveDialogOptions): Promise<string | 
 export async function showConfirm(message: string): Promise<boolean> {
   if (process.platform !== 'darwin') throw new Error('native confirm is macOS-only');
 
-  const binary = await ensureNativeBinary('confirm');
+  const binary = nativeBinary('confirm');
   try {
     await execFileAsync(binary, [message], { maxBuffer: 64 * 1024 });
     return true;
@@ -70,7 +76,7 @@ export async function showConfirm(message: string): Promise<boolean> {
 export async function showPrompt(message: string, defaultValue: string): Promise<string | null> {
   if (process.platform !== 'darwin') throw new Error('native prompt is macOS-only');
 
-  const binary = await ensureNativeBinary('prompt');
+  const binary = nativeBinary('prompt');
   try {
     const { stdout } = await execFileAsync(binary, [message, defaultValue], { maxBuffer: 64 * 1024 });
     return stdout.replace(/\n$/, '');
