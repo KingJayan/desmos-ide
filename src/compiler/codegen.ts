@@ -2,7 +2,7 @@
 
 import * as T from './types';
 
-const DESMOS_NAMED: Record<string, string> = {
+export const DESMOS_NAMED: Record<string, string> = {
   red: '#c74440', blue: '#2d70b3', green: '#388c46',
   orange: '#fa7e19', purple: '#6042a6', black: '#000000', white: '#ffffff',
 };
@@ -96,28 +96,22 @@ export interface DesmosExpr {
   parametricDomain?: { min: string; max: string };
 }
 
-/** where an emitted expression came from, so the graph can point back at the source */
 export interface ExprSource {
   id: string;
   line: number;
   col: number;
 }
 
-/** the clock the transport controls, so the ui does not have to guess which slider it is */
 export interface ClockInfo {
   id: string;
   name: string;
   min: number;
   max: number;
-  /** milliseconds for one sweep */
-  period: number;
+  period: number; //ms
   mode: T.TimeMode;
 }
 
-/** the angles project() uses when no camera is declared, in radians */
 const DEFAULT_CAMERA = { azimuth: 0.6, elevation: 0.4 };
-
-/** one sweep takes this long unless `period` says otherwise */
 const DEFAULT_PERIOD = 4000;
 
 export interface DesmosState {
@@ -203,21 +197,17 @@ export class Codegen {
   private sources: ExprSource[] = [];
   private currentPos: T.Pos | null = null;
   private clockInfo: ClockInfo | null = null;
-  /** the camera angles as latex, read by project() */
   private cameraLatex = { azimuth: fmtNum(DEFAULT_CAMERA.azimuth), elevation: fmtNum(DEFAULT_CAMERA.elevation) };
 
-  /** valid once generate() has run; null when the source declares no clock */
   clock(): ClockInfo | null {
     return this.clockInfo;
   }
 
-  /** valid once generate() has run */
   sourceMap(): ExprSource[] {
     return this.sources;
   }
 
   generate(program: T.Program): DesmosState {
-    // the camera is read by project(), which can appear above the camera line
     const cam = program.body.find(st => st.type === 'CameraDecl') as T.CameraDecl | undefined;
     if (cam) {
       this.cameraLatex = {
@@ -233,7 +223,7 @@ export class Codegen {
     };
   }
 
-  // stable id derived from a logical name
+  // derived from a logical name
   private stableId(base: string): string {
     const n = (this.idCounts.get(base) ?? 0) + 1;
     this.idCounts.set(base, n);
@@ -309,13 +299,13 @@ export class Codegen {
       return;
     }
 
-    // expr block lowered form — emit bare expression without name binding
+    // expr block lowered form
     if (stmt.name.startsWith('__expr_')) {
       this.emit({ type: 'expression', latex: this.toLaTeX(stmt.value) }, stmt.name);
       return;
     }
 
-    // domain restriction: y = x^2 domain x > 0  →  y=x^{2}\left\{x>0\right\}
+    // dom restriction: y = x^2 domain x > 0  →  y=x^{2}\left\{x>0\right\}
     if (stmt.domain) {
       const exprLatex   = this.toLaTeX(stmt.value);
       const domainLatex = this.toLaTeX(stmt.domain);
@@ -326,10 +316,7 @@ export class Codegen {
     this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` }, stmt.name);
   }
 
-  /**
-   * the clock is an ordinary desmos slider that starts playing. that is the only
-   * clock desmos has, so the transport drives this one expression
-   */
+  /* clock is a ordinary desmos slider */
   private genTimeDecl(stmt: T.TimeDecl): void {
     const min = this.constOr(stmt.start, 0);
     const max = this.constOr(stmt.end, 1);
@@ -364,12 +351,10 @@ export class Codegen {
     }, `${stmt.name}_el`);
   }
 
-  /** a number the slider bounds need up front; anything else falls back */
   private constOr(expr: T.Expr | undefined, fallback: number): number {
     return expr?.type === 'NumLit' ? expr.value : fallback;
   }
 
-  /** alias r = expr — identical output to VarDecl */
   private genAliasDecl(stmt: T.AliasDecl): void {
     const varName = nameToLatex(stmt.name);
     this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` }, stmt.name);
@@ -716,9 +701,7 @@ export class Codegen {
     return `\\left(${screenX},${screenY}\\right)`;
   }
 
-  /**
-   * the animation presets
-   */
+  /* anim presets */
   private presetToLatex(fn: string, args: string[]): string | null {
     const u = `\\left(${args[0] ?? '0'}\\right)`;
     const second = (fallback: string) =>
