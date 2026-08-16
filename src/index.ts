@@ -3,7 +3,7 @@
 import { tokenize, LexError } from './compiler/lexer';
 import { parse, ParseError } from './compiler/parser';
 import { optimize } from './compiler/optimizer';
-import { codegenWithSourceMap, DesmosState, DesmosExpr, ExprSource } from './compiler/codegen';
+import { codegenWithSourceMap, ClockInfo, DesmosState, DesmosExpr, ExprSource } from './compiler/codegen';
 import { analyze } from './compiler/analyze';
 import type { Program, Statement, Expr } from './compiler/types';
 
@@ -40,6 +40,8 @@ export interface CompileSuccess {
   symbols: SymbolInfo[];
   /** maps each graph expression back to the statement that produced it */
   sourceMap: ExprSource[];
+  /** the clock the transport drives, or null when the source declares no `time` */
+  clock: ClockInfo | null;
 }
 
 export interface CompileError {
@@ -201,11 +203,11 @@ export function compile(src: string): CompileResult {
     }
 
     const optimized = optimize(ast);
-    const { state, sourceMap } = codegenWithSourceMap(optimized);
+    const { state, sourceMap, clock } = codegenWithSourceMap(optimized);
     const symbols   = extractSymbols(ast);
     const warnings  = checkWarnings(ast);
 
-    return { success: true, state, warnings, symbols, sourceMap };
+    return { success: true, state, warnings, symbols, sourceMap, clock };
   } catch (e) {
     if (e instanceof LexError)
       return { success: false, errors: [mkError(e.message, 1, e.line, e.col)] };

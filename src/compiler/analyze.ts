@@ -41,8 +41,15 @@ export function analyze(program: T.Program): SemanticError[] {
       case 'SpiralDecl':  declaredVars.add(stmt.name); break;
       case 'WaveDecl':    declaredVars.add(stmt.name); break;
       case 'GridDecl':    declaredVars.add(stmt.name); break;
+      case 'TimeDecl':    declaredVars.add(stmt.name); break;
+      case 'CameraDecl':  declaredVars.add(stmt.name); break;
     }
   }
+
+  // project() reads one camera and the transport drives one clock, so a second of
+  // either has no way to say which one is meant
+  onlyOne(program, 'TimeDecl', 'time', errors);
+  onlyOne(program, 'CameraDecl', 'camera', errors);
 
   for (const stmt of program.body) {
     checkStmt(stmt, declaredFns, declaredVars, errors);
@@ -131,6 +138,32 @@ function checkStmt(
       if (stmt.ymin) cx(stmt.ymin);
       if (stmt.ymax) cx(stmt.ymax);
       break;
+    case 'TimeDecl':
+      if (stmt.start)  cx(stmt.start);
+      if (stmt.end)    cx(stmt.end);
+      if (stmt.period) cx(stmt.period);
+      break;
+    case 'CameraDecl':
+      cx(stmt.azimuth); cx(stmt.elevation);
+      break;
+  }
+}
+
+/** reports every declaration of a kind past the first */
+function onlyOne(
+  program: T.Program,
+  kind: 'TimeDecl' | 'CameraDecl',
+  keyword: string,
+  errors: SemanticError[],
+): void {
+  const found = program.body.filter(s => s.type === kind);
+  for (const extra of found.slice(1)) {
+    errors.push({
+      error: `Only one '${keyword}' declaration is allowed`,
+      line: extra.pos.line,
+      col: extra.pos.col,
+      phase: 2,
+    });
   }
 }
 

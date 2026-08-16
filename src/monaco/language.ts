@@ -9,7 +9,7 @@ export const KEYWORDS = [
   'text', 'group', 'as', 'at',
   'for', 'step', 'where', 'else',
   'if', 'then', 'domain', 'expr', 'loop',
-  'time', 'project', 'camera',
+  'time', 'camera', 'period', 'mirror', 'azimuth', 'elevation',
   'spiral', 'wave', 'grid',
 ] as const;
 
@@ -44,7 +44,7 @@ export const languageConfig = {
 // monarch tokenizer
 
 // Token classes:
-//   kw          - let fn in map point circle line points time project camera
+//   kw          - let fn in map point circle line points time camera
 //   function.builtin - sin cos tan …
 //   identifier       - user-defined names
 //   number           - 3  3.14
@@ -155,6 +155,7 @@ export interface CompletionItem {
 const STATEMENT_KEYWORDS = new Set([
   'fn', 'alias', 'point', 'circle', 'line', 'curve', 'region',
   'polygon', 'segment', 'text', 'group', 'spiral', 'wave', 'grid', 'debug', 'expr',
+  'time', 'camera',
 ]);
 
 export function buildCompletions(kinds: {

@@ -50,11 +50,48 @@ export const BUILTINS: readonly BuiltinFn[] = [
     snippet: '(${1:0}, ${2:0}, ${3:10})',
     doc: 'A draggable Desmos slider.',
   },
-  { name: 'time',    signature: 'time(period?) → number', snippet: '(${1:1000})', doc: 'An animating clock value.' },
-  { name: 'project', signature: 'project(x, y) → point',  snippet: '(${1:x}, ${2:y})' },
-  { name: 'camera',  signature: 'camera(x, y) → point',   snippet: '(${1:x}, ${2:y})' },
+  {
+    name: 'project',
+    signature: 'project(x, y, z?) → point',
+    snippet: '(${1:x}, ${2:y}, ${3:z})',
+    doc: 'Projects a 3D point onto the graph, using the declared camera. z defaults to 0.',
+  },
+
+  {
+    name: 'ease',
+    signature: 'ease(u) → number  (u: 0–1)',
+    snippet: '(${1:u})',
+    doc: 'Smoothstep. Starts and ends at rest, so motion does not jump.',
+  },
+  {
+    name: 'pulse',
+    signature: 'pulse(u) → number  (u: 0–1)',
+    snippet: '(${1:u})',
+    doc: 'Rises 0 → 1 → 0 across the sweep.',
+  },
+  {
+    name: 'bounce',
+    signature: 'bounce(u) → number  (u: 0–1)',
+    snippet: '(${1:u})',
+    doc: 'A bounce off zero. Same shape as pulse, but it eases at the top.',
+  },
+  {
+    name: 'wobble',
+    signature: 'wobble(u, amp?) → number  (u: 0–1)',
+    snippet: '(${1:u}, ${2:1})',
+    doc: 'One full sine cycle across the sweep. amp defaults to 1.',
+  },
+  {
+    name: 'orbit',
+    signature: 'orbit(u, r?) → point  (u: 0–1)',
+    snippet: '(${1:u}, ${2:1})',
+    doc: 'A point going once around a circle of radius r. r defaults to 1.',
+  },
+
   { name: 'polygon', signature: 'polygon(p1, p2, ...) → polygon', snippet: '(${1:p})' },
 ];
+
+export const ANIMATION_PRESETS = ['ease', 'pulse', 'bounce', 'wobble', 'orbit'] as const;
 
 export const BUILTIN_NAMES: readonly string[] = BUILTINS.map(b => b.name);
 

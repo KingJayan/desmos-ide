@@ -13,7 +13,8 @@ export class ParseError extends Error {
   }
 }
 
-const KW_AS_FN = new Set(['time', 'project', 'camera', 'circle', 'map']);
+// `time` and `camera` are statements, so only `project` is left as a call
+const KW_AS_FN = new Set(['project', 'circle', 'map']);
 
 export interface ParseErrorInfo {
   error: string;
@@ -127,6 +128,8 @@ class Parser {
         case 'spiral':  return this.parseSpiralDecl();
         case 'wave':    return this.parseWaveDecl();
         case 'grid':    return this.parseGridDecl();
+        case 'time':    return this.parseTimeDecl();
+        case 'camera':  return this.parseCameraDecl();
       }
     }
 
@@ -295,6 +298,56 @@ class Parser {
 
     const style = this.parseStyleBlock();
     return { type: 'LineDecl', name, form: 'expr', expr: lhs, style, pos };
+  }
+
+  /** time T [= 0..10] [period 2000] [loop|mirror] */
+  private parseTimeDecl(): T.TimeDecl {
+    const pos = this.curPos();
+    this.eat('kw', 'time');
+    const name = this.eat('ident').value;
+
+    let start: T.Expr | undefined;
+    let end: T.Expr | undefined;
+    if (this.check('op', '=')) {
+      this.advance();
+      start = this.parseExpr();
+      this.eat('dotdot');
+      end = this.parseExpr();
+    }
+
+    let period: T.Expr | undefined;
+    if (this.check('kw', 'period')) {
+      this.advance();
+      period = this.parseExpr();
+    }
+
+    let mode: T.TimeMode | undefined;
+    if (this.check('kw', 'loop'))        { this.advance(); mode = 'loop'; }
+    else if (this.check('kw', 'mirror')) { this.advance(); mode = 'mirror'; }
+
+    return { type: 'TimeDecl', name, start, end, period, mode, pos };
+  }
+
+  /** camera cam = azimuth(0.6), elevation(0.4) */
+  private parseCameraDecl(): T.CameraDecl {
+    const pos = this.curPos();
+    this.eat('kw', 'camera');
+    const name = this.eat('ident').value;
+    this.eat('op', '=');
+
+    this.eat('kw', 'azimuth');
+    this.eat('lparen');
+    const azimuth = this.parseExpr();
+    this.eat('rparen');
+
+    this.eat('comma');
+
+    this.eat('kw', 'elevation');
+    this.eat('lparen');
+    const elevation = this.parseExpr();
+    this.eat('rparen');
+
+    return { type: 'CameraDecl', name, azimuth, elevation, pos };
   }
 
   private parseVarDecl(): T.VarDecl | T.CurveDecl {

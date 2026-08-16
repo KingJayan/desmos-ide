@@ -72,7 +72,7 @@ export interface DesmosSlider {
   hardMax?: boolean;
   isPlaying?: boolean;
   animationPeriod?: number;
-  loopMode?: 'LOOP_FORWARD' | 'LOOP_BACKWARD' | 'PLAY_ONCE';
+  loopMode?: 'LOOP_FORWARD' | 'LOOP_BACKWARD' | 'LOOP_FORWARD_REVERSE' | 'PLAY_ONCE';
 }
 
 export interface DesmosExpr {
@@ -102,6 +102,23 @@ export interface ExprSource {
   line: number;
   col: number;
 }
+
+/** the clock the transport controls, so the ui does not have to guess which slider it is */
+export interface ClockInfo {
+  id: string;
+  name: string;
+  min: number;
+  max: number;
+  /** milliseconds for one sweep */
+  period: number;
+  mode: T.TimeMode;
+}
+
+/** the angles project() uses when no camera is declared, in radians */
+const DEFAULT_CAMERA = { azimuth: 0.6, elevation: 0.4 };
+
+/** one sweep takes this long unless `period` says otherwise */
+const DEFAULT_PERIOD = 4000;
 
 export interface DesmosState {
   version: 9;
@@ -185,6 +202,14 @@ export class Codegen {
   private idCounts = new Map<string, number>();
   private sources: ExprSource[] = [];
   private currentPos: T.Pos | null = null;
+  private clockInfo: ClockInfo | null = null;
+  /** the camera angles as latex, read by project() */
+  private cameraLatex = { azimuth: fmtNum(DEFAULT_CAMERA.azimuth), elevation: fmtNum(DEFAULT_CAMERA.elevation) };
+
+  /** valid once generate() has run; null when the source declares no clock */
+  clock(): ClockInfo | null {
+    return this.clockInfo;
+  }
 
   /** valid once generate() has run */
   sourceMap(): ExprSource[] {
@@ -192,6 +217,14 @@ export class Codegen {
   }
 
   generate(program: T.Program): DesmosState {
+    // the camera is read by project(), which can appear above the camera line
+    const cam = program.body.find(st => st.type === 'CameraDecl') as T.CameraDecl | undefined;
+    if (cam) {
+      this.cameraLatex = {
+        azimuth: nameToLatex(`${cam.name}_az`),
+        elevation: nameToLatex(`${cam.name}_el`),
+      };
+    }
     for (const stmt of program.body) this.genStmt(stmt);
     return {
       version: 9,
@@ -234,6 +267,8 @@ export class Codegen {
       case 'SpiralDecl':  this.genSpiralDecl(stmt);  break;
       case 'WaveDecl':    this.genWaveDecl(stmt);    break;
       case 'GridDecl':    this.genGridDecl(stmt);    break;
+      case 'TimeDecl':    this.genTimeDecl(stmt);    break;
+      case 'CameraDecl':  this.genCameraDecl(stmt);  break;
       case 'FnDecl':      this.genFnDecl(stmt);      break;
       // DebugDecl and ExprBlockDecl are stripped in optimizer; VarDecl handles ExprBlock lowered form
     }
@@ -289,6 +324,49 @@ export class Codegen {
     }
 
     this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` }, stmt.name);
+  }
+
+  /**
+   * the clock is an ordinary desmos slider that starts playing. that is the only
+   * clock desmos has, so the transport drives this one expression
+   */
+  private genTimeDecl(stmt: T.TimeDecl): void {
+    const min = this.constOr(stmt.start, 0);
+    const max = this.constOr(stmt.end, 1);
+    const period = this.constOr(stmt.period, DEFAULT_PERIOD);
+    const mode: T.TimeMode = stmt.mode ?? 'loop';
+
+    const id = this.emit({
+      type: 'expression',
+      latex: `${nameToLatex(stmt.name)}=${fmtNum(min)}`,
+      slider: {
+        min: fmtNum(min),
+        max: fmtNum(max),
+        hardMin: true,
+        hardMax: true,
+        isPlaying: true,
+        animationPeriod: period,
+        loopMode: mode === 'mirror' ? 'LOOP_FORWARD_REVERSE' : 'LOOP_FORWARD',
+      },
+    }, stmt.name);
+
+    this.clockInfo = { id, name: stmt.name, min, max, period, mode };
+  }
+
+  private genCameraDecl(stmt: T.CameraDecl): void {
+    this.emit({
+      type: 'expression',
+      latex: `${nameToLatex(`${stmt.name}_az`)}=${this.toLaTeX(stmt.azimuth)}`,
+    }, `${stmt.name}_az`);
+    this.emit({
+      type: 'expression',
+      latex: `${nameToLatex(`${stmt.name}_el`)}=${this.toLaTeX(stmt.elevation)}`,
+    }, `${stmt.name}_el`);
+  }
+
+  /** a number the slider bounds need up front; anything else falls back */
+  private constOr(expr: T.Expr | undefined, fallback: number): number {
+    return expr?.type === 'NumLit' ? expr.value : fallback;
   }
 
   /** alias r = expr — identical output to VarDecl */
@@ -626,12 +704,48 @@ export class Codegen {
     }
   }
 
+  private projectToLatex(args: string[]): string {
+    const g = (i: number) => `\\left(${args[i] ?? '0'}\\right)`;
+    const x = g(0), y = g(1), z = args[2] !== undefined ? g(2) : '0';
+    const { azimuth: a, elevation: e } = this.cameraLatex;
+    const sinA = `\\sin\\left(${a}\\right)`, cosA = `\\cos\\left(${a}\\right)`;
+    const sinE = `\\sin\\left(${e}\\right)`, cosE = `\\cos\\left(${e}\\right)`;
+
+    const screenX = `-${x}${sinA}+${y}${cosA}`;
+    const screenY = `-\\left(${x}${cosA}+${y}${sinA}\\right)${sinE}+${z}${cosE}`;
+    return `\\left(${screenX},${screenY}\\right)`;
+  }
+
+  /**
+   * the animation presets
+   */
+  private presetToLatex(fn: string, args: string[]): string | null {
+    const u = `\\left(${args[0] ?? '0'}\\right)`;
+    const second = (fallback: string) =>
+      args[1] !== undefined ? `\\left(${args[1]}\\right)` : fallback;
+
+    switch (fn) {
+      case 'ease':   return `${u}^{2}\\left(3-2${u}\\right)`;
+      case 'pulse':  return `1-\\left|2${u}-1\\right|`;
+      case 'bounce': return `\\left|\\sin\\left(\\pi ${u}\\right)\\right|`;
+      case 'wobble': return `${second('1')}\\sin\\left(2\\pi ${u}\\right)`;
+      case 'orbit': {
+        const r = second('1');
+        return `\\left(${r}\\cos\\left(2\\pi ${u}\\right),${r}\\sin\\left(2\\pi ${u}\\right)\\right)`;
+      }
+      default: return null;
+    }
+  }
+
   private callToLatex(call: T.Call): string {
     const args = call.args.map(a => this.toLaTeX(a));
 
     if (call.fn === 'sqrt') return `\\sqrt{${args[0] ?? '0'}}`;
     if (call.fn === 'abs')  return `\\left|${args[0] ?? '0'}\\right|`;
-    if (call.fn === 'project') return args[0] ?? '0';
+    if (call.fn === 'project') return this.projectToLatex(args);
+
+    const preset = this.presetToLatex(call.fn, args);
+    if (preset !== null) return preset;
 
     const latexFn = MATH_FNS[call.fn];
     if (latexFn) return `${latexFn}\\left(${args.join(',')}\\right)`;
@@ -654,8 +768,8 @@ export function codegen(program: T.Program): DesmosState {
 
 export function codegenWithSourceMap(
   program: T.Program,
-): { state: DesmosState; sourceMap: ExprSource[] } {
+): { state: DesmosState; sourceMap: ExprSource[]; clock: ClockInfo | null } {
   const gen = new Codegen();
   const state = gen.generate(program);
-  return { state, sourceMap: gen.sourceMap() };
+  return { state, sourceMap: gen.sourceMap(), clock: gen.clock() };
 }

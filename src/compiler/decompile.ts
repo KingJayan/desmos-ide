@@ -377,8 +377,11 @@ export function decompile(expr: DesmosExpr, name: string): string | null {
 
   // a = slider(value, min, max)
   if (expr.slider && node.k === 'cmp' && node.op === '=' && isPlainName(node.l)) {
-    const { min, max } = expr.slider;
+    const { min, max, isPlaying } = expr.slider;
     if (min === undefined || max === undefined) return null;
+    // an animating slider is either a clock or a slider with a speed, and this
+    // spelling says neither, so writing it back would stop the animation
+    if (isPlaying) return null;
     return `${node.l.v} = slider(${print(node.r)}, ${min}, ${max})`;
   }
 

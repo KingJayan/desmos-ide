@@ -10,6 +10,8 @@ export const KEYWORDS = new Set([
   'spiral', 'wave', 'grid',
 
   'alias', 'debug', 'domain', 'if', 'then', 'expr', 'loop',
+
+  'period', 'mirror', 'azimuth', 'elevation',
 ]);
 
 export type TT =

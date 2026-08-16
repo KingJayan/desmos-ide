@@ -27,7 +27,9 @@ export type Statement =
   | FnDecl
   | SpiralDecl
   | WaveDecl
-  | GridDecl;
+  | GridDecl
+  | TimeDecl
+  | CameraDecl;
 
 /** a = expr [domain cond] */
 export interface VarDecl {
@@ -208,6 +210,30 @@ export interface GridDecl {
   ymin?: Expr;
   ymax?: Expr;
   style?: StyleBlock;
+  pos: Pos;
+}
+
+/** how the clock behaves when it reaches the end of its range */
+export type TimeMode = 'loop' | 'mirror';
+
+/** time T [= 0..10] [period 2000] [loop|mirror] — the one clock the graph animates on */
+export interface TimeDecl {
+  type: 'TimeDecl';
+  name: string;
+  start?: Expr;
+  end?: Expr;
+  /** milliseconds for one sweep of the range */
+  period?: Expr;
+  mode?: TimeMode;
+  pos: Pos;
+}
+
+/** camera cam = azimuth(0.6), elevation(0.4) — the angles project() reads */
+export interface CameraDecl {
+  type: 'CameraDecl';
+  name: string;
+  azimuth: Expr;
+  elevation: Expr;
   pos: Pos;
 }
 

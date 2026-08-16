@@ -1,6 +1,7 @@
 // optimizer — shadow-safe (all transforms operate on cloned nodes)
 
 import * as T from './types';
+import { ANIMATION_PRESETS } from './builtins';
 
 interface FnDef { params: string[]; body: T.Expr; }
 interface Env { fns: Map<string, FnDef>; }
@@ -39,6 +40,8 @@ function collectAllRefs(program: T.Program): Set<string> {
       case 'SpiralDecl': walk(stmt.turns); walk(stmt.spacing); [stmt.cx, stmt.cy, stmt.rotate].forEach(e => e && walk(e)); break;
       case 'WaveDecl': [stmt.freq, stmt.amp, stmt.phase, stmt.cx, stmt.cy, stmt.xmin, stmt.xmax].forEach(e => e && walk(e)); break;
       case 'GridDecl': [stmt.cols, stmt.rows, stmt.xmin, stmt.xmax, stmt.ymin, stmt.ymax].forEach(e => e && walk(e)); break;
+      case 'TimeDecl': [stmt.start, stmt.end, stmt.period].forEach(e => e && walk(e)); break;
+      case 'CameraDecl': walk(stmt.azimuth); walk(stmt.elevation); break;
     }
   }
   // also collect refs inside alias bodies (aliases can reference other aliases)
@@ -131,6 +134,12 @@ function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
         step:  oxopt(stmt.step),
         body:  ox(stmt.body),
       };
+
+    case 'TimeDecl':
+      return { ...stmt, start: oxopt(stmt.start), end: oxopt(stmt.end), period: oxopt(stmt.period) };
+
+    case 'CameraDecl':
+      return { ...stmt, azimuth: ox(stmt.azimuth), elevation: ox(stmt.elevation) };
 
     case 'RegionDecl':
       return { ...stmt, expr: ox(stmt.expr) };
@@ -276,7 +285,7 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
         ? Object.fromEntries(Object.entries(expr.kwargs).map(([k, v]) => [k, ox(v)]))
         : undefined;
 
-      const BUILTINS = new Set(['time', 'project', 'camera', 'rgb', 'hsv', 'slider']);
+      const BUILTINS = new Set(['project', 'rgb', 'hsv', 'slider', ...ANIMATION_PRESETS]);
       if (BUILTINS.has(expr.fn)) return { ...expr, args, kwargs };
 
       const fn = env.fns.get(expr.fn);
