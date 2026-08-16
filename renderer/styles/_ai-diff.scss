@@ -1,0 +1,36 @@
+.ai-diff-preview {
+  margin-top: 6px;
+  border: 1px solid var(--surface1);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 0.9rem;
+}
+.ai-diff-lines {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--mantle);
+}
+.ai-diff-add,
+.ai-diff-del {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 1px 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.ai-diff-add { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
+.ai-diff-del { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+.ai-diff-no-change,
+.ai-diff-insert-note {
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  color: var(--overlay1);
+}
+.ai-diff-btns {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--mantle);
+  border-top: 1px solid var(--surface0);
+}

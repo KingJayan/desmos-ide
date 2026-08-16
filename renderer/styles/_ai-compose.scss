@@ -1,0 +1,263 @@
+.ai-compose {
+  border-top: 1px solid var(--surface0);
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--crust);
+  position: relative;
+}
+
+.ai-ctx-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  background: color-mix(in srgb, var(--blue) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--blue) 25%, transparent);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  color: var(--blue);
+  animation: ctx-pill-in 0.2s ease-out;
+}
+
+.ai-ctx-pill-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-ctx-pill-close {
+  background: transparent;
+  border: none;
+  color: var(--blue);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.ai-ctx-pill-close:hover {
+  opacity: 1;
+}
+
+.ai-config-popover {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(100% + 6px);
+  background: var(--mantle);
+  border: 1px solid var(--surface1);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  z-index: 3;
+}
+
+.ai-config-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.85rem;
+  color: var(--overlay2);
+}
+
+.ai-config-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--overlay1);
+}
+
+.ai-config-input {
+  border: 1px solid var(--surface1);
+  border-radius: 5px;
+  background: var(--base);
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 0.9rem;
+  outline: none;
+}
+.ai-config-input:focus { border-color: var(--mauve); }
+
+.ai-config-save {
+  border: 1px solid var(--mauve);
+  background: color-mix(in srgb, var(--mauve) 14%, transparent);
+  color: var(--mauve);
+  border-radius: 5px;
+  font-size: 0.9rem;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.ai-config-save:hover {
+  background: color-mix(in srgb, var(--mauve) 22%, transparent);
+}
+
+.ai-autocomplete {
+  display: none;
+  flex-direction: column;
+  background: var(--crust);
+  border: 1px solid var(--surface1);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.ai-autocomplete--open { display: flex; }
+
+.ai-ac-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--surface0);
+  transition: background 0.1s, padding-left 0.12s;
+}
+.ai-ac-item:last-child { border-bottom: none; }
+.ai-ac-item:hover,
+.ai-ac-item--active { background: var(--surface0); padding-left: 14px; }
+
+.ai-ac-cmd  { color: var(--mauve); font-family: var(--font-mono); font-weight: 600; }
+.ai-ac-arg  { color: var(--peach); font-family: var(--font-mono); }
+.ai-ac-desc { color: var(--overlay1); margin-left: auto; font-size: 0.85rem; }
+
+.ai-compose-wrap {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.12s;
+  overflow: hidden;
+}
+.ai-compose-wrap:focus-within { border-color: var(--mauve); }
+
+.ai-input {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  padding: 9px 11px 6px;
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  user-select: text;
+  min-height: 36px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.ai-input::placeholder { color: var(--overlay0); }
+.ai-input:disabled { opacity: 0.5; }
+
+.ai-compose-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 6px 4px 8px;
+  border-top: 1px solid var(--surface1);
+  gap: 6px;
+}
+
+.ai-compose-bar-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ai-ctx-btn {
+  --btn-accent: var(--mauve);
+  gap: 3px;
+  padding: 2px 6px;
+  border-color: var(--surface1);
+  color: var(--overlay0);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.ai-ctx-btn--on {
+  color: var(--mauve);
+  border-color: var(--mauve);
+  background: color-mix(in srgb, var(--mauve) 12%, transparent);
+}
+.ai-ctx-btn--on:hover {
+  background: color-mix(in srgb, var(--mauve) 20%, transparent);
+}
+
+.ai-sidebar--compact .ai-ctx-btn span { display: none; }
+.ai-sidebar--compact .ai-ctx-btn { padding: 2px 5px; }
+.ai-sidebar--compact .ai-provider-label { display: none; }
+.ai-sidebar--compact .ai-provider-state { display: none; }
+.ai-sidebar--compact .ai-status-memory { display: none; }
+.ai-sidebar--compact .ai-provider-select { max-width: 72px; font-size: 0.8rem; }
+
+.ai-send-btn {
+  --btn-press: 0.9;
+  --btn-hover-border: transparent;
+  background: var(--mauve);
+  border-radius: 6px;
+  color: var(--crust);
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+}
+.ai-send-btn:hover {
+  background: var(--mauve);
+  color: var(--crust);
+  opacity: 0.9;
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--mauve) 40%, transparent);
+}
+.ai-send-btn:active { opacity: 1; }
+
+.ai-config-copilot { display: flex; flex-direction: column; gap: 6px; }
+.ai-copilot-row { display: flex; align-items: center; gap: 6px; }
+.ai-copilot-status { font-size: 0.9rem; color: var(--overlay1); flex: 1; }
+.ai-copilot-status--connected { color: var(--green); }
+.ai-copilot-status--pending { color: var(--yellow); }
+
+.ai-copilot-connect,
+.ai-copilot-disconnect {
+  padding: 3px 9px;
+  font-size: 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface1);
+  background: transparent;
+  color: var(--subtext1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-copilot-connect:hover { border-color: var(--mauve); color: var(--mauve); }
+.ai-copilot-disconnect:hover { border-color: var(--red); color: var(--red); }
+
+.ai-copilot-code-wrap { display: flex; flex-direction: column; gap: 4px; }
+.ai-copilot-instructions { font-size: 0.9rem; color: var(--subtext1); line-height: 1.5; }
+.ai-copilot-link { color: var(--blue); text-decoration: none; }
+.ai-copilot-link:hover { text-decoration: underline; }
+.ai-copilot-user-code {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--mauve);
+  background: var(--surface0);
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  text-align: center;
+  display: block;
+}

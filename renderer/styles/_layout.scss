@@ -1,0 +1,200 @@
+html {
+  font-size: 13px;
+}
+html[data-ui-scale='compact'] { font-size: 12px; }
+html[data-ui-scale='large']   { font-size: 15px; }
+
+html, body {
+  height: 100%;
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--base);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  overflow: hidden;
+}
+
+#toolbar {
+  height: var(--toolbar-h);
+  background: var(--crust);
+  border-bottom: 1px solid var(--surface0);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 16px;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.toolbar-center {
+  flex: 1;
+  text-align: center;
+  color: var(--overlay2);
+  font-size: 0.95rem;
+  pointer-events: none;
+  user-select: text;
+}
+
+#saved-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--yellow);
+  vertical-align: middle;
+  pointer-events: auto;
+}
+
+.filename--unsaved {
+  font-style: italic;
+}
+
+.app-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--blue);
+  letter-spacing: 0.02em;
+  margin-left: 72px;
+}
+
+.mode-toggle {
+  display: flex;
+  background: var(--surface0);
+  border-radius: var(--radius);
+  padding: 2px;
+  gap: 2px;
+}
+
+.mode-btn {
+  --btn-hover-border: transparent;
+  color: var(--overlay2);
+  padding: 3px 12px;
+  border-radius: 3px;
+}
+.mode-btn.active { background: var(--surface1); color: var(--text); }
+
+.toolbar-btn {
+  border-color: var(--surface1);
+  --btn-press: 0.93;
+  -webkit-app-region: no-drag;
+}
+.toolbar-btn:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 20%, transparent); }
+
+
+#workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+#activity-bar {
+  width: 50px;
+  border-right: 1px solid var(--surface0);
+  background: var(--crust);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  flex-shrink: 0;
+}
+
+.activity-btn {
+  --btn-hover-border: transparent;
+  --btn-press: 0.92;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--overlay1);
+  position: relative;
+}
+
+.activity-btn.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface1) 50%, transparent);
+}
+
+.activity-btn.active::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--blue);
+}
+
+.activity-btn:active {
+  transform: scale(0.92);
+}
+
+.activity-btn .lucide {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+}
+
+.activity-spacer {
+  flex: 1;
+}
+
+#left-panel {
+  width: 45%;
+  min-width: 280px;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  background: var(--base);
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.pane        { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.pane.hidden { display: none; }
+.pane.split  { flex: 1; min-height: 120px; }
+
+#pane-divider {
+  height: 4px;
+  background: var(--surface0);
+  cursor: row-resize;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+#pane-divider:hover,
+#pane-divider.dragging { background: var(--blue); }
+#pane-divider.hidden   { display: none; }
+
+#editor-container { flex: 1; min-height: 0; overflow: hidden; }
+
+#divider {
+  width: 4px;
+  background: var(--surface0);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+#divider:hover,
+#divider.dragging { background: var(--blue); }
+
+#right-panel {
+  flex: 1;
+  min-width: 200px;
+  background: var(--mantle);
+  position: relative;
+}
+#graph-container { width: 100%; height: 100%; }

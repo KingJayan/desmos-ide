@@ -1,0 +1,20 @@
+// load order is cascade order: tokens first, then the shared control base,
+// then one partial per part of the ui
+@use 'styles/tokens';
+@use 'styles/buttons';
+@use 'styles/layout';
+@use 'styles/transport';
+@use 'styles/git';
+@use 'styles/enhanced';
+@use 'styles/sidepanel';
+@use 'styles/ai-header';
+@use 'styles/ai-messages';
+@use 'styles/ai-markdown';
+@use 'styles/ai-compose';
+@use 'styles/ai-diff';
+@use 'styles/settings';
+@use 'styles/outline';
+@use 'styles/command-palette';
+@use 'styles/sliders';
+@use 'styles/model-picker';
+@use 'styles/search';

@@ -1,0 +1,106 @@
+@use 'sass:map';
+
+// every theme sets the same sixteen slots, so the palettes live in one map and
+// the selectors are generated. adding a theme is one entry here.
+$palettes: (
+  'desmos-dark': (
+    'base': #1e1e2e, 'mantle': #181825, 'crust': #11111b,
+    'surface0': #313244, 'surface1': #45475a,
+    'overlay0': #6c7086, 'overlay1': #7f849c, 'overlay2': #9399b2,
+    'subtext1': #bac2de, 'text': #cdd6f4,
+    'blue': #89b4fa, 'green': #a6e3a1, 'yellow': #f9e2af,
+    'red': #f38ba8, 'mauve': #cba6f7, 'peach': #fab387,
+  ),
+  'catppuccin-latte': (
+    'base': #eff1f5, 'mantle': #e6e9ef, 'crust': #dce0e8,
+    'surface0': #ccd0da, 'surface1': #bcc0cc,
+    'overlay0': #9ca0b0, 'overlay1': #8c8fa1, 'overlay2': #7c7f93,
+    'subtext1': #5c5f77, 'text': #4c4f69,
+    'blue': #1e66f5, 'green': #40a02b, 'yellow': #df8e1d,
+    'red': #d20f39, 'mauve': #8839ef, 'peach': #fe640b,
+  ),
+  'catppuccin-frappe': (
+    'base': #303446, 'mantle': #292c3c, 'crust': #232634,
+    'surface0': #414559, 'surface1': #51576d,
+    'overlay0': #737994, 'overlay1': #838ba7, 'overlay2': #949cbb,
+    'subtext1': #b5bfe2, 'text': #c6d0f5,
+    'blue': #8caaee, 'green': #a6d189, 'yellow': #e5c890,
+    'red': #e78284, 'mauve': #ca9ee6, 'peach': #ef9f76,
+  ),
+  'catppuccin-macchiato': (
+    'base': #24273a, 'mantle': #1e2030, 'crust': #181926,
+    'surface0': #363a4f, 'surface1': #494d64,
+    'overlay0': #6e738d, 'overlay1': #8087a2, 'overlay2': #939ab7,
+    'subtext1': #b8c0e0, 'text': #cad3f5,
+    'blue': #8aadf4, 'green': #a6da95, 'yellow': #eed49f,
+    'red': #ed8796, 'mauve': #c6a0f6, 'peach': #f5a97f,
+  ),
+  'github-dark': (
+    'base': #0d1117, 'mantle': #0b0f14, 'crust': #010409,
+    'surface0': #21262d, 'surface1': #30363d,
+    'overlay0': #6e7681, 'overlay1': #8b949e, 'overlay2': #a1a7b0,
+    'subtext1': #c9d1d9, 'text': #e6edf3,
+    'blue': #58a6ff, 'green': #3fb950, 'yellow': #d29922,
+    'red': #ff7b72, 'mauve': #d2a8ff, 'peach': #ffa657,
+  ),
+  'github-light': (
+    'base': #ffffff, 'mantle': #f6f8fa, 'crust': #f3f4f6,
+    'surface0': #d0d7de, 'surface1': #afb8c1,
+    'overlay0': #8c959f, 'overlay1': #6e7781, 'overlay2': #57606a,
+    'subtext1': #3d444d, 'text': #24292f,
+    'blue': #0969da, 'green': #1a7f37, 'yellow': #9a6700,
+    'red': #cf222e, 'mauve': #8250df, 'peach': #bc4c00,
+  ),
+  'monokai': (
+    'base': #272822, 'mantle': #22231d, 'crust': #1b1c17,
+    'surface0': #3e3d32, 'surface1': #49483e,
+    'overlay0': #75715e, 'overlay1': #90908a, 'overlay2': #a6a69f,
+    'subtext1': #c2c2bd, 'text': #f8f8f2,
+    'blue': #66d9ef, 'green': #a6e22e, 'yellow': #e6db74,
+    'red': #f92672, 'mauve': #ae81ff, 'peach': #fd971f,
+  ),
+  'vs-dark': (
+    'base': #1e1e1e, 'mantle': #252526, 'crust': #181818,
+    'surface0': #2d2d2d, 'surface1': #3c3c3c,
+    'overlay0': #7a7a7a, 'overlay1': #9da0a6, 'overlay2': #b0b4ba,
+    'subtext1': #cccccc, 'text': #d4d4d4,
+    'blue': #569cd6, 'green': #6a9955, 'yellow': #dcdcaa,
+    'red': #f44747, 'mauve': #c586c0, 'peach': #ce9178,
+  ),
+  'vs-light': (
+    'base': #ffffff, 'mantle': #f3f3f3, 'crust': #e7e7e7,
+    'surface0': #dddddd, 'surface1': #cccccc,
+    'overlay0': #888888, 'overlay1': #666666, 'overlay2': #4f4f4f,
+    'subtext1': #3a3a3a, 'text': #333333,
+    'blue': #006ab1, 'green': #008000, 'yellow': #795e26,
+    'red': #cd3131, 'mauve': #af00db, 'peach': #a31515,
+  ),
+);
+
+// the palette used when no theme attribute is set
+$default-theme: 'desmos-dark';
+
+@mixin palette($name) {
+  @each $slot, $value in map.get($palettes, $name) {
+    --#{$slot}: #{$value};
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+:root {
+  @include palette($default-theme);
+
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  --font-ui:   'Avenir Next', 'SF Pro Text', 'Segoe UI', sans-serif;
+  --toolbar-h: 40px;
+  --status-h:  24px;
+  --radius:    4px;
+}
+
+@each $name, $palette in $palettes {
+  :root[data-color-theme='#{$name}'] {
+    @include palette($name);
+  }
+}

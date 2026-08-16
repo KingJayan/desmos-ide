@@ -1,0 +1,94 @@
+#outline-sidebar-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+#outline-sidebar-container.hidden { display: none; }
+
+.outline-empty {
+  padding: 14px 12px;
+  font-size: 0.9rem;
+  color: var(--overlay1);
+}
+.outline-empty--hidden { display: none; }
+
+.outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+.outline-list::-webkit-scrollbar       { width: 5px; }
+.outline-list::-webkit-scrollbar-track { background: transparent; }
+.outline-list::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+
+.outline-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.outline-item:hover { background: color-mix(in srgb, var(--surface0) 70%, transparent); }
+.outline-item:active { background: var(--surface1); }
+
+.outline-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  min-width: 26px;
+  text-align: center;
+}
+.outline-badge--let    { background: color-mix(in srgb, var(--blue)  18%, transparent); color: var(--blue);  border: 1px solid color-mix(in srgb, var(--blue)  30%, transparent); }
+.outline-badge--fn     { background: color-mix(in srgb, var(--mauve) 18%, transparent); color: var(--mauve); border: 1px solid color-mix(in srgb, var(--mauve) 30%, transparent); }
+.outline-badge--circle { background: color-mix(in srgb, var(--peach) 18%, transparent); color: var(--peach); border: 1px solid color-mix(in srgb, var(--peach) 30%, transparent); }
+.outline-badge--point  { background: color-mix(in srgb, var(--peach) 18%, transparent); color: var(--peach); border: 1px solid color-mix(in srgb, var(--peach) 30%, transparent); }
+.outline-badge--line   { background: color-mix(in srgb, var(--yellow) 18%, transparent); color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent); }
+.outline-badge--points { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent); }
+
+.outline-name {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-line {
+  font-size: 0.85rem;
+  color: var(--overlay0);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.expr-math {
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  cursor: text;
+  padding: 0 2px;
+  border-radius: 3px;
+  overflow: hidden;
+  transition: background 0.1s;
+}
+.expr-math:hover { background: color-mix(in srgb, var(--blue) 8%, transparent); }
+.expr-math .katex { font-size: 1em; color: var(--text); }
+.expr-math-placeholder {
+  color: var(--overlay0);
+  font-style: italic;
+  font-size: 0.95rem;
+  font-family: var(--font-ui);
+}

@@ -1,0 +1,53 @@
+.search-modal {
+  width: 680px;
+  max-height: 560px;
+}
+
+.search-modal .cmd-search-icon {
+  transform: none;
+  font-size: 1.3rem;
+}
+
+.search-regex-btn {
+  flex-shrink: 0;
+  border-color: var(--surface1);
+  color: var(--overlay0);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 2px 7px;
+}
+.search-regex-btn.active {
+  color: var(--blue);
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.search-pick-btn {
+  align-self: flex-start;
+  margin: 0 12px 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--blue);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--blue);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.search-summary {
+  padding: 7px 16px;
+  font-size: 0.9rem;
+  color: var(--overlay1);
+  border-bottom: 1px solid var(--surface0);
+  flex-shrink: 0;
+}
+
+.search-hit-text {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.graph-linked-line {
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--blue);
+}

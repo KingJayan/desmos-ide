@@ -1,0 +1,128 @@
+.ai-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.ai-hr {
+  border: none;
+  height: 1px;
+  background: var(--surface1);
+  margin: 6px 0;
+}
+
+.ai-inline-code {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--peach);
+}
+
+.ai-list {
+  margin: 4px 0 4px 16px;
+  padding: 0;
+}
+
+.ai-list-item {
+  margin: 2px 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.ai-code-block {
+  margin-top: 8px;
+  border: 1px solid var(--surface1);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ai-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface0);
+  border-bottom: 1px solid var(--surface1);
+  padding: 6px 10px;
+  gap: 8px;
+}
+
+.ai-code-lang {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--overlay1);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-code-copy-btn {
+  --btn-press: 0.93;
+  border-color: var(--surface1);
+  color: var(--overlay1);
+  padding: 2px 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.ai-code-block pre {
+  background: var(--base);
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0;
+}
+.ai-code-block pre::-webkit-scrollbar       { height: 4px; }
+.ai-code-block pre::-webkit-scrollbar-track { background: transparent; }
+.ai-code-block pre::-webkit-scrollbar-thumb { background: var(--surface1); }
+
+.ai-code-block code {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--text);
+  white-space: pre;
+}
+
+.ai-code-actions {
+  display: flex;
+  gap: 4px;
+  padding: 5px 8px;
+  background: var(--mantle);
+  border-top: 1px solid var(--surface0);
+}
+
+.ai-action-btn {
+  --btn-press: 0.93;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
+.ai-action-btn--insert {
+  background: var(--surface0);
+  color: var(--blue);
+  border-color: var(--blue);
+}
+.ai-action-btn--insert:hover  { background: var(--blue); color: var(--crust); }
+
+.ai-action-btn--replace {
+  --btn-accent: var(--green);
+  background: var(--surface0);
+  color: var(--green);
+  border-color: var(--green);
+}
+.ai-action-btn--replace:hover { background: var(--green); color: var(--crust); }
+
+.ai-action-btn--deny {
+  --btn-accent: var(--red);
+  color: var(--overlay0);
+  border-color: var(--surface1);
+}
+
+.ai-dismissed {
+  font-size: 0.9rem;
+  color: var(--overlay0);
+  font-style: italic;
+}

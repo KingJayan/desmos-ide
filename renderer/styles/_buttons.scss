@@ -1,0 +1,60 @@
+$interactive:
+  '.btn',
+  '.toolbar-btn', '.mode-btn', '.activity-btn', '.action-btn',
+  '.git-panel-btn', '.unsaved-export-btn', '.search-regex-btn',
+  '.ai-icon-btn', '.ai-config-btn', '.ai-toolbar-btn', '.ai-code-copy-btn',
+  '.ai-action-btn', '.ai-ctx-btn', '.ai-send-btn', '.transport-play';
+
+:is(#{$interactive}) {
+  --btn-accent: var(--blue);
+  --btn-press: 0.94;
+  --btn-hover-border: var(--btn-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--subtext1);
+  cursor: pointer;
+  transition:
+    color 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s,
+    transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  &:hover {
+    color: var(--btn-accent);
+    border-color: var(--btn-hover-border);
+    background: color-mix(in srgb, var(--btn-accent) 8%, transparent);
+  }
+
+  &:active {
+    transform: scale(var(--btn-press));
+    box-shadow: none;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+    transform: none;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

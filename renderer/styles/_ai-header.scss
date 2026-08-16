@@ -1,0 +1,206 @@
+.ai-header {
+  height: 36px;
+  background: var(--crust);
+  border-bottom: 1px solid var(--surface0);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ai-chat-select {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
+}
+.ai-chat-select:focus { border-color: var(--mauve); }
+
+.ai-chat-select--pending {
+  color: var(--overlay1);
+  font-style: italic;
+  animation: chat-title-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes chat-title-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-chat-select--pending { animation: none; }
+}
+
+.ai-icon-btn {
+  --btn-press: 0.88;
+  border-color: var(--surface1);
+  color: var(--overlay1);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.ai-icon-btn--danger { --btn-accent: var(--red); }
+
+.ai-icon-btn .lucide {
+  width: 13px;
+  height: 13px;
+}
+
+.ai-provider-select {
+  background: transparent;
+  border: 1px solid var(--surface1);
+  color: var(--overlay1);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  border-radius: 4px;
+  padding: 2px 4px;
+  max-width: 126px;
+  outline: none;
+}
+.ai-provider-select:focus { border-color: var(--mauve); color: var(--text); }
+.ai-provider-select option { background: var(--mantle); }
+
+.ai-provider-label {
+  font-size: 0.85rem;
+  color: var(--subtext1);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.ai-provider-label--dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--overlay0);
+  flex-shrink: 0;
+}
+.ai-provider-label--on {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.ai-provider-state {
+  font-size: 0.85rem;
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+}
+.ai-provider-state--key { color: var(--green); border-color: color-mix(in srgb, var(--green) 60%, transparent); }
+.ai-provider-state--env { color: var(--overlay1); border-color: var(--surface1); }
+
+.ai-config-btn {
+  --btn-accent: var(--mauve);
+  border-color: var(--surface1);
+  color: var(--overlay1);
+  width: 24px;
+  height: 20px;
+  padding: 0;
+}
+
+.ai-config-btn .lucide {
+  width: 12px;
+  height: 12px;
+}
+
+.ai-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--overlay1);
+  pointer-events: auto;
+}
+
+.ai-empty-icon {
+  width: 52px;
+  height: 52px;
+  color: var(--overlay1);
+}
+
+.ai-empty-hint {
+  font-size: 0.9rem;
+  color: var(--overlay0);
+}
+
+.ai-empty-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--mauve);
+}
+
+.ai-prompt-chips {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.ai-chips-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+  align-items: center;
+}
+
+.ai-prompt-chip {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  color: var(--subtext1);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+.ai-prompt-chip:hover {
+  color: var(--text);
+  border-color: var(--mauve);
+  background: color-mix(in srgb, var(--surface0) 120%, transparent);
+}
+.ai-prompt-chip--more {
+  background: none;
+  border: none;
+  color: var(--overlay0);
+  font-size: 0.85rem;
+  padding: 2px 6px;
+  margin-top: 2px;
+}
+.ai-prompt-chip--more:hover {
+  background: none;
+  color: var(--mauve);
+}
+
+.ai-msg--system { justify-content: center; }
+.ai-bubble--system {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  color: var(--overlay2);
+  font-size: 0.9rem;
+  font-style: italic;
+  max-width: 100%;
+  text-align: center;
+  white-space: pre-wrap;
+}
