@@ -3,6 +3,7 @@
 import {
   Check, ChevronRight, Copy, FileText, Search, Send, Square, SquarePen, X,
 } from 'lucide';
+import { escapeHtml } from './escape';
 
 type IconNode = [tag: string, attrs: Record<string, string | number>][];
 
@@ -58,11 +59,8 @@ export function iconEl(name: IconName, opts: IconOptions = {}): SVGElement {
 /** for the places that build their markup as a string */
 export function iconSvg(name: IconName, opts: IconOptions = {}): string {
   const attrs = (a: Record<string, string | number>) =>
-    Object.entries(a).map(([k, v]) => `${k}="${escapeAttr(String(v))}"`).join(' ');
+    Object.entries(a).map(([k, v]) => `${k}="${escapeHtml(String(v))}"`).join(' ');
   const body = ICONS[name].map(([tag, a]) => `<${tag} ${attrs(a)}/>`).join('');
   return `<svg ${attrs(rootAttrs(opts))}>${body}</svg>`;
 }
 
-function escapeAttr(v: string): string {
-  return v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
