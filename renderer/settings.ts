@@ -1,6 +1,8 @@
 import { createIcons, X } from 'lucide';
 
 export type ColorTheme =
+  | 'dsmx'
+  | 'dsmx-light'
   | 'desmos-dark'
   | 'catppuccin-latte'
   | 'catppuccin-frappe'
@@ -10,7 +12,7 @@ export type ColorTheme =
   | 'monokai'
   | 'vs-dark'
   | 'vs-light';
-export type EditorTheme = 'desmos-dark' | 'catppuccin-latte' | 'catppuccin-frappe' | 'catppuccin-macchiato' | 'github-dark' | 'github-light' | 'monokai' | 'vs-dark' | 'vs-light';
+export type EditorTheme = 'dsmx' | 'dsmx-light' | 'desmos-dark' | 'catppuccin-latte' | 'catppuccin-frappe' | 'catppuccin-macchiato' | 'github-dark' | 'github-light' | 'monokai' | 'vs-dark' | 'vs-light';
 
 export interface EditorSettings {
   colorTheme:  ColorTheme;
@@ -35,11 +37,11 @@ export const UI_SCALES = ['compact', 'default', 'large'] as const;
 export const GIT_AUTOFETCH_PERIODS = [60, 180, 300, 900] as const;
 
 const DEFAULTS: EditorSettings = {
-  colorTheme:  'desmos-dark',
-  editorTheme: 'desmos-dark',
+  colorTheme:  'dsmx',
+  editorTheme: 'dsmx',
   fontSize:    14,
   codeFontFamily: '"JetBrains Mono", "Cascadia Code", Consolas, monospace',
-  uiFontFamily:   '"Avenir Next", "SF Pro Text", "Segoe UI", sans-serif',
+  uiFontFamily:   'Inter, "SF Pro Text", -apple-system, sans-serif',
   minimap:     false,
   lineNumbers: 'on',
   wordWrap:    'off',
@@ -56,6 +58,7 @@ const STORAGE_KEY = 'desmos-ide-settings';
 const SETTINGS_VERSION = 2;
 
 const VALID_COLOR_THEMES = new Set<ColorTheme>([
+  'dsmx','dsmx-light',
   'desmos-dark','catppuccin-latte','catppuccin-frappe','catppuccin-macchiato',
   'github-dark','github-light','monokai','vs-dark','vs-light',
 ]);
@@ -64,11 +67,13 @@ const VALID_WORD_WRAP = new Set(['on','off']);
 const VALID_FONTS_CODE = new Set([
   '"JetBrains Mono", "Cascadia Code", Consolas, monospace',
   '"Cascadia Code", Consolas, monospace',
+  '"IBM Plex Mono", Consolas, monospace',
   '"Fira Code", Consolas, monospace',
   'Consolas, monospace',
   '"SF Mono", monospace',
 ]);
 const VALID_FONTS_UI = new Set([
+  'Inter, "SF Pro Text", -apple-system, sans-serif',
   '"Avenir Next", "SF Pro Text", "Segoe UI", sans-serif',
   '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
   '"SF Pro Text", "Helvetica Neue", Arial, sans-serif',
@@ -173,6 +178,8 @@ export class SettingsPanel {
             <div class="settings-row">
               <label class="settings-label">color theme</label>
               <select class="settings-select" id="s-color-theme">
+                <option value="dsmx">dsmx Dark</option>
+                <option value="dsmx-light">dsmx Light</option>
                 <option value="desmos-dark">Catppuccin Mocha</option>
                 <option value="catppuccin-latte">Catppuccin Latte</option>
                 <option value="catppuccin-frappe">Catppuccin Frappé</option>
@@ -207,6 +214,8 @@ export class SettingsPanel {
             <div class="settings-row">
               <label class="settings-label">syntax theme</label>
               <select class="settings-select" id="s-editor-theme">
+                <option value="dsmx">dsmx Dark</option>
+                <option value="dsmx-light">dsmx Light</option>
                 <option value="desmos-dark">Catppuccin Mocha</option>
                 <option value="catppuccin-latte">Catppuccin Latte</option>
                 <option value="catppuccin-frappe">Catppuccin Frappé</option>
@@ -230,6 +239,7 @@ export class SettingsPanel {
             <div class="settings-row">
               <label class="settings-label">ui font</label>
               <select class="settings-select" id="s-ui-font-family">
+                <option value='Inter, "SF Pro Text", -apple-system, sans-serif'>Inter</option>
                 <option value='"Avenir Next", "SF Pro Text", "Segoe UI", sans-serif'>Avenir Next</option>
                 <option value='"Segoe UI", "Helvetica Neue", Arial, sans-serif'>Segoe UI</option>
                 <option value='"SF Pro Text", "Helvetica Neue", Arial, sans-serif'>SF Pro Text</option>
@@ -243,6 +253,7 @@ export class SettingsPanel {
               <select class="settings-select" id="s-code-font-family">
                 <option value='"JetBrains Mono", "Cascadia Code", Consolas, monospace'>JetBrains Mono</option>
                 <option value='"Cascadia Code", Consolas, monospace'>Cascadia Code</option>
+                <option value='"IBM Plex Mono", Consolas, monospace'>IBM Plex Mono</option>
                 <option value='"Fira Code", Consolas, monospace'>Fira Code</option>
                 <option value='Consolas, monospace'>Consolas</option>
                 <option value='"SF Mono", monospace'>SF Mono</option>

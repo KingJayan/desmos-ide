@@ -10,154 +10,232 @@
 </head>
 <body>
   <div id="app">
-    <header id="toolbar">
-      <div class="toolbar-left">
-        <span class="app-name">desmos-ide</span>
-        <div class="mode-toggle">
+    <header id="titlebar">
+      <div class="tb-group tb-group--left">
+        <span class="tb-traffic"></span>
+        <button id="project-widget" class="tb-widget" type="button" title="recent files">
+          <i data-lucide="box" aria-hidden="true"></i>
+          <span class="tb-widget-label">desmos-ide</span>
+          <i class="tb-widget-caret" data-lucide="chevron-down" aria-hidden="true"></i>
+        </button>
+        <button id="branch-widget" class="tb-widget tb-widget--quiet hidden" type="button" title="branches">
+          <i data-lucide="git-branch" aria-hidden="true"></i>
+          <span class="tb-widget-label" id="branch-widget-label">--</span>
+        </button>
+      </div>
+
+      <div class="tb-group tb-group--center">
+        <button id="search-widget" class="tb-search" type="button" title="run a command  ⌘⇧P">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <span id="filename">untitled.dsmx</span>
+          <span id="saved-dot" class="hidden" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <div class="tb-group tb-group--right">
+        <div class="mode-toggle" role="group" aria-label="view mode">
           <button id="btn-dsl" class="mode-btn active" title="Write the DSL. This is the file that gets saved.">dsl</button>
           <button id="btn-split" class="mode-btn" title="DSL editor and the expression list side by side">split</button>
           <button id="btn-enhanced" class="mode-btn" title="Edit the expressions the way Desmos does. Edits are written back into the DSL file.">enhanced</button>
         </div>
-      </div>
-      <div class="toolbar-center">
-        <span id="filename">untitled.dsmx</span>
-        <span id="saved-dot" class="hidden" aria-hidden="true"></span>
-      </div>
-      <div class="toolbar-right">
-        <button id="btn-new"  class="toolbar-btn">new</button>
-        <button id="btn-open" class="toolbar-btn">open</button>
-        <button id="btn-save" class="toolbar-btn">save</button>
+        <div class="tb-actions">
+          <button id="btn-new"  class="tb-icon" title="new file  ⌘N" aria-label="new file"><i data-lucide="file-plus" aria-hidden="true"></i></button>
+          <button id="btn-open" class="tb-icon" title="open file  ⌘O" aria-label="open file"><i data-lucide="folder-open" aria-hidden="true"></i></button>
+          <button id="btn-save" class="tb-icon" title="save  ⌘S" aria-label="save"><i data-lucide="save" aria-hidden="true"></i></button>
+        </div>
       </div>
     </header>
 
-    <main id="workspace">
-      <aside id="activity-bar" aria-label="Sidebar">
-        <button id="btn-sidebar-git" class="activity-btn" title="source control" aria-label="source control">
-          <i data-lucide="git-branch" aria-hidden="true"></i>
-        </button>
-        <button id="btn-sidebar-ai" class="activity-btn" title="ai assistant" aria-label="ai assistant">
-          <i data-lucide="bot" aria-hidden="true"></i>
-        </button>
-        <button id="btn-sidebar-outline" class="activity-btn" title="outline" aria-label="outline">
-          <i data-lucide="list" aria-hidden="true"></i>
-        </button>
-        <span class="activity-spacer"></span>
-        <button id="btn-sidebar-settings" class="activity-btn" title="settings" aria-label="settings">
-          <i data-lucide="settings" aria-hidden="true"></i>
-        </button>
+    <div id="canvas">
+      <aside id="rail-left" class="rail" aria-label="left tool windows">
+        <div class="rail-group">
+          <button id="btn-sidebar-git" class="rail-btn" title="commit  ⌘1" aria-label="commit">
+            <i data-lucide="git-branch" aria-hidden="true"></i>
+          </button>
+          <button id="btn-sidebar-outline" class="rail-btn" title="structure  ⌘2" aria-label="structure">
+            <i data-lucide="list-tree" aria-hidden="true"></i>
+          </button>
+        </div>
+        <span class="rail-spacer"></span>
+        <div class="rail-group">
+          <button id="btn-tool-problems" class="rail-btn" title="problems  ⌘3" aria-label="problems">
+            <i data-lucide="circle-alert" aria-hidden="true"></i>
+            <span id="problems-badge" class="rail-badge hidden">0</span>
+          </button>
+          <button id="btn-tool-timeline" class="rail-btn" title="timeline  ⌘4" aria-label="timeline">
+            <i data-lucide="history" aria-hidden="true"></i>
+          </button>
+          <button id="btn-sidebar-settings" class="rail-btn" title="settings  ⌘," aria-label="settings">
+            <i data-lucide="settings" aria-hidden="true"></i>
+          </button>
+        </div>
       </aside>
 
-      <div id="left-panel">
-        <div id="dsl-pane" class="pane">
-          <div id="editor-container"></div>
+      <div id="center-col">
+        <div id="upper-row">
+          <section id="tool-left" class="island hidden" aria-label="left tool window">
+            <div id="git-sidebar-container" class="tool-body hidden">
+              <div class="sidepanel-header">
+                <div class="sidepanel-title">commit</div>
+                <button id="git-refresh-status" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh source control" aria-label="refresh source control">
+                  <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                </button>
+              </div>
+
+              <div class="git-summary-row">
+                <span id="git-branch" class="git-pill git-pill--unknown">branch: --</span>
+                <span id="git-modified" class="git-pill git-pill--unknown">--</span>
+              </div>
+              <div id="git-summary-msg" class="git-summary-msg">Loading Git status...</div>
+
+              <section class="git-section" id="git-section-modified">
+                <div class="git-section-header" data-section="modified" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+                  <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
+                  <div id="git-modified-panel-title" class="git-modified-panel-title">modified files</div>
+                </div>
+                <div id="git-modified-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
+                <ul id="git-modified-list" class="git-modified-list"></ul>
+              </section>
+
+              <section class="git-section" id="git-section-branch">
+                <div class="git-section-header" data-section="branch" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+                  <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
+                  <div id="git-branch-panel-title" class="git-modified-panel-title">branches</div>
+                  <div class="git-inline-actions">
+                    <button id="git-branch-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh branches" aria-label="refresh branches">
+                      <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                    </button>
+                    <button id="git-branch-create" class="git-panel-btn git-panel-btn--icon" type="button" title="create branch" aria-label="create branch">
+                      <i data-lucide="git-branch-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+                <div id="git-branch-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
+                <ul id="git-branch-list" class="git-modified-list"></ul>
+              </section>
+
+              <section class="git-section" id="git-section-history">
+                <div class="git-section-header" data-section="history" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+                  <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
+                  <div id="git-history-panel-title" class="git-modified-panel-title">version tree</div>
+                  <div class="git-inline-actions">
+                    <button id="git-history-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh version tree" aria-label="refresh version tree">
+                      <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+                <div id="git-history-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
+                <pre id="git-history-content" class="git-history-content"></pre>
+              </section>
+
+              <section class="git-section" id="git-section-remote">
+                <div class="git-section-header" data-section="remote" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
+                  <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
+                  <div id="git-remote-panel-title" class="git-modified-panel-title">remotes</div>
+                  <div class="git-inline-actions">
+                    <button id="git-remote-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh remotes" aria-label="refresh remotes">
+                      <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                    </button>
+                    <button id="git-remote-add" class="git-panel-btn git-panel-btn--icon" type="button" title="add remote" aria-label="add remote">
+                      <i data-lucide="plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+                <div id="git-remote-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
+                <ul id="git-remote-list" class="git-modified-list"></ul>
+              </section>
+            </div>
+
+            <div id="outline-sidebar-container" class="tool-body hidden">
+              <div class="sidepanel-header">
+                <div class="sidepanel-title">structure</div>
+              </div>
+              <div id="outline-empty" class="outline-empty">no symbols yet, write some DSL</div>
+              <ul id="outline-list" class="outline-list"></ul>
+            </div>
+          </section>
+
+          <div id="tool-left-divider" class="gutter gutter--v hidden"></div>
+
+          <section id="editor-island" class="island">
+            <div id="tab-strip" role="tablist" aria-label="open files">
+              <div id="file-tab" class="tab tab--active" role="tab" aria-selected="true">
+                <i class="tab-icon" data-lucide="file-code" aria-hidden="true"></i>
+                <span id="tab-label" class="tab-label">untitled.dsmx</span>
+                <span id="tab-dot" class="tab-dot hidden" aria-hidden="true"></span>
+                <button id="tab-close" class="tab-close" title="close file" aria-label="close file">
+                  <i data-lucide="x" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="editor-stack">
+              <div id="dsl-pane" class="pane">
+                <div id="editor-container"></div>
+              </div>
+              <div id="pane-divider" class="gutter gutter--h hidden"></div>
+              <div id="enhanced-pane" class="pane hidden">
+                <div id="enhanced-unsaved-bar" class="hidden">
+                  <span>Some of these edits are on the graph only &mdash; export them to keep them</span>
+                  <button id="btn-export-json" class="unsaved-export-btn">export json</button>
+                </div>
+                <div id="enhanced-hint">Edit the expressions the way Desmos does. Every edit is written back into the DSL file.</div>
+                <div id="expr-list"></div>
+                <div id="expr-actions">
+                  <button id="btn-add-expr" class="action-btn">+ add expression</button>
+                </div>
+              </div>
+            </div>
+
+            <footer id="breadcrumbs" aria-label="file path"></footer>
+          </section>
+
+          <div id="divider" class="gutter gutter--v"></div>
+
+          <section id="graph-island" class="island">
+            <div id="graph-container"></div>
+            <div id="transport" class="hidden"></div>
+          </section>
+
+          <div id="ai-divider" class="gutter gutter--v hidden"></div>
+
+          <section id="ai-panel" class="island hidden" aria-label="right tool window">
+            <div id="ai-sidebar-container" class="tool-body"></div>
+          </section>
         </div>
-        <div id="pane-divider" class="hidden"></div>
-        <div id="enhanced-pane" class="pane hidden">
-          <div id="enhanced-unsaved-bar" class="hidden">
-            <span>Some of these edits are on the graph only &mdash; export them to keep them</span>
-            <button id="btn-export-json" class="unsaved-export-btn">export json</button>
-          </div>
-          <div id="enhanced-hint">Edit the expressions the way Desmos does. Every edit is written back into the DSL file.</div>
-          <div id="expr-list"></div>
-          <div id="expr-actions">
-            <button id="btn-add-expr" class="action-btn">+ add expression</button>
-          </div>
-        </div>
-      </div>
 
-      <div id="divider"></div>
+        <div id="bottom-divider" class="gutter gutter--h hidden"></div>
 
-      <div id="right-panel">
-        <div id="graph-container"></div>
-        <div id="transport" class="hidden"></div>
-      </div>
-
-      <div id="ai-divider" class="hidden"></div>
-
-      <div id="ai-panel" class="hidden">
-        <div id="git-sidebar-container" class="hidden">
-          <div class="sidepanel-header">
-            <div class="sidepanel-title">source control</div>
-            <button id="git-refresh-status" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh source control" aria-label="refresh source control">
-              <i data-lucide="refresh-cw" aria-hidden="true"></i>
+        <section id="tool-bottom" class="island hidden" aria-label="bottom tool window">
+          <div class="tool-tabs" role="tablist">
+            <button id="btn-tab-problems" class="tool-tab tool-tab--active" role="tab" aria-selected="true">
+              problems <span id="problems-count" class="tool-tab-count hidden">0</span>
+            </button>
+            <button id="btn-tab-timeline" class="tool-tab" role="tab" aria-selected="false">timeline</button>
+            <span class="tool-tabs-spacer"></span>
+            <button id="btn-tool-bottom-close" class="tool-tab-icon" title="hide" aria-label="hide bottom tool window">
+              <i data-lucide="chevron-down" aria-hidden="true"></i>
             </button>
           </div>
-
-          <div class="git-summary-row">
-            <span id="git-branch" class="git-pill git-pill--unknown">branch: --</span>
-            <span id="git-modified" class="git-pill git-pill--unknown">--</span>
+          <div id="problems-body" class="tool-body">
+            <div id="problems-empty" class="tool-empty">no problems, the file compiles</div>
+            <ul id="problems-list" class="problems-list"></ul>
           </div>
-          <div id="git-summary-msg" class="git-summary-msg">Loading Git status...</div>
-
-          <section class="git-section" id="git-section-modified">
-            <div class="git-section-header" data-section="modified" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
-              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
-              <div id="git-modified-panel-title" class="git-modified-panel-title">modified files</div>
-            </div>
-            <div id="git-modified-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
-            <ul id="git-modified-list" class="git-modified-list"></ul>
-          </section>
-
-          <section class="git-section" id="git-section-branch">
-            <div class="git-section-header" data-section="branch" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
-              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
-              <div id="git-branch-panel-title" class="git-modified-panel-title">branches</div>
-              <div class="git-inline-actions">
-                <button id="git-branch-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh branches" aria-label="refresh branches">
-                  <i data-lucide="refresh-cw" aria-hidden="true"></i>
-                </button>
-                <button id="git-branch-create" class="git-panel-btn git-panel-btn--icon" type="button" title="create branch" aria-label="create branch">
-                  <i data-lucide="git-branch-plus" aria-hidden="true"></i>
-                </button>
-              </div>
-            </div>
-            <div id="git-branch-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
-            <ul id="git-branch-list" class="git-modified-list"></ul>
-          </section>
-
-          <section class="git-section" id="git-section-history">
-            <div class="git-section-header" data-section="history" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
-              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
-              <div id="git-history-panel-title" class="git-modified-panel-title">version tree</div>
-              <div class="git-inline-actions">
-                <button id="git-history-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh version tree" aria-label="refresh version tree">
-                  <i data-lucide="refresh-cw" aria-hidden="true"></i>
-                </button>
-              </div>
-            </div>
-            <div id="git-history-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
-            <pre id="git-history-content" class="git-history-content"></pre>
-          </section>
-
-          <section class="git-section" id="git-section-remote">
-            <div class="git-section-header" data-section="remote" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
-              <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
-              <div id="git-remote-panel-title" class="git-modified-panel-title">remotes</div>
-              <div class="git-inline-actions">
-                <button id="git-remote-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh remotes" aria-label="refresh remotes">
-                  <i data-lucide="refresh-cw" aria-hidden="true"></i>
-                </button>
-                <button id="git-remote-add" class="git-panel-btn git-panel-btn--icon" type="button" title="add remote" aria-label="add remote">
-                  <i data-lucide="plus" aria-hidden="true"></i>
-                </button>
-              </div>
-            </div>
-            <div id="git-remote-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
-            <ul id="git-remote-list" class="git-modified-list"></ul>
-          </section>
-        </div>
-
-        <div id="ai-sidebar-container" class="hidden"></div>
-
-        <div id="outline-sidebar-container" class="hidden">
-          <div class="sidepanel-header">
-            <div class="sidepanel-title">outline</div>
+          <div id="timeline-body" class="tool-body hidden">
+            <div id="timeline-empty" class="tool-empty">no history yet</div>
+            <ul id="timeline-list" class="timeline-list"></ul>
           </div>
-          <div id="outline-empty" class="outline-empty">no symbols yet, write some DSL</div>
-          <ul id="outline-list" class="outline-list"></ul>
-        </div>
+        </section>
       </div>
-    </main>
+
+      <aside id="rail-right" class="rail" aria-label="right tool windows">
+        <div class="rail-group">
+          <button id="btn-sidebar-ai" class="rail-btn" title="ai assistant  ⌘5" aria-label="ai assistant">
+            <i data-lucide="bot" aria-hidden="true"></i>
+          </button>
+        </div>
+      </aside>
+    </div>
 
     <footer id="statusbar">
       <span id="status-msg" role="status" aria-live="polite">Ready</span>

@@ -5,7 +5,10 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 };
 
 import * as monaco from 'monaco-editor';
-import { createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown } from 'lucide';
+import {
+  createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
+  Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode,
+} from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
 import { builtinSignature } from '../src/compiler/builtins';
 import { formatDsl } from '../src/compiler/format';
@@ -34,46 +37,78 @@ import {
   loadRecent, loadSession, pushRecent, recentLabel, removeRecent, saveRecent, saveSession,
 } from './session';
 import { registerColorProvider } from './color-provider';
+import { iconEl } from './icons';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 registerColorProvider();
 createIcons({
-  icons: { GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown },
+  icons: {
+    GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
+    Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode,
+  },
   attrs: { 'stroke-width': '1.9' },
 });
 
 
-const editorContainer = document.getElementById('editor-container')!;
-const graphContainer  = document.getElementById('graph-container')!;
-const dslPane         = document.getElementById('dsl-pane')!;
-const enhancedPane    = document.getElementById('enhanced-pane')!;
-const btnDsl          = document.getElementById('btn-dsl')      as HTMLButtonElement;
-const btnSplit        = document.getElementById('btn-split')    as HTMLButtonElement;
-const btnEnhanced     = document.getElementById('btn-enhanced') as HTMLButtonElement;
-const paneDivider     = document.getElementById('pane-divider')!;
-const btnNew          = document.getElementById('btn-new')      as HTMLButtonElement;
-const btnOpen         = document.getElementById('btn-open')     as HTMLButtonElement;
-const btnSave         = document.getElementById('btn-save')     as HTMLButtonElement;
-const filenameEl      = document.getElementById('filename')!;
-const savedDotEl      = document.getElementById('saved-dot')!;
-const statusMsg       = document.getElementById('status-msg')!;
-const statusBranch    = document.getElementById('status-branch')!;
-const statusSave      = document.getElementById('status-save')!;
-const statusPos       = document.getElementById('status-pos')!;
-const dividerEl       = document.getElementById('divider')!;
-const leftPanel       = document.getElementById('left-panel')!;
-const workspace       = document.getElementById('workspace')!;
-const btnSidebarGit      = document.getElementById('btn-sidebar-git')      as HTMLButtonElement;
-const btnSidebarAi       = document.getElementById('btn-sidebar-ai')       as HTMLButtonElement;
-const btnSidebarOutline  = document.getElementById('btn-sidebar-outline')  as HTMLButtonElement;
-const btnSidebarSettings = document.getElementById('btn-sidebar-settings') as HTMLButtonElement;
-const gitContainer       = document.getElementById('git-sidebar-container')!;
-const outlineContainer   = document.getElementById('outline-sidebar-container')!;
-const outlineList        = document.getElementById('outline-list')!;
-const outlineEmpty       = document.getElementById('outline-empty')!;
-const aiPanel            = document.getElementById('ai-panel')!;
-const aiDivider          = document.getElementById('ai-divider')!;
-const aiContainer        = document.getElementById('ai-sidebar-container')!;
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+const editorContainer = $('editor-container');
+const graphContainer = $('graph-container');
+const dslPane = $('dsl-pane');
+const enhancedPane = $('enhanced-pane');
+const btnDsl = $<HTMLButtonElement>('btn-dsl');
+const btnSplit = $<HTMLButtonElement>('btn-split');
+const btnEnhanced = $<HTMLButtonElement>('btn-enhanced');
+const paneDivider = $('pane-divider');
+const btnNew = $<HTMLButtonElement>('btn-new');
+const btnOpen = $<HTMLButtonElement>('btn-open');
+const btnSave = $<HTMLButtonElement>('btn-save');
+const filenameEl = $('filename');
+const savedDotEl = $('saved-dot');
+const statusMsg = $('status-msg');
+const statusBranch = $('status-branch');
+const statusSave = $('status-save');
+const statusPos = $('status-pos');
+const dividerEl = $('divider');
+const leftPanel = $('editor-island');
+const workspace = $('upper-row');
+const centerCol = $('center-col');
+const tabLabel = $('tab-label');
+const tabDot = $('tab-dot');
+const tabClose = $<HTMLButtonElement>('tab-close');
+const breadcrumbs = $('breadcrumbs');
+const projectWidget = $<HTMLButtonElement>('project-widget');
+const branchWidget = $<HTMLButtonElement>('branch-widget');
+const branchWidgetLbl = $('branch-widget-label');
+const searchWidget = $<HTMLButtonElement>('search-widget');
+const toolLeft = $('tool-left');
+const toolLeftDivider = $('tool-left-divider');
+const toolBottom = $('tool-bottom');
+const bottomDivider = $('bottom-divider');
+const btnToolProblems = $<HTMLButtonElement>('btn-tool-problems');
+const btnToolTimeline = $<HTMLButtonElement>('btn-tool-timeline');
+const btnTabProblems = $<HTMLButtonElement>('btn-tab-problems');
+const btnTabTimeline = $<HTMLButtonElement>('btn-tab-timeline');
+const btnBottomClose = $<HTMLButtonElement>('btn-tool-bottom-close');
+const problemsBody = $('problems-body');
+const problemsList = $('problems-list');
+const problemsEmpty = $('problems-empty');
+const problemsBadge = $('problems-badge');
+const problemsCount = $('problems-count');
+const timelineBody = $('timeline-body');
+const timelineList = $('timeline-list');
+const timelineEmpty = $('timeline-empty');
+const btnSidebarGit = $<HTMLButtonElement>('btn-sidebar-git');
+const btnSidebarAi = $<HTMLButtonElement>('btn-sidebar-ai');
+const btnSidebarOutline = $<HTMLButtonElement>('btn-sidebar-outline');
+const btnSidebarSettings = $<HTMLButtonElement>('btn-sidebar-settings');
+const gitContainer = $('git-sidebar-container');
+const outlineContainer = $('outline-sidebar-container');
+const outlineList = $('outline-list');
+const outlineEmpty = $('outline-empty');
+const aiPanel = $('ai-panel');
+const aiDivider = $('ai-divider');
+const aiContainer = $('ai-sidebar-container');
 
 
 const DEFAULT_SRC = `// desmos DSL snippet
@@ -93,6 +128,61 @@ text lbl = "hello, desmos" at (0, 1.5)
 
 const initSettings = loadSettings();
 let autosaveOn = initSettings.autosave;
+
+monaco.editor.defineTheme('dsmx', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '5d6878' },
+    { token: 'keyword',   foreground: '8cd7ff' },
+    { token: 'string',    foreground: '7fe0b0' },
+    { token: 'number',    foreground: 'f0c58d' },
+    { token: 'type',      foreground: 'c3b0ff' },
+    { token: 'function',  foreground: 'a9c7ff' },
+    { token: 'variable',  foreground: 'edf2fa' },
+    { token: 'operator',  foreground: '9aa5b6' },
+  ],
+  colors: {
+    'editor.background':                '#0e1420',
+    'editor.foreground':                '#edf2fa',
+    'editorLineNumber.foreground':      '#2c3745',
+    'editorLineNumber.activeForeground':'#9aa5b6',
+    'editor.selectionBackground':       '#1e3244',
+    'editor.lineHighlightBackground':   '#141b28',
+    'editorCursor.foreground':          '#8cd7ff',
+    'editorIndentGuide.background1':    '#1b2431',
+    'editorIndentGuide.activeBackground1': '#2c3745',
+    'editorWhitespace.foreground':      '#1b2431',
+    'editorBracketMatch.background':    '#1e3244',
+    'editorBracketMatch.border':        '#8cd7ff',
+  },
+});
+
+monaco.editor.defineTheme('dsmx-light', {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: 'comment',   foreground: '8b95a5' },
+    { token: 'keyword',   foreground: '0b7ec4' },
+    { token: 'string',    foreground: '12855f' },
+    { token: 'number',    foreground: 'b06a1c' },
+    { token: 'type',      foreground: '6d4ad1' },
+    { token: 'function',  foreground: '1c62a8' },
+    { token: 'variable',  foreground: '141a24' },
+    { token: 'operator',  foreground: '55606f' },
+  ],
+  colors: {
+    'editor.background':                '#ffffff',
+    'editor.foreground':                '#141a24',
+    'editorLineNumber.foreground':      '#cbd2de',
+    'editorLineNumber.activeForeground':'#55606f',
+    'editor.selectionBackground':       '#cfe6f6',
+    'editor.lineHighlightBackground':   '#f4f6fa',
+    'editorCursor.foreground':          '#0b7ec4',
+    'editorIndentGuide.background1':    '#e8ecf3',
+    'editorWhitespace.foreground':      '#e8ecf3',
+  },
+});
 
 monaco.editor.defineTheme('desmos-dark', {
   base: 'vs-dark',
@@ -281,11 +371,21 @@ const editor = monaco.editor.create(editorContainer, {
   automaticLayout: true,
   fontFamily: initSettings.codeFontFamily,
   fontLigatures: true,
-  padding: { top: 12 },
+  lineHeight: 1.6,
+  padding: { top: 12, bottom: 12 },
   renderWhitespace: 'none',
   smoothScrolling: true,
   overviewRulerBorder: false,
   hideCursorInOverviewRuler: true,
+  renderLineHighlight: 'all',
+  renderLineHighlightOnlyWhenFocus: true,
+  cursorBlinking: 'smooth',
+  cursorSmoothCaretAnimation: 'on',
+  roundedSelection: false,
+  guides: { indentation: true, bracketPairs: 'active' },
+  bracketPairColorization: { enabled: true },
+  scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10, useShadows: false },
+  glyphMargin: false,
 });
 
 
@@ -501,7 +601,6 @@ function renderOutline(symbols: SymbolInfo[]): void {
     li.appendChild(name);
     li.appendChild(lineNum);
 
-    // the row acts as a button, so the outline is reachable without a mouse
     li.tabIndex = 0;
     li.setAttribute('role', 'button');
     li.setAttribute('aria-label', `${sym.kind} ${sym.name}, line ${sym.line}`);
@@ -514,7 +613,6 @@ function renderOutline(symbols: SymbolInfo[]): void {
     li.addEventListener('click', jump);
     li.addEventListener('keydown', e => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
-      // space would otherwise scroll the panel out from under the selection
       e.preventDefault();
       jump();
     });
@@ -545,13 +643,26 @@ function handleCompileResult(result: CompileResult): void {
     const { syntax, semantic } = errorsByPhase(result.errors, errorToMarker);
     monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', syntax);
     monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', semantic);
-    // the last good graph stays on screen, so the bar keeps driving its clock
   }
+  renderProblems(
+    result.success
+      ? result.warnings.map(w => ({
+          severity: 'warning' as const,
+          message: w.message,
+          line: w.startLineNumber,
+          col: w.startColumn,
+        }))
+      : result.errors.map(e => ({
+          severity: 'error' as const,
+          message: e.message,
+          line: e.line ?? 1,
+          col: e.col ?? 1,
+        })),
+  );
   const { msg, kind } = compileStatus(result);
   setStatus(msg, kind);
 }
 
-// makes ⇧⌥F and the "Format Code" palette entry real
 monaco.languages.registerDocumentFormattingEditProvider(LANGUAGE_ID, {
   provideDocumentFormattingEdits(model) {
     const formatted = formatDsl(model.getValue());
@@ -723,6 +834,8 @@ const gitPanel = new GitPanel({
   onBranch: branch => {
     statusBranch.textContent = branch ? `⎇ ${branch}` : '';
     statusBranch.classList.toggle('hidden', !branch);
+    branchWidgetLbl.textContent = branch ?? '--';
+    branchWidget.classList.toggle('hidden', !branch);
   },
 });
 
@@ -767,7 +880,10 @@ let watchedPath: string | null = null;
 function setFilename(p: string | null): Promise<unknown> {
   currentPath = p;
   if (p) rememberRecent(p);
-  filenameEl.textContent = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
+  const name = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
+  filenameEl.textContent = name;
+  tabLabel.textContent = name;
+  renderBreadcrumbs(p);
   refreshSavedState();
   return Promise.resolve(window.electronAPI?.setGitContext(p)).then(() => gitPanel.refreshAll());
 }
@@ -782,6 +898,7 @@ function markSaved(content: string): void {
 function refreshSavedState(): void {
   const unsaved = savedSource === null || editor.getValue() !== savedSource;
   savedDotEl.classList.toggle('hidden', !unsaved);
+  tabDot.classList.toggle('hidden', !unsaved);
   savedDotEl.title = currentPath
     ? 'Unsaved changes — ⌘S to write them to the file'
     : 'This buffer has no file yet — ⌘S to choose one';
@@ -789,8 +906,6 @@ function refreshSavedState(): void {
   refreshSaveFact(unsaved);
 }
 
-// the bar says whether the app writes the file for you, because autosave writes
-// with no dialog and the alternative is to find out from the disk
 function refreshSaveFact(unsaved: boolean): void {
   const on = autosaveOn && !!currentPath;
   statusSave.textContent = on
@@ -874,6 +989,7 @@ async function cmdSave(saveAs = false): Promise<void> {
     void setFilename(result.path);
     startWatching(result.path);
     setStatus(`Saved to ${result.path}`, 'success');
+    noteSave(result.path.split(/[\\/]/).pop()!);
     persistSession();
   } else if (!result.canceled) {
     setStatus(result.message, 'error');
@@ -948,7 +1064,11 @@ async function autosave(): Promise<void> {
   try {
     const sent = editor.getValue();
     const result = await window.electronAPI?.saveFile(currentPath, sent);
-    if (result?.ok) { markSaved(sent); setStatus('Autosaved', 'info'); }
+    if (result?.ok) {
+      markSaved(sent);
+      noteSave(`${currentPath.split(/[\\/]/).pop()} (autosave)`);
+      setStatus('Autosaved', 'info');
+    }
     else if (result && !result.canceled) setStatus(result.message, 'error');
   } finally {
     autosaving = false;
@@ -1070,7 +1190,21 @@ window.addEventListener('keydown', e => {
     palette.toggle();
     return;
   }
+
+  // ⌘1..⌘5 toggle the tool windows, the way the rail tooltips say
+  if (!e.shiftKey && !e.altKey && TOOL_KEYS[k]) {
+    e.preventDefault();
+    TOOL_KEYS[k]();
+  }
 });
+
+const TOOL_KEYS: Record<string, () => void> = {
+  '1': () => setSidebarView(leftView === 'git' ? null : 'git'),
+  '2': () => setSidebarView(leftView === 'outline' ? null : 'outline'),
+  '3': () => toggleBottom('problems'),
+  '4': () => toggleBottom('timeline'),
+  '5': () => setSidebarView(sidebarView === 'ai' ? null : 'ai'),
+};
 
 window.addEventListener('keydown', e => {
   if (e.key === 'F1') {
@@ -1101,9 +1235,21 @@ dividerEl.addEventListener('mousedown', e => {
 
 document.addEventListener('mousemove', e => {
   if (dragging) {
-    const rect = workspace.getBoundingClientRect();
-    const w = Math.max(280, Math.min(e.clientX - rect.left, rect.width - 204));
+    const rect = leftPanel.getBoundingClientRect();
+    const room = workspace.getBoundingClientRect().right - rect.left;
+    const w = Math.max(280, Math.min(e.clientX - rect.left, room - 204));
     leftPanel.style.width = `${w}px`;
+    editor.layout();
+  }
+  if (toolLeftDragging) {
+    const rect = toolLeft.getBoundingClientRect();
+    toolLeft.style.width = `${Math.max(180, Math.min(e.clientX - rect.left, 520))}px`;
+    editor.layout();
+  }
+  if (bottomDragging) {
+    const rect = centerCol.getBoundingClientRect();
+    const h = Math.max(90, Math.min(rect.bottom - e.clientY, rect.height - 140));
+    toolBottom.style.height = `${h}px`;
     editor.layout();
   }
   if (paneDragging) {
@@ -1116,6 +1262,8 @@ document.addEventListener('mousemove', e => {
 });
 
 let paneDragging = false;
+let toolLeftDragging = false;
+let bottomDragging = false;
 
 paneDivider.addEventListener('mousedown', e => {
   paneDragging = true;
@@ -1123,10 +1271,24 @@ paneDivider.addEventListener('mousedown', e => {
   e.preventDefault();
 });
 
+toolLeftDivider.addEventListener('mousedown', e => {
+  toolLeftDragging = true;
+  toolLeftDivider.classList.add('dragging');
+  e.preventDefault();
+});
+
+bottomDivider.addEventListener('mousedown', e => {
+  bottomDragging = true;
+  bottomDivider.classList.add('dragging');
+  e.preventDefault();
+});
+
 document.addEventListener('mouseup', () => {
   if (dragging) { dragging = false; dividerEl.classList.remove('dragging'); }
   if (aiDragging) { aiDragging = false; aiDivider.classList.remove('dragging'); }
   if (paneDragging) { paneDragging = false; paneDivider.classList.remove('dragging'); }
+  if (toolLeftDragging) { toolLeftDragging = false; toolLeftDivider.classList.remove('dragging'); }
+  if (bottomDragging) { bottomDragging = false; bottomDivider.classList.remove('dragging'); }
 });
 
 // sidebar
@@ -1170,19 +1332,29 @@ function ensureAiSidebar(): AISidebar {
   return aiSidebar;
 }
 
+// git and outline dock into the left tool window, ai into the right one, so a
+// left view and the ai panel can be open at the same time
+let leftView: 'git' | 'outline' | null = null;
+
 function setSidebarView(next: SidebarView): void {
+  if (next === 'git' || next === 'outline') leftView = next;
+  else if (next === null) leftView = null;
   sidebarView = next;
-  const open = next !== null;
 
-  aiPanel.classList.toggle('hidden', !open);
-  aiDivider.classList.toggle('hidden', !open);
-  gitContainer.classList.toggle('hidden', next !== 'git');
-  aiContainer.classList.toggle('hidden', next !== 'ai');
-  outlineContainer.classList.toggle('hidden', next !== 'outline');
+  const leftOpen = leftView !== null;
+  toolLeft.classList.toggle('hidden', !leftOpen);
+  toolLeftDivider.classList.toggle('hidden', !leftOpen);
+  gitContainer.classList.toggle('hidden', leftView !== 'git');
+  outlineContainer.classList.toggle('hidden', leftView !== 'outline');
 
-  btnSidebarGit.classList.toggle('active', next === 'git');
-  btnSidebarAi.classList.toggle('active', next === 'ai');
-  btnSidebarOutline.classList.toggle('active', next === 'outline');
+  const aiOpen = next === 'ai';
+  aiPanel.classList.toggle('hidden', !aiOpen);
+  aiDivider.classList.toggle('hidden', !aiOpen);
+  aiContainer.classList.toggle('hidden', !aiOpen);
+
+  btnSidebarGit.classList.toggle('active', leftView === 'git');
+  btnSidebarOutline.classList.toggle('active', leftView === 'outline');
+  btnSidebarAi.classList.toggle('active', aiOpen);
 
   if (next === 'ai') {
     ensureAiSidebar();
@@ -1236,7 +1408,7 @@ editor.onDidChangeModelDecorations(() => {
   codeLensEmitter.fire(undefined as unknown as monaco.languages.CodeLensProvider);
 });
 
-// "Optimize expression" context menu action (requires selection)
+// "Optimize expression" context menu action
 editor.addAction({
   id: 'ai.optimize',
   label: 'ai: optimize expression',
@@ -1261,8 +1433,179 @@ btnSidebarAi.addEventListener('click', () => {
 });
 
 btnSidebarOutline.addEventListener('click', () => {
-  setSidebarView(sidebarView === 'outline' ? null : 'outline');
+  setSidebarView(leftView === 'outline' ? null : 'outline');
 });
+
+
+function renderBreadcrumbs(path: string | null): void {
+  breadcrumbs.replaceChildren();
+  const parts = path ? path.split(/[\\/]/).filter(Boolean) : ['untitled.dsmx'];
+
+  const shown = parts.length > 4 ? ['…', ...parts.slice(-4)] : parts;
+  shown.forEach((part, i) => {
+    if (i > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'crumb-sep';
+      sep.textContent = '›';
+      breadcrumbs.appendChild(sep);
+    }
+    const crumb = document.createElement('span');
+    crumb.className = 'crumb';
+    const last = i === shown.length - 1;
+    crumb.appendChild(iconEl(last ? 'file-code' : 'folder-open'));
+    crumb.appendChild(document.createTextNode(part));
+    breadcrumbs.appendChild(crumb);
+  });
+}
+
+searchWidget.addEventListener('click', () => palette.toggle());
+projectWidget.addEventListener('click', () => palette.show('open'));
+branchWidget.addEventListener('click', () => setSidebarView('git'));
+tabClose.addEventListener('click', () => void cmdNew());
+
+
+type BottomTab = 'problems' | 'timeline';
+let bottomTab: BottomTab = 'problems';
+let bottomOpen = false;
+
+function setBottomTab(tab: BottomTab): void {
+  bottomTab = tab;
+  problemsBody.classList.toggle('hidden', tab !== 'problems');
+  timelineBody.classList.toggle('hidden', tab !== 'timeline');
+  btnTabProblems.classList.toggle('tool-tab--active', tab === 'problems');
+  btnTabTimeline.classList.toggle('tool-tab--active', tab === 'timeline');
+  btnTabProblems.setAttribute('aria-selected', String(tab === 'problems'));
+  btnTabTimeline.setAttribute('aria-selected', String(tab === 'timeline'));
+  if (tab === 'timeline') void refreshTimeline();
+}
+
+function setBottomOpen(open: boolean, tab?: BottomTab): void {
+  bottomOpen = open;
+  toolBottom.classList.toggle('hidden', !open);
+  bottomDivider.classList.toggle('hidden', !open);
+  btnToolProblems.classList.toggle('active', open && bottomTab === 'problems');
+  btnToolTimeline.classList.toggle('active', open && bottomTab === 'timeline');
+  if (open && tab) setBottomTab(tab);
+  editor.layout();
+}
+
+function toggleBottom(tab: BottomTab): void {
+  if (bottomOpen && bottomTab === tab) setBottomOpen(false);
+  else setBottomOpen(true, tab);
+  btnToolProblems.classList.toggle('active', bottomOpen && bottomTab === 'problems');
+  btnToolTimeline.classList.toggle('active', bottomOpen && bottomTab === 'timeline');
+}
+
+btnToolProblems.addEventListener('click', () => toggleBottom('problems'));
+btnToolTimeline.addEventListener('click', () => toggleBottom('timeline'));
+btnTabProblems.addEventListener('click', () => { setBottomTab('problems'); setBottomOpen(true); });
+btnTabTimeline.addEventListener('click', () => { setBottomTab('timeline'); setBottomOpen(true); });
+btnBottomClose.addEventListener('click', () => setBottomOpen(false));
+
+interface Problem {
+  severity: 'error' | 'warning';
+  message: string;
+  line: number;
+  col: number;
+}
+
+function renderProblems(problems: Problem[]): void {
+  problemsList.replaceChildren();
+  problemsEmpty.classList.toggle('hidden', problems.length > 0);
+
+  const errors = problems.filter(p => p.severity === 'error').length;
+  const badgeText = String(problems.length);
+  problemsBadge.textContent = badgeText;
+  problemsCount.textContent = badgeText;
+  problemsBadge.classList.toggle('hidden', problems.length === 0);
+  problemsCount.classList.toggle('hidden', problems.length === 0);
+  problemsBadge.style.background = errors ? 'var(--red)' : 'var(--yellow)';
+
+  for (const p of problems) {
+    const li = document.createElement('li');
+    li.className = 'problem-row';
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+
+    const sev = document.createElement('span');
+    sev.className = `problem-sev problem-sev--${p.severity}`;
+    sev.textContent = p.severity === 'error' ? 'error' : 'warn';
+
+    const msg = document.createElement('span');
+    msg.className = 'problem-msg';
+    msg.textContent = p.message;
+
+    const loc = document.createElement('span');
+    loc.className = 'problem-loc';
+    loc.textContent = `${p.line}:${p.col}`;
+
+    li.append(sev, msg, loc);
+
+    const jump = () => {
+      editor.revealLineInCenter(p.line);
+      editor.setPosition({ lineNumber: p.line, column: p.col });
+      editor.focus();
+    };
+    li.addEventListener('click', jump);
+    li.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      jump();
+    });
+    problemsList.appendChild(li);
+  }
+}
+
+// the timeline pairs this session's saves with the commits git already knows about
+const localSaves: { when: number; what: string }[] = [];
+
+function noteSave(what: string): void {
+  localSaves.unshift({ when: Date.now(), what });
+  if (localSaves.length > 20) localSaves.pop();
+  if (bottomOpen && bottomTab === 'timeline') void refreshTimeline();
+}
+
+function clockLabel(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+async function refreshTimeline(): Promise<void> {
+  const rows: { when: string; kind: string; what: string }[] = localSaves.map(s => ({
+    when: clockLabel(s.when),
+    kind: 'save',
+    what: s.what,
+  }));
+
+  const log = await window.electronAPI?.gitHistory(20).catch(() => null);
+  if (log?.ok) {
+    for (const line of log.lines) {
+      const [hash, ...rest] = line.trim().split(/\s+/);
+      rows.push({ when: hash.slice(0, 7), kind: 'commit', what: rest.join(' ') });
+    }
+  }
+
+  timelineList.replaceChildren();
+  timelineEmpty.classList.toggle('hidden', rows.length > 0);
+  for (const row of rows) {
+    const li = document.createElement('li');
+    li.className = 'timeline-row';
+
+    const when = document.createElement('span');
+    when.className = 'timeline-when';
+    when.textContent = row.when;
+
+    const kind = document.createElement('span');
+    kind.className = 'timeline-kind';
+    kind.textContent = row.kind;
+
+    const what = document.createElement('span');
+    what.className = 'timeline-what';
+    what.textContent = row.what;
+
+    li.append(when, kind, what);
+    timelineList.appendChild(li);
+  }
+}
 
 // divider drag
 let aiDragging = false;
@@ -1476,7 +1819,6 @@ function syncRecent(): void {
   void window.electronAPI?.setRecentFiles(recentFiles.map(f => f.path));
 }
 
-// the recent files are commands too, so they are reachable without new chrome
 function refreshPaletteCommands(): void {
   const paths = recentFiles.map(f => f.path);
   palette.register([
@@ -1495,7 +1837,6 @@ function refreshPaletteCommands(): void {
 
 syncRecent();
 
-// restores the last session before anything else touches the buffer
 async function restoreSession(): Promise<void> {
   const saved = loadSession();
   if (!saved) {

@@ -1,6 +1,11 @@
+// the webview paints a native aqua chip on any button it is not told about
+button, select { -webkit-appearance: none; appearance: none; }
+
 $interactive:
   '.btn',
-  '.toolbar-btn', '.mode-btn', '.activity-btn', '.action-btn',
+  '.toolbar-btn', '.mode-btn', '.action-btn',
+  '.tb-widget', '.tb-icon', '.rail-btn', '.tab-close',
+  '.tool-tab', '.tool-tab-icon',
   '.git-panel-btn', '.unsaved-export-btn', '.search-regex-btn',
   '.ai-icon-btn', '.ai-config-btn', '.ai-toolbar-btn', '.ai-code-copy-btn',
   '.ai-action-btn', '.ai-ctx-btn', '.ai-send-btn', '.transport-play';
@@ -14,11 +19,13 @@ $interactive:
   justify-content: center;
   gap: 4px;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-small);
+  font-weight: 500;
   line-height: 1;
   padding: 4px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius);
+  white-space: nowrap;
   background: none;
   color: var(--subtext1);
   cursor: pointer;
@@ -29,7 +36,7 @@ $interactive:
   &:hover {
     color: var(--btn-accent);
     border-color: var(--btn-hover-border);
-    background: color-mix(in srgb, var(--btn-accent) 8%, transparent);
+    background: color-mix(in srgb, var(--btn-accent) 10%, transparent);
   }
 
   &:active {
@@ -44,10 +51,28 @@ $interactive:
   }
 }
 
+// one caret for every dropdown; a data uri cannot read a css variable, so the
+// stroke is a mid grey that holds on a dark floor and on a light one
+select {
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23949cab' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px 12px;
+}
+select option {
+  background: var(--mantle);
+  color: var(--text);
+}
+
 :focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

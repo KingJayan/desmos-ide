@@ -1,9 +1,11 @@
+@use 'tokens' as *;
+
 .cmd-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: color-mix(in srgb, var(--crust) 60%, transparent);
-  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--crust) 62%, transparent);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -20,11 +22,7 @@
 .cmd-modal {
   width: 560px;
   max-width: calc(100vw - 40px);
-  background: var(--mantle);
-  border: 1px solid var(--surface1);
-  border-radius: 8px;
-  box-shadow: 0 24px 60px color-mix(in srgb, var(--crust) 80%, transparent),
-              0 4px 16px color-mix(in srgb, var(--crust) 60%, transparent);
+  @include panel;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -41,12 +39,12 @@
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--surface0);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .cmd-search-icon {
-  color: var(--blue);
+  color: var(--accent);
   font-size: 1.4rem;
   font-weight: 300;
   line-height: 1;
@@ -62,8 +60,8 @@
   outline: none;
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 1.1rem;
-  caret-color: var(--blue);
+  font-size: var(--fs-large);
+  caret-color: var(--accent);
 }
 .cmd-input::placeholder { color: var(--overlay0); }
 
@@ -73,9 +71,7 @@
   flex: 1;
   padding: 4px 0;
 }
-.cmd-list::-webkit-scrollbar { width: 5px; }
-.cmd-list::-webkit-scrollbar-track { background: transparent; }
-.cmd-list::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+.cmd-list { @include scrollbar; }
 
 .cmd-item {
   display: flex;
@@ -86,8 +82,11 @@
   cursor: pointer;
   transition: background 0.07s;
 }
-.cmd-item--active { background: color-mix(in srgb, var(--blue) 12%, transparent); }
-.cmd-item:hover   { background: color-mix(in srgb, var(--blue) 8%, transparent); }
+.cmd-item--active {
+  background: var(--selected);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.cmd-item:hover { background: var(--hover); }
 
 .cmd-item-left {
   display: flex;
@@ -97,16 +96,16 @@
 }
 
 .cmd-item-label {
-  font-size: 1rem;
+  font-size: var(--fs-base);
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cmd-item--active .cmd-item-label { color: var(--blue); }
+.cmd-item--active .cmd-item-label { color: var(--accent); }
 
 .cmd-item-desc {
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--overlay1);
   white-space: nowrap;
   overflow: hidden;
@@ -114,12 +113,13 @@
 }
 
 .cmd-item-kb {
-  font-size: 0.9rem;
+  font-size: var(--fs-micro);
   font-family: var(--font-mono);
-  color: var(--overlay0);
-  background: var(--surface0);
-  border: 1px solid var(--surface1);
-  border-radius: 4px;
+  color: var(--overlay1);
+  background: var(--panel-sunken);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius);
   padding: 1px 6px;
   flex-shrink: 0;
   white-space: nowrap;
@@ -129,6 +129,5 @@
   padding: 24px 16px;
   text-align: center;
   color: var(--overlay0);
-  font-size: 1rem;
-  font-style: italic;
+  font-size: var(--fs-small);
 }

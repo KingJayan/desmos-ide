@@ -1,29 +1,12 @@
-#ai-divider {
-  width: 4px;
-  background: var(--surface0);
-  cursor: col-resize;
-  flex-shrink: 0;
-  transition: background 0.12s;
-}
-#ai-divider:hover,
-#ai-divider.dragging { background: var(--mauve); }
+@use 'tokens' as *;
 
-#ai-panel {
-  width: 320px;
-  min-width: 260px;
-  max-width: 500px;
-  background: var(--mantle);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  border-left: 1px solid var(--surface0);
-  overflow: hidden;
-}
-#ai-panel.hidden { display: none; }
-#ai-divider.hidden { display: none; }
+// the ai gutter keeps mauve, the accent that marks every ai surface
+#ai-divider:hover::after,
+#ai-divider.dragging::after { background: var(--mauve); }
 
 #git-sidebar-container,
-#ai-sidebar-container {
+#ai-sidebar-container,
+#outline-sidebar-container {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -31,25 +14,24 @@
 }
 
 #git-sidebar-container.hidden,
-#ai-sidebar-container.hidden {
+#ai-sidebar-container.hidden,
+#outline-sidebar-container.hidden {
   display: none;
 }
 
 .sidepanel-header {
-  min-height: 38px;
-  background: var(--crust);
-  border-bottom: 1px solid var(--surface0);
+  min-height: 30px;
+  background: var(--island-header);
+  border-bottom: 1px solid var(--island-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 4px 10px;
   gap: 8px;
   flex-shrink: 0;
 }
 
 .sidepanel-title {
-  color: var(--subtext1);
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  @include eyebrow;
+  color: var(--overlay1);
 }

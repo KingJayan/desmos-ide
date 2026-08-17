@@ -1,5 +1,6 @@
 // load order is cascade order: tokens first, then the shared control base,
 // then one partial per part of the ui
+@use 'styles/fonts';
 @use 'styles/tokens';
 @use 'styles/buttons';
 @use 'styles/layout';

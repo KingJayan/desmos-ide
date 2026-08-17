@@ -1,5 +1,7 @@
+@use 'tokens' as *;
+
 .ai-heading {
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--text);
   margin-top: 6px;
@@ -15,11 +17,11 @@
 
 .ai-inline-code {
   background: var(--surface0);
-  border: 1px solid var(--surface1);
-  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
   padding: 1px 5px;
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--peach);
 }
 
@@ -31,12 +33,12 @@
 .ai-list-item {
   margin: 2px 0;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: var(--fs-small);
 }
 
 .ai-code-block {
   margin-top: 8px;
-  border: 1px solid var(--surface1);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -46,21 +48,21 @@
   align-items: center;
   justify-content: space-between;
   background: var(--surface0);
-  border-bottom: 1px solid var(--surface1);
+  border-bottom: 1px solid var(--border-strong);
   padding: 6px 10px;
   gap: 8px;
 }
 
 .ai-code-lang {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   color: var(--overlay1);
   letter-spacing: 0.05em;
 }
 
 .ai-code-copy-btn {
   --btn-press: 0.93;
-  border-color: var(--surface1);
+  border-color: var(--border-strong);
   color: var(--overlay1);
   padding: 2px 6px;
   flex-shrink: 0;
@@ -73,13 +75,11 @@
   overflow-x: auto;
   margin: 0;
 }
-.ai-code-block pre::-webkit-scrollbar       { height: 4px; }
-.ai-code-block pre::-webkit-scrollbar-track { background: transparent; }
-.ai-code-block pre::-webkit-scrollbar-thumb { background: var(--surface1); }
+.ai-code-block pre { @include scrollbar(5px); }
 
 .ai-code-block code {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--text);
   white-space: pre;
 }
@@ -89,14 +89,14 @@
   gap: 4px;
   padding: 5px 8px;
   background: var(--mantle);
-  border-top: 1px solid var(--surface0);
+  border-top: 1px solid var(--border);
 }
 
 .ai-action-btn {
   --btn-press: 0.93;
   padding: 3px 10px;
-  border-radius: 3px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-small);
 }
 
 .ai-action-btn--insert {
@@ -117,11 +117,10 @@
 .ai-action-btn--deny {
   --btn-accent: var(--red);
   color: var(--overlay0);
-  border-color: var(--surface1);
+  border-color: var(--border-strong);
 }
 
 .ai-dismissed {
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--overlay0);
-  font-style: italic;
 }

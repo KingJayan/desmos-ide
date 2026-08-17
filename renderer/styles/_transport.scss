@@ -1,3 +1,5 @@
+@use 'tokens' as *;
+
 #transport {
   position: absolute;
   left: 50%;
@@ -9,12 +11,9 @@
   gap: 8px;
   max-width: calc(100% - 24px);
   padding: 5px 10px;
-  border: 1px solid var(--surface0);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--crust) 88%, transparent);
-  backdrop-filter: blur(6px);
+  @include panel(999px);
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-small);
   color: var(--subtext1);
 }
 #transport.hidden { display: none; }
@@ -22,13 +21,13 @@
 .transport-play { padding: 4px 6px; }
 
 .transport-name {
-  font-family: var(--font-code);
-  color: var(--blue);
+  font-family: var(--font-mono);
+  color: var(--accent);
   min-width: 1.5em;
 }
 
 .transport-value {
-  font-family: var(--font-code);
+  font-family: var(--font-mono);
   min-width: 3.5em;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -49,17 +48,18 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: var(--blue);
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
 
 .transport-speed {
   font-family: var(--font-ui);
-  font-size: 0.9rem;
-  padding: 2px 4px;
-  border: 1px solid var(--surface0);
+  font-size: var(--fs-micro);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--mantle);
+  background: var(--panel-sunken);
   color: var(--subtext1);
   cursor: pointer;
 }

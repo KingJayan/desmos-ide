@@ -1,7 +1,8 @@
 // one icon source for the whole UI
 
 import {
-  Check, ChevronRight, Copy, FileText, Pause, Play, Search, Send, Square, SquarePen, X,
+  Check, ChevronRight, Copy, FileCode, FileText, FolderOpen, Pause, Play, Search, Send,
+  Square, SquarePen, X,
 } from 'lucide';
 import { escapeHtml } from './escape';
 
@@ -11,7 +12,9 @@ const ICONS = {
   check: Check as IconNode,
   'chevron-right': ChevronRight as IconNode,
   copy: Copy as IconNode,
+  'file-code': FileCode as IconNode,
   'file-text': FileText as IconNode,
+  'folder-open': FolderOpen as IconNode,
   pause: Pause as IconNode,
   play: Play as IconNode,
   search: Search as IconNode,

@@ -1,11 +1,13 @@
+@use 'tokens' as *;
+
 #statusbar {
   height: var(--status-h);
-  background: var(--crust);
-  border-top: 1px solid var(--surface0);
   display: flex;
   align-items: center;
   padding: 0 12px;
-  font-size: 0.95rem;
+  flex-shrink: 0;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.01em;
   color: var(--overlay2);
 }
 #status-msg { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.2s; }
@@ -29,10 +31,10 @@
   height: 18px;
   padding: 0 8px;
   border-radius: 999px;
-  border: 1px solid var(--surface1);
+  border: 1px solid var(--border-strong);
   color: var(--subtext1);
-  background: color-mix(in srgb, var(--surface0) 55%, transparent);
-  font-size: 0.9rem;
+  background: var(--panel-sunken);
+  font-size: var(--fs-micro);
   font-family: var(--font-mono);
   max-width: 32ch;
   overflow: hidden;
@@ -51,10 +53,10 @@
 .git-summary-msg {
   margin: 0 10px 10px;
   padding: 6px 8px;
-  border: 1px solid var(--surface0);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   color: var(--overlay1);
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   font-family: var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
@@ -63,9 +65,10 @@
 
 .git-section {
   margin: 0 10px 10px;
-  border: 1px solid var(--surface0);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--mantle) 82%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-sunken);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
@@ -74,12 +77,12 @@
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--surface0);
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
   user-select: none;
 }
-.git-section-header:hover { background: color-mix(in srgb, var(--surface0) 45%, transparent); }
-.git-section-header:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.git-section-header:hover { background: var(--hover); }
+.git-section-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .git-section-chevron {
   display: inline-flex;
@@ -95,16 +98,13 @@
 .git-section--collapsed > :not(.git-section-header) { display: none; }
 
 .git-modified-panel-title {
+  @include eyebrow;
   padding: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--overlay1);
 }
 
 .git-modified-empty {
   padding: 10px;
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--overlay1);
   display: none;
 }
@@ -114,6 +114,7 @@
 }
 
 .git-modified-list {
+  @include scrollbar;
   list-style: none;
   margin: 0;
   padding: 4px;
@@ -125,9 +126,9 @@
   display: block;
   max-width: 100%;
   padding: 6px 8px;
-  border-radius: 5px;
+  border-radius: var(--radius);
   color: var(--subtext1);
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -135,22 +136,20 @@
 }
 
 .git-modified-list li:hover {
-  background: color-mix(in srgb, var(--surface0) 80%, transparent);
+  background: var(--hover);
 }
 
 .git-panel-actions {
   display: flex;
   gap: 6px;
   padding: 8px;
-  border-top: 1px solid var(--surface0);
+  border-top: 1px solid var(--border);
 }
 
 .git-panel-btn {
-  border-color: var(--surface1);
-  background: var(--surface0);
-  border-radius: 5px;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface0) 55%, transparent);
   padding: 3px 8px;
-  font-size: 0.9rem;
 }
 
 .git-panel-btn .lucide {
@@ -190,20 +189,21 @@
 
 .git-branch-upstream,
 .git-remote-url {
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   color: var(--overlay1);
 }
 
 .git-history-content {
+  @include scrollbar;
   margin: 0;
   padding: 8px 10px;
   white-space: pre;
   overflow: auto;
   max-height: 240px;
   color: var(--subtext1);
-  font-size: 0.9rem;
+  font-size: var(--fs-micro);
   font-family: var(--font-mono);
-  line-height: 1.35;
+  line-height: 1.45;
   display: none;
 }
 
@@ -231,8 +231,8 @@
 
 .git-pill--unknown {
   color: var(--overlay1);
-  border-color: var(--surface1);
-  background: color-mix(in srgb, var(--surface0) 45%, transparent);
+  border-color: var(--border-strong);
+  background: var(--panel-sunken);
 }
 
 @keyframes status-flash {

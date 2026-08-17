@@ -1,3 +1,5 @@
+@use 'tokens' as *;
+
 #enhanced-unsaved-bar {
   display: flex;
   align-items: center;
@@ -6,7 +8,7 @@
   padding: 6px 12px;
   background: color-mix(in srgb, var(--yellow) 12%, var(--base));
   border-bottom: 1px solid color-mix(in srgb, var(--yellow) 35%, transparent);
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--yellow);
   flex-shrink: 0;
 }
@@ -14,8 +16,8 @@
 
 #enhanced-hint {
   padding: 6px 12px;
-  border-bottom: 1px solid var(--surface0);
-  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-micro);
   color: var(--overlay1);
   flex-shrink: 0;
 }
@@ -26,7 +28,6 @@
   border-color: color-mix(in srgb, var(--yellow) 50%, transparent);
   background: color-mix(in srgb, var(--yellow) 15%, transparent);
   color: var(--yellow);
-  font-size: 0.9rem;
   white-space: nowrap;
 }
 .unsaved-export-btn:hover { background: color-mix(in srgb, var(--yellow) 28%, transparent); }
@@ -44,22 +45,24 @@
   flex-direction: column;
   gap: 3px;
 }
-#expr-list::-webkit-scrollbar       { width: 6px; }
-#expr-list::-webkit-scrollbar-track { background: transparent; }
-#expr-list::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+#expr-list { @include scrollbar; }
 
 .expr-row {
   display: flex;
   align-items: center;
   gap: 8px;
   background: var(--mantle);
-  border: 1px solid var(--surface0);
-  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 5px 8px;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
   animation: row-in 0.18s cubic-bezier(0.34,1.56,0.64,1);
 }
-.expr-row:focus-within { border-color: var(--blue); box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 20%, transparent); }
+.expr-row:hover { border-color: var(--border-strong); }
+.expr-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
 
 @keyframes row-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
@@ -67,7 +70,7 @@
 }
 
 .expr-id {
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   color: var(--overlay0);
   font-family: var(--font-mono);
   min-width: 18px;
@@ -91,7 +94,7 @@
   border: none;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   outline: none;
   min-width: 0;
   user-select: text;
@@ -106,7 +109,7 @@
   font-size: 1.4rem;
   line-height: 1;
   padding: 0 2px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition: color 0.12s, transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
   flex-shrink: 0;
 }
@@ -115,14 +118,15 @@
 
 #expr-actions {
   padding: 8px;
-  border-top: 1px solid var(--surface0);
+  border-top: 1px solid var(--border);
 }
 
 .action-btn {
   --btn-press: 0.98;
   width: 100%;
   border-style: dashed;
-  border-color: var(--surface1);
-  color: var(--overlay2);
+  border-color: var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--overlay1);
   padding: 8px;
 }

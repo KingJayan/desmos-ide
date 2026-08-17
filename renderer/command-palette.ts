@@ -70,11 +70,11 @@ export class CommandPalette {
     this.open ? this.close() : this.show();
   }
 
-  show(): void {
+  show(prefill = ''): void {
     this.open = true;
     this.overlay.classList.add('cmd-overlay--visible');
     this.overlay.setAttribute('aria-hidden', 'false');
-    this.input.value = '';
+    this.input.value = prefill;
     this.filter();
     requestAnimationFrame(() => this.input.focus());
   }

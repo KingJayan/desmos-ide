@@ -1,9 +1,9 @@
 .ai-diff-preview {
   margin-top: 6px;
-  border: 1px solid var(--surface1);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   overflow: hidden;
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
 }
 .ai-diff-lines {
   max-height: 180px;
@@ -14,7 +14,7 @@
 .ai-diff-add,
 .ai-diff-del {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   padding: 1px 8px;
   white-space: pre-wrap;
   word-break: break-all;
@@ -24,7 +24,7 @@
 .ai-diff-no-change,
 .ai-diff-insert-note {
   padding: 6px 10px;
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--overlay1);
 }
 .ai-diff-btns {
@@ -32,5 +32,5 @@
   gap: 6px;
   padding: 6px 8px;
   background: var(--mantle);
-  border-top: 1px solid var(--surface0);
+  border-top: 1px solid var(--border);
 }

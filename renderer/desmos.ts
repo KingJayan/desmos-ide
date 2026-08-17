@@ -8,6 +8,8 @@ type DesmosThemeSpec = {
 };
 
 const DESMOS_THEMES: Record<ColorTheme, DesmosThemeSpec> = {
+  dsmx: { background: '#0e1420', text: '#5d6878', fillScale: 1 },
+  'dsmx-light': { background: '#ffffff', text: '#8b95a5', fillScale: 0.55 },
   'desmos-dark': { background: '#24273a', text: '#7f849c', fillScale: 1 },
   'catppuccin-latte': { background: '#eff1f5', text: '#9ca0b0', fillScale: 0.55 },
   'catppuccin-frappe': { background: '#303446', text: '#737994', fillScale: 1 },
@@ -83,7 +85,7 @@ export function heldBounds(before: GraphView, now: GraphView, math: MathBounds):
 
 export class DesmosGraph {
   private calc: DesmosCalculator;
-  private theme: ColorTheme = 'desmos-dark';
+  private theme: ColorTheme = 'dsmx';
   private snapshots = new Map<string, string>();
   private drawn = new Map<string, DesmosExpr>();
 

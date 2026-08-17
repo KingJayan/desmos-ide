@@ -1,3 +1,5 @@
+@use 'tokens' as *;
+
 #outline-sidebar-container {
   display: flex;
   flex-direction: column;
@@ -8,7 +10,7 @@
 
 .outline-empty {
   padding: 14px 12px;
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--overlay1);
 }
 .outline-empty--hidden { display: none; }
@@ -20,27 +22,25 @@
   overflow-y: auto;
   flex: 1;
 }
-.outline-list::-webkit-scrollbar       { width: 5px; }
-.outline-list::-webkit-scrollbar-track { background: transparent; }
-.outline-list::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+.outline-list { @include scrollbar; }
 
 .outline-item {
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 5px 7px;
-  border-radius: 5px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: background 0.1s;
 }
-.outline-item:hover { background: color-mix(in srgb, var(--surface0) 70%, transparent); }
-.outline-item:active { background: var(--surface1); }
+.outline-item:hover  { background: var(--hover); }
+.outline-item:active { background: var(--selected); }
 
 .outline-badge {
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: var(--fs-micro);
+  font-weight: 600;
   font-family: var(--font-mono);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   padding: 1px 5px;
   letter-spacing: 0.05em;
   flex-shrink: 0;

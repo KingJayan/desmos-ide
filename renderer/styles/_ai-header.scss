@@ -1,7 +1,7 @@
 .ai-header {
   height: 36px;
   background: var(--crust);
-  border-bottom: 1px solid var(--surface0);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   padding: 0 12px;
@@ -12,13 +12,13 @@
 .ai-chat-select {
   flex: 1;
   min-width: 0;
-  background: var(--surface0);
-  border: 1px solid var(--surface1);
-  border-radius: 3px;
+  background-color: var(--surface0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 0.9rem;
-  padding: 2px 4px;
+  font-size: var(--fs-small);
+  padding: 2px 22px 2px 6px;
   cursor: pointer;
   outline: none;
 }
@@ -26,7 +26,6 @@
 
 .ai-chat-select--pending {
   color: var(--overlay1);
-  font-style: italic;
   animation: chat-title-pulse 1.4s ease-in-out infinite;
 }
 
@@ -41,7 +40,7 @@
 
 .ai-icon-btn {
   --btn-press: 0.88;
-  border-color: var(--surface1);
+  border-color: var(--border-strong);
   color: var(--overlay1);
   width: 24px;
   height: 24px;
@@ -56,13 +55,13 @@
 }
 
 .ai-provider-select {
-  background: transparent;
-  border: 1px solid var(--surface1);
+  background-color: transparent;
+  border: 1px solid var(--border-strong);
   color: var(--overlay1);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
-  border-radius: 4px;
-  padding: 2px 4px;
+  font-size: var(--fs-micro);
+  border-radius: var(--radius);
+  padding: 2px 20px 2px 6px;
   max-width: 126px;
   outline: none;
 }
@@ -70,7 +69,7 @@
 .ai-provider-select option { background: var(--mantle); }
 
 .ai-provider-label {
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   color: var(--subtext1);
   max-width: 110px;
   overflow: hidden;
@@ -92,18 +91,18 @@
 }
 
 .ai-provider-state {
-  font-size: 0.85rem;
-  border: 1px solid var(--surface1);
-  border-radius: 4px;
+  font-size: var(--fs-micro);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
   padding: 1px 5px;
   font-family: var(--font-mono);
 }
 .ai-provider-state--key { color: var(--green); border-color: color-mix(in srgb, var(--green) 60%, transparent); }
-.ai-provider-state--env { color: var(--overlay1); border-color: var(--surface1); }
+.ai-provider-state--env { color: var(--overlay1); border-color: var(--border-strong); }
 
 .ai-config-btn {
   --btn-accent: var(--mauve);
-  border-color: var(--surface1);
+  border-color: var(--border-strong);
   color: var(--overlay1);
   width: 24px;
   height: 20px;
@@ -133,16 +132,16 @@
 }
 
 .ai-empty-hint {
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   color: var(--overlay0);
 }
 
 .ai-empty-hint kbd {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   background: var(--surface0);
-  border: 1px solid var(--surface1);
-  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
   padding: 1px 5px;
   color: var(--mauve);
 }
@@ -165,11 +164,11 @@
 
 .ai-prompt-chip {
   background: var(--surface0);
-  border: 1px solid var(--surface1);
+  border: 1px solid var(--border-strong);
   color: var(--subtext1);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 6px 12px;
-  font-size: 0.9rem;
+  font-size: var(--fs-small);
   font-family: var(--font-ui);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -184,7 +183,7 @@
   background: none;
   border: none;
   color: var(--overlay0);
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   padding: 2px 6px;
   margin-top: 2px;
 }
@@ -196,10 +195,9 @@
 .ai-msg--system { justify-content: center; }
 .ai-bubble--system {
   background: var(--surface0);
-  border: 1px solid var(--surface1);
+  border: 1px solid var(--border-strong);
   color: var(--overlay2);
-  font-size: 0.9rem;
-  font-style: italic;
+  font-size: var(--fs-small);
   max-width: 100%;
   text-align: center;
   white-space: pre-wrap;

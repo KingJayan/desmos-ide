@@ -6,12 +6,12 @@
   padding: 3px 8px;
   background: color-mix(in srgb, var(--mantle) 90%, var(--mauve) 10%);
   border: 1px solid color-mix(in srgb, var(--surface1) 80%, var(--mauve) 20%);
-  border-radius: 6px;
+  border-radius: var(--radius);
   pointer-events: all;
   user-select: none;
   vertical-align: middle;
   transition: border-color 0.12s, background 0.12s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  box-shadow: var(--shadow-sm);
 }
 .inline-slider-widget:hover {
   background: color-mix(in srgb, var(--mantle) 80%, var(--mauve) 20%);
@@ -19,7 +19,7 @@
 }
 .inline-slider-bound {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--fs-micro);
   color: var(--overlay0);
   min-width: 3ch;
   text-align: center;
@@ -60,7 +60,7 @@
 }
 .inline-slider-label {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   font-weight: 600;
   color: var(--mauve);
   min-width: 4ch;
@@ -82,10 +82,10 @@
   padding: 3px 8px;
   background: color-mix(in srgb, var(--base) 85%, var(--blue) 15%);
   border: 1px solid color-mix(in srgb, var(--surface1) 70%, var(--blue) 30%);
-  border-radius: 6px;
+  border-radius: var(--radius);
   flex-shrink: 0;
   transition: border-color 0.12s, background 0.12s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.14);
+  box-shadow: var(--shadow-sm);
 }
 .expr-slider-wrap:hover {
   background: color-mix(in srgb, var(--base) 72%, var(--blue) 28%);
@@ -116,7 +116,7 @@
 .expr-slider-track:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.05); }
 .expr-slider-badge {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--fs-micro);
   font-weight: 600;
   color: var(--blue);
   min-width: 4ch;

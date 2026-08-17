@@ -1,8 +1,22 @@
 @use 'sass:map';
 
-// every theme sets the same sixteen slots, so the palettes live in one map and
-// the selectors are generated. adding a theme is one entry here.
 $palettes: (
+  'dsmx': (
+    'base': #0e1420, 'mantle': #0b1017, 'crust': #06080c,
+    'surface0': #1b2431, 'surface1': #26313f,
+    'overlay0': #6f7a8c, 'overlay1': #9aa5b6, 'overlay2': #b7c0cd,
+    'subtext1': #d3dae4, 'text': #edf2fa,
+    'blue': #8cd7ff, 'green': #7fe0b0, 'yellow': #f0c58d,
+    'red': #ff8f9c, 'mauve': #c3b0ff, 'peach': #f0c58d,
+  ),
+  'dsmx-light': (
+    'base': #ffffff, 'mantle': #f4f6fa, 'crust': #e8ecf3,
+    'surface0': #dfe4ec, 'surface1': #cbd2de,
+    'overlay0': #8b95a5, 'overlay1': #6f7a8c, 'overlay2': #55606f,
+    'subtext1': #3b4453, 'text': #141a24,
+    'blue': #0b7ec4, 'green': #12855f, 'yellow': #9a6a12,
+    'red': #c8384a, 'mauve': #6d4ad1, 'peach': #b06a1c,
+  ),
   'desmos-dark': (
     'base': #1e1e2e, 'mantle': #181825, 'crust': #11111b,
     'surface0': #313244, 'surface1': #45475a,
@@ -77,30 +91,151 @@ $palettes: (
   ),
 );
 
-// the palette used when no theme attribute is set
-$default-theme: 'desmos-dark';
+$default-theme: 'dsmx';
+$light-themes: 'dsmx-light', 'catppuccin-latte', 'github-light', 'vs-light';
 
 @mixin palette($name) {
   @each $slot, $value in map.get($palettes, $name) {
     --#{$slot}: #{$value};
   }
+  color-scheme: if(index($light-themes, $name), light, dark);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
+.hidden { display: none !important; }
+
+@mixin eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--overlay0);
+}
+
+@mixin panel($radius: var(--radius-lg)) {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: $radius;
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+
+@mixin island {
+  background: var(--island);
+  border: 1px solid var(--island-border);
+  border-radius: var(--island-radius);
+  box-shadow: var(--shadow-island);
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+@mixin gutter($axis) {
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+  transition: background-color 0.14s ease;
+
+  @if $axis == 'v' {
+    width: var(--gap);
+    cursor: col-resize;
+  } @else {
+    height: var(--gap);
+    cursor: row-resize;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    border-radius: 999px;
+    background: transparent;
+    transition: background-color 0.14s ease;
+
+    @if $axis == 'v' {
+      inset: 22% calc(50% - 1px);
+    } @else {
+      inset: calc(50% - 1px) 22%;
+    }
+  }
+
+  &:hover::after,
+  &.dragging::after { background: var(--accent); }
+}
+
+@mixin scrollbar($width: 6px) {
+  &::-webkit-scrollbar       { width: $width; height: $width; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--overlay0) 32%, transparent);
+    border-radius: 999px;
+  }
+  &:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--overlay0) 55%, transparent); }
+}
 
 :root {
   @include palette($default-theme);
 
-  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
-  --font-ui:   'Avenir Next', 'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
+  --font-ui:      'Inter', 'SF Pro Text', -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+
+  --fs-micro: 0.8rem;
+  --fs-small: 0.9rem;
+  --fs-base:  1rem;
+  --fs-large: 1.1rem;
+
   --toolbar-h: 40px;
   --status-h:  24px;
-  --radius:    4px;
+  --rail-w:    40px;
+  --gap:       6px;
+  --island-radius: 10px;
+
+  --radius-xs: 3px;
+  --radius:    5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --accent:   var(--blue);
+  --accent-2: var(--peach);
+  --accent-line: linear-gradient(90deg, transparent, var(--accent), var(--accent-2));
+
+  --border:        color-mix(in srgb, var(--surface0) 78%, transparent);
+  --border-strong: var(--surface1);
+  --panel:         color-mix(in srgb, var(--mantle) 92%, transparent);
+  --panel-sunken:  color-mix(in srgb, var(--crust) 55%, transparent);
+  --hover:         color-mix(in srgb, var(--surface0) 62%, transparent);
+  --selected:      color-mix(in srgb, var(--accent) 14%, transparent);
+
+  --window: var(--crust);
+  --window-glow:
+    radial-gradient(900px 520px at 14% -10%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 55%),
+    radial-gradient(760px 460px at 88% -4%, color-mix(in srgb, var(--accent-2) 9%, transparent), transparent 52%);
+
+  --island:        var(--base);
+  --island-border: color-mix(in srgb, var(--surface0) 62%, transparent);
+  --island-header: color-mix(in srgb, var(--mantle) 76%, transparent);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.28);
+  --shadow-md: 0 6px 18px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 24px 60px rgb(0 0 0 / 0.46), 0 4px 14px rgb(0 0 0 / 0.32);
+  --shadow-island: 0 1px 2px rgb(0 0 0 / 0.24), 0 6px 20px rgb(0 0 0 / 0.18);
 }
 
 @each $name, $palette in $palettes {
   :root[data-color-theme='#{$name}'] {
     @include palette($name);
+  }
+}
+
+@each $name in $light-themes {
+  :root[data-color-theme='#{$name}'] {
+    --shadow-sm:     0 1px 2px rgb(15 23 42 / 0.07);
+    --shadow-md:     0 6px 18px rgb(15 23 42 / 0.09);
+    --shadow-lg:     0 24px 60px rgb(15 23 42 / 0.14), 0 4px 14px rgb(15 23 42 / 0.08);
+    --shadow-island: 0 1px 2px rgb(15 23 42 / 0.06), 0 6px 18px rgb(15 23 42 / 0.07);
+    --island-border: color-mix(in srgb, var(--surface1) 72%, transparent);
+    --window: color-mix(in srgb, var(--crust) 72%, var(--mantle));
   }
 }
