@@ -2,3 +2,5 @@ docs/** linguist-documentation=false
 src/tests/** linguist-vendored=true
 *.dsmx linguist-language=asl
 packaging/** linguist-generated=true
+cli/** linguist-generated=true
+
