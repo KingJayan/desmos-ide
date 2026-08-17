@@ -1,0 +1,14 @@
+// phyllotaxis — the spiral a sunflower head packs its seeds in.
+// the golden angle is the only one that never lines the seeds up into rows.
+
+ang = slider(2.39996, 2.2, 2.6, step=0.00002)
+scale = slider(0.14, 0.05, 0.3, step=0.01)
+
+seeds = (scale * sqrt(i) * cos(ang * i), scale * sqrt(i) * sin(ang * i)) for i in 0..600 step 1
+
+time T = 0..600 period 9000
+
+// one seed walks the sequence, tracing the order they were laid down in
+point walker (scale * sqrt(T) * cos(ang * T), scale * sqrt(T) * sin(ang * T)) as { color red pointSize 12 }
+
+text lbl = "2.39996 is the golden angle" at (0, -4)

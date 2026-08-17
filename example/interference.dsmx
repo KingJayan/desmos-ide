@@ -1,0 +1,19 @@
+// two-source interference — the classic ripple tank, as one region.
+// the bright bands are where the two waves arrive in step.
+
+sep = slider(3, 0.5, 6, step=0.1)
+lam = slider(1.2, 0.4, 3, step=0.1)
+
+time T = 0..6.28 period 3000
+
+fn d1(px, py) = sqrt((px + sep / 2)^2 + py^2)
+fn d2(px, py) = sqrt((px - sep / 2)^2 + py^2)
+
+fn wave1(px, py) = sin(6.28318 * d1(px, py) / lam - T)
+fn wave2(px, py) = sin(6.28318 * d2(px, py) / lam - T)
+
+region crest = wave1(x, y) + wave2(x, y) > 1.2 as { color blue opacity 0.35 }
+region trough = wave1(x, y) + wave2(x, y) < -1.2 as { color red opacity 0.2 }
+
+point s1 (-1.5, 0) as { color orange pointSize 12 }
+point s2 (1.5, 0) as { color orange pointSize 12 }

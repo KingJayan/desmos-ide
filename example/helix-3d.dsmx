@@ -1,0 +1,20 @@
+// a 3d helix over a flat lattice, turned by the clock.
+// the camera angles are ordinary variables, so animating azimuth spins the whole scene.
+
+time T = 0..6.28 period 16000
+
+camera cam = azimuth(T), elevation(0.42)
+
+h = 0.18
+
+// the coil climbs as it turns, so the z of each sample is its own parameter
+coil = project(2cos(u), 2sin(u), h * u) for u in 0..25.13 step 0.02
+
+// a square of floor markers, to show the projection is doing the work
+floor = project(i - 3, 0, 0) for i in 0..6 step 1
+back = project(0, i - 3, 0) for i in 0..6 step 1
+
+base = project(0, 0, 0)
+top = project(0, 0, 4.5)
+
+text lbl = "azimuth is driven by the clock" at (0, -3)

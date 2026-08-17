@@ -1,0 +1,24 @@
+// a small system — one star, two planets and a moon.
+// each body is the same point expression read at the clock instead of at t.
+
+time T = 0..6.28 period 14000
+
+r1 = 2
+r2 = 3.4
+rm = 0.5
+
+group sky as "Bodies"
+
+point star (0, 0) as { color orange pointSize 22 }
+
+curve path1 (t in 0..6.28 step 0.01) { (r1 * cos(t), r1 * sin(t)) } as { color blue lineOpacity 0.35 }
+curve path2 (t in 0..6.28 step 0.01) { (r2 * cos(t), r2 * sin(t)) } as { color green lineOpacity 0.35 }
+
+point inner (r1 * cos(T), r1 * sin(T)) as { color blue pointSize 12 }
+
+// the outer planet runs slower, so its year is longer
+w = 0.55
+point outer (r2 * cos(w * T), r2 * sin(w * T)) as { color green pointSize 14 }
+
+// the moon rides the outer planet and goes round it nine times a year
+point moon (r2 * cos(w * T) + rm * cos(9 * T), r2 * sin(w * T) + rm * sin(9 * T)) as { color red pointSize 7 }

@@ -1,0 +1,16 @@
+// fourier — a square wave built one odd harmonic at a time.
+// drag n from 1 to 6 and watch the ripple settle towards the step.
+
+n = slider(2, 1, 6, step=1)
+
+// a term switches itself off once its index passes n, so one slider drives them all
+fn on(i) = if n >= i then 1 else 0
+fn harm(k, i) = on(i) * sin(k * x) / k
+
+sq = 1.27324 * (harm(1, 1) + harm(3, 2) + harm(5, 3) + harm(7, 4) + harm(9, 5) + harm(11, 6))
+
+target = { sin(x) > 0: 1, sin(x) < 0: -1, else: 0 }
+
+region band = y < 1.2 as { color blue opacity 0.06 }
+
+text lbl = "partial sums of 4/pi * sum sin(kx)/k, k odd" at (0, 1.5)

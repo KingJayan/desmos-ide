@@ -1,0 +1,16 @@
+// lissajous — two perpendicular sine waves, one running ahead of the other.
+// drag a and b: whole-number ratios close the curve, anything else never does.
+
+a = slider(3, 1, 9, step=1)
+b = slider(2, 1, 9, step=1)
+
+time T = 0..6.28 period 8000
+
+// the phase drifts through a full cycle, so the figure folds and opens again
+d = wobble(T, 3.14159)
+
+curve figure (t in 0..6.28 step 0.01) { (sin(a * t + d), sin(b * t)) } as gradient("blue", "red")
+
+point head (sin(a * T + d), sin(b * T)) as { color red pointSize 14 }
+
+text ratio = "a:b" at (0, 1.25)

@@ -1,0 +1,19 @@
+// spirograph — a small wheel rolling inside a big one, with a pen off its centre.
+// ring is the fixed circle, wheel the rolling one, pen how far the tip sits from its hub.
+
+ring = slider(5, 2, 8, step=1)
+wheel = slider(3, 1, 7, step=1)
+pen = slider(2.4, 0.2, 5, step=0.1)
+
+diff = ring - wheel
+turns = diff / wheel
+
+fn px(u) = diff * cos(u) + pen * cos(turns * u)
+fn py(u) = diff * sin(u) - pen * sin(turns * u)
+
+curve trace (u in 0..62.8 step 0.01) { (px(u), py(u)) } as gradient("purple", "blue")
+
+circle bound = circle((0, 0), 8) as { color blue opacity 0.04 lineWidth 1 }
+
+time T = 0..62.8 period 12000
+point tip (px(T), py(T)) as { color red pointSize 12 }

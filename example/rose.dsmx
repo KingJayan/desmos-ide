@@ -1,0 +1,13 @@
+// rose curve — r = cos(k*theta), drawn as a parametric so k can be any number.
+// an odd whole k gives k petals, an even one gives 2k.
+
+k = slider(5, 1, 12, step=1)
+s = slider(1, 0.2, 2, step=0.1)
+
+fn petal(u) = s * cos(k * u)
+
+curve rose (u in 0..12.57 step 0.005) { (petal(u) * cos(u), petal(u) * sin(u)) } as gradient("red", "orange")
+
+circle bound = circle((0, 0), 2) as { color blue opacity 0.06 lineWidth 1 }
+
+text caption = "odd k: k petals, even k: 2k" at (0, -2.4)
