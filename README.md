@@ -1,10 +1,10 @@
 <div align="center">
 <h2><code>KingJayan/desmos-ide</code></h2>
-<p>a minimalist Desmos IDE - integrated DSL and live graph</p>
+<p>code your desmos graphs.</p>
 </div>
 
 <p align="center">
-<img src="https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="ts" /> <img src="https://img.shields.io/badge/electrobun-F9F1E1?style=for-the-badge&logo=bun&logoColor=000000" alt="Bun" />
+  <img src="https://skillicons.dev/icons?i=ts,bun" height="36">
 </p>
 
 ## features
