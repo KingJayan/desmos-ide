@@ -12,3 +12,4 @@ docs/src/App.svelte.bak
 .claude
 build
 dist
+artifacts

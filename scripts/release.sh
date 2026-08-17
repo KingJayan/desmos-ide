@@ -49,6 +49,23 @@ bun run build:release
 APP="$(find build/stable-* -maxdepth 2 -name '*.app' -type d 2>/dev/null | head -1)"
 [[ -n "$APP" ]] || die "no .app under build/stable-* — did electrobun build --env=stable run?"
 APP_NAME="$(basename "$APP" .app)"
+[[ "$APP" == build/stable-* ]] || die "refusing to touch ${APP}"
+
+# electrobun wraps the real bundle in a self-extractor, and that launcher
+# segfaults in fs.path.resolve, so what gets shipped is the payload it carries
+PAYLOAD="$(find "${APP}/Contents/Resources" -maxdepth 1 -name '*.tar.zst' | head -1)"
+if [[ -n "$PAYLOAD" ]]; then
+  step "unpacking the app bundle"
+  UNPACKED="build/stable-unpacked"
+  rm -rf "$UNPACKED"
+  mkdir -p "$UNPACKED"
+  tar -xf "$PAYLOAD" -C "$UNPACKED"
+  INNER="$(find "$UNPACKED" -maxdepth 1 -name '*.app' -type d | head -1)"
+  [[ -n "$INNER" ]] || die "the self-extractor carries no .app"
+  rm -rf "$APP"
+  mv "$INNER" "$APP"
+  rm -rf "$UNPACKED"
+fi
 echo "app: ${APP}"
 
 step "installing the quick look extension"
