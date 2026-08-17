@@ -3,7 +3,7 @@ import { BUILTINS, BUILTIN_NAMES } from '../compiler/builtins';
 export const LANGUAGE_ID = 'desmos-dsl';
 
 export const KEYWORDS = [
-  'fn', 'alias', 'debug', 'in', 'map',
+  'fn', 'alias', 'debug', 'in', 'map', 'use',
   'point', 'circle', 'line',
   'curve', 'region', 'polygon', 'segment',
   'text', 'group', 'as', 'at',
@@ -13,7 +13,6 @@ export const KEYWORDS = [
   'spiral', 'wave', 'grid',
 ] as const;
 
-// re-exported so the editor and the analyzer can never disagree about what exists
 export const BUILTIN_FNS = BUILTIN_NAMES;
 
 export const languageConfig = {
@@ -307,7 +306,7 @@ export interface DiagnosticMarker {
   severity: 8 | 4; // 8 = Error, 4 = Warning
 }
 
-//monaco registration 
+//monaco registration
 
 export interface DocumentSymbol {
   name: string;

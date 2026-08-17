@@ -7,6 +7,7 @@ export default {
     identifier: 'dev.desmoside.app',
     version: pkg.version,
     description: 'an ide for Desmos with a custom dsl',
+    urlSchemes: ['dsmx'],
     fileAssociations: [
       { ext: ['dsmx'], name: 'Desmos DSL Document', role: 'Editor' },
     ],

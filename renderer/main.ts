@@ -8,6 +8,7 @@ import * as monaco from 'monaco-editor';
 import {
   createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
   Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode, Zap,
+  Puzzle,
 } from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
 import { builtinSignature } from '../src/compiler/builtins';
@@ -40,6 +41,12 @@ import {
 } from './session';
 import { registerColorProvider } from './color-provider';
 import { iconEl } from './icons';
+import { PluginHost } from './plugins/host';
+import { PluginPanel } from './plugins/panel';
+import { PluginPage } from './plugins/page';
+import type { PluginActions } from './plugins/actions';
+import type { MacroError } from '../src/plugin/macro';
+import type { RegistryEntry } from '../src/plugin/manifest';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 registerColorProvider();
@@ -47,6 +54,7 @@ createIcons({
   icons: {
     GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
     Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode, Zap,
+    Puzzle,
   },
   attrs: { 'stroke-width': '1.9' },
 });
@@ -111,6 +119,13 @@ const gitContainer = $('git-sidebar-container');
 const outlineContainer = $('outline-sidebar-container');
 const outlineList = $('outline-list');
 const outlineEmpty = $('outline-empty');
+const btnSidebarPlugins = $<HTMLButtonElement>('btn-sidebar-plugins');
+const pluginsContainer = $('plugins-sidebar-container');
+const fileTab = $('file-tab');
+const pluginTab = $('plugin-tab');
+const pluginTabLabel = $('plugin-tab-label');
+const pluginTabClose = $<HTMLButtonElement>('plugin-tab-close');
+const pluginPageEl = $('plugin-page');
 const aiPanel = $('ai-panel');
 const aiDivider = $('ai-divider');
 const aiContainer = $('ai-sidebar-container');
@@ -423,7 +438,6 @@ const graphLink = new GraphLink({
 
 graph.onSelectionChange(id => graphLink.onGraphSelected(id));
 
-/** the lines a statement owns: its own down to the line before the next one */
 function stmtRange(at: ExprSource): monaco.Range {
   const nextLine = sourceMap
     .filter(e => e.line > at.line)
@@ -679,8 +693,16 @@ function handleCompileResult(result: CompileResult): void {
 
     renderOptimizations([]);
   }
-  renderProblems(
-    result.success
+  monaco.editor.setModelMarkers(model, 'desmos-dsl-plugin', macroErrors.map(e => ({
+    startLineNumber: e.line, startColumn: e.col,
+    endLineNumber: e.line,   endColumn: model.getLineMaxColumn(Math.min(e.line, model.getLineCount())),
+    message: e.message,
+    severity: 8,
+  })));
+
+  renderProblems([
+    ...macroErrors.map(e => ({ severity: 'error' as const, message: e.message, line: e.line, col: e.col })),
+    ...(result.success
       ? result.warnings.map(w => ({
           severity: 'warning' as const,
           message: w.message,
@@ -692,8 +714,8 @@ function handleCompileResult(result: CompileResult): void {
           message: e.message,
           line: e.line ?? 1,
           col: e.col ?? 1,
-        })),
-  );
+        }))),
+  ]);
   const { msg, kind } = compileStatus(result);
   setStatus(msg, kind);
 }
@@ -822,11 +844,25 @@ function spawnWorker(): Worker {
 
 activeWorker = spawnWorker();
 
-function runCompile(): void {
+let macroErrors: MacroError[] = [];
+
+async function runCompile(): Promise<void> {
   if (!activeWorker) return;
   const src = editor.getValue();
   compileRequestId += 1;
-  activeWorker.postMessage({ id: compileRequestId, src });
+  const id = compileRequestId;
+
+  const expanded = await pluginHost.expand(src);
+  if (id !== compileRequestId || !activeWorker) return;
+
+  macroErrors = expanded.errors;
+  activeWorker.postMessage({
+    id,
+    src: expanded.src,
+    lineMap: expanded.lineMap,
+    prelude: pluginHost.prelude(),
+    available: pluginHost.ids(),
+  });
 }
 
 editor.onDidChangeModelContent(() => {
@@ -839,6 +875,7 @@ editor.onDidChangeModelContent(() => {
 window.addEventListener('unload', () => {
   activeWorker?.terminate();
   activeWorker = null;
+  pluginHost.dispose();
   stopWatching();
   enhanced?.dispose();
   transport.dispose();
@@ -846,8 +883,6 @@ window.addEventListener('unload', () => {
 });
 
 function setStatus(msg: string, kind: 'success' | 'error' | 'info' = 'info'): void {
-  // the status bar is the only channel for a failed write or a refused edit, so an
-  // error interrupts the screen reader while the rest waits for a pause
   statusMsg.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
   statusMsg.textContent = msg;
   statusMsg.className = kind;
@@ -874,6 +909,144 @@ const gitPanel = new GitPanel({
   },
 });
 
+// plugins
+let registryEntries: RegistryEntry[] = [];
+
+const pluginHost = new PluginHost(() => {
+  pluginPanel.render();
+  pluginPage.render();
+  refreshPaletteCommands();
+  registerPluginThemes();
+});
+
+function registerPluginThemes(): void {
+  for (const plugin of pluginHost.enabled()) {
+    const theme = plugin.manifest.theme;
+    if (!theme) continue;
+    const hex = (v: string) => (v.startsWith('#') ? v : `#${v}`);
+    monaco.editor.defineTheme(`plugin-${plugin.manifest.id}`, {
+      base: theme.dark ? 'vs-dark' : 'vs',
+      inherit: true,
+      rules: Object.entries(theme.tokens).map(([token, foreground]) => ({
+        token,
+        foreground: foreground.replace('#', ''),
+      })),
+      colors: Object.fromEntries(Object.entries(theme.editor).map(([k, v]) => [k, hex(v)])),
+    });
+  }
+}
+
+const pluginActions: PluginActions = {
+  installed: () => pluginHost.list(),
+  registry: () => registryEntries,
+  loadError: id => pluginHost.loadError(id),
+
+  install: async id => {
+    setStatus(`Installing ${id}…`, 'info');
+    const result = await window.electronAPI?.pluginInstall(id);
+    if (!result?.ok) {
+      setStatus(result?.message ?? 'Plugins need the desktop app', 'error');
+      return;
+    }
+    await pluginHost.refresh();
+    void runCompile();
+    setStatus(`Installed ${result.plugin.manifest.name}`, 'success');
+  },
+
+  uninstall: async id => {
+    if (!(await nativeConfirm(`Remove the plugin '${id}'?`))) return;
+    const result = await window.electronAPI?.pluginUninstall(id);
+    if (!result?.ok) {
+      setStatus(result?.message ?? 'Plugins need the desktop app', 'error');
+      return;
+    }
+    if (pluginPage.openId === id) closePluginTab();
+    await pluginHost.refresh();
+    void runCompile();
+    setStatus(`Removed ${id}`, 'success');
+  },
+
+  setEnabled: async (id, enabled) => {
+    const result = await window.electronAPI?.pluginSetEnabled(id, enabled);
+    if (!result?.ok) {
+      setStatus(result?.message ?? 'Plugins need the desktop app', 'error');
+      return;
+    }
+    await pluginHost.refresh();
+    void runCompile();
+    setStatus(`${enabled ? 'Enabled' : 'Disabled'} ${id}`, 'info');
+  },
+
+  openPage: id => openPluginPage(id),
+  openExternal: url => void window.electronAPI?.openExternal(url),
+  refreshRegistry: () => refreshRegistry(),
+};
+
+const pluginPanel = new PluginPanel({
+  search: $<HTMLInputElement>('plugins-search'),
+  installedList: $('plugins-installed-list'),
+  installedEmpty: $('plugins-installed-empty'),
+  marketList: $('plugins-market-list'),
+  marketEmpty: $('plugins-market-empty'),
+  refresh: $<HTMLButtonElement>('plugins-refresh'),
+}, pluginActions);
+
+const pluginPage = new PluginPage(pluginPageEl, pluginActions);
+
+async function refreshRegistry(): Promise<void> {
+  const result = await window.electronAPI?.pluginRegistry();
+  if (!result) return;
+  if (!result.ok) {
+    setStatus(result.message, 'error');
+    return;
+  }
+  registryEntries = result.index.plugins;
+  pluginPanel.render();
+  pluginPage.render();
+}
+
+let activeTab: 'file' | 'plugin' = 'file';
+
+function setActiveTab(tab: 'file' | 'plugin'): void {
+  activeTab = tab;
+  const onFile = tab === 'file';
+  fileTab.classList.toggle('tab--active', onFile);
+  fileTab.setAttribute('aria-selected', String(onFile));
+  pluginTab.classList.toggle('tab--active', !onFile);
+  pluginTab.setAttribute('aria-selected', String(!onFile));
+  pluginPageEl.classList.toggle('hidden', onFile);
+
+  if (onFile) {
+    applyMode(mode);
+    return;
+  }
+  dslPane.classList.add('hidden');
+  enhancedPane.classList.add('hidden');
+  paneDivider.classList.add('hidden');
+}
+
+function openPluginPage(id: string): void {
+  pluginTab.classList.remove('hidden');
+  pluginTabLabel.textContent = pluginHost.list().find(p => p.manifest.id === id)?.manifest.name
+    ?? registryEntries.find(p => p.manifest.id === id)?.manifest.name
+    ?? id;
+  pluginPage.show(id);
+  setActiveTab('plugin');
+}
+
+function closePluginTab(): void {
+  pluginTab.classList.add('hidden');
+  pluginPage.close();
+  setActiveTab('file');
+}
+
+fileTab.addEventListener('click', () => setActiveTab('file'));
+pluginTab.addEventListener('click', () => { if (pluginPage.openId) setActiveTab('plugin'); });
+pluginTabClose.addEventListener('click', e => { e.stopPropagation(); closePluginTab(); });
+
+void pluginHost.refresh().then(() => runCompile());
+void refreshRegistry();
+
 runCompile();
 
 //mode switching
@@ -884,6 +1057,8 @@ function applyMode(m: Mode): void {
   btnDsl.classList.toggle('active', m === 'dsl');
   btnSplit.classList.toggle('active', m === 'split');
   btnEnhanced.classList.toggle('active', m === 'enhanced');
+
+  if (activeTab === 'plugin') return;
 
   const showDsl      = m === 'dsl' || m === 'split';
   const showEnhanced = m === 'enhanced' || m === 'split';
@@ -903,15 +1078,19 @@ function applyMode(m: Mode): void {
   if (showDsl) editor.layout();
 }
 
-btnDsl.addEventListener('click', () => applyMode('dsl'));
-btnSplit.addEventListener('click', () => applyMode('split'));
-btnEnhanced.addEventListener('click', () => applyMode('enhanced'));
+function showMode(m: Mode): void {
+  applyMode(m);
+  if (activeTab !== 'file') setActiveTab('file');
+}
+
+btnDsl.addEventListener('click', () => showMode('dsl'));
+btnSplit.addEventListener('click', () => showMode('split'));
+btnEnhanced.addEventListener('click', () => showMode('enhanced'));
 
 //file ops
 let currentPath: string | null = null;
 let watchedPath: string | null = null;
 
-// the git panel follows the open file, so point the main process at it before refreshing
 function setFilename(p: string | null): Promise<unknown> {
   currentPath = p;
   if (p) rememberRecent(p);
@@ -1135,8 +1314,6 @@ function persistSession(): void {
   });
 }
 
-// writes straight to the open file. an untitled buffer is never given a path
-// behind the user's back, so it only rides along in the restored session.
 async function autosave(): Promise<void> {
   if (!autosaveOn || !currentPath || autosaving) return;
   autosaving = true;
@@ -1270,7 +1447,7 @@ window.addEventListener('keydown', e => {
     return;
   }
 
-  // ⌘1..⌘6 toggle the tool windows, the way the rail tooltips say
+  // ⌘1..⌘7 toggle the tool windows, the way the rail tooltips say
   if (!e.shiftKey && !e.altKey && TOOL_KEYS[k]) {
     e.preventDefault();
     TOOL_KEYS[k]();
@@ -1284,6 +1461,7 @@ const TOOL_KEYS: Record<string, () => void> = {
   '4': () => toggleBottom('timeline'),
   '5': () => setSidebarView(sidebarView === 'ai' ? null : 'ai'),
   '6': () => toggleBottom('optimizer'),
+  '7': () => setSidebarView(leftView === 'plugins' ? null : 'plugins'),
 };
 
 window.addEventListener('keydown', e => {
@@ -1301,6 +1479,11 @@ window.electronAPI?.onMenuExportTex(() => void cmdExportTex());
 window.electronAPI?.onMenuExportImage(format => void cmdExportImage(format));
 window.electronAPI?.onMenuShare(() => void cmdCopyShareLink());
 window.electronAPI?.onMenuOpenRecent(path => void openPath(path));
+window.electronAPI?.onMenuPlugins(() => setSidebarView('plugins'));
+window.electronAPI?.onOpenPluginPage(id => {
+  if (registryEntries.length === 0) void refreshRegistry().then(() => openPluginPage(id));
+  else openPluginPage(id);
+});
 
 window.addEventListener('focus', () => {
   void gitPanel.refreshIfStale();
@@ -1374,7 +1557,7 @@ document.addEventListener('mouseup', () => {
 });
 
 // sidebar
-type SidebarView = 'git' | 'ai' | 'outline' | null;
+type SidebarView = 'git' | 'ai' | 'outline' | 'plugins' | null;
 let sidebarView: SidebarView = null;
 let aiSidebar: AISidebar | null = null;
 let aiSelectionListener: { dispose(): void } | null = null;
@@ -1405,7 +1588,6 @@ function ensureAiSidebar(): AISidebar {
       editor.focus();
     },
   );
-  // Hook editor selection changes to update the context pill
   if (!aiSelectionListener) {
     aiSelectionListener = editor.onDidChangeCursorSelection(() => {
       aiSidebar?.refreshCtxPill();
@@ -1414,12 +1596,10 @@ function ensureAiSidebar(): AISidebar {
   return aiSidebar;
 }
 
-// git and outline dock into the left tool window, ai into the right one, so a
-// left view and the ai panel can be open at the same time
-let leftView: 'git' | 'outline' | null = null;
+let leftView: 'git' | 'outline' | 'plugins' | null = null;
 
 function setSidebarView(next: SidebarView): void {
-  if (next === 'git' || next === 'outline') leftView = next;
+  if (next === 'git' || next === 'outline' || next === 'plugins') leftView = next;
   else if (next === null) leftView = null;
   sidebarView = next;
 
@@ -1428,6 +1608,7 @@ function setSidebarView(next: SidebarView): void {
   toolLeftDivider.classList.toggle('hidden', !leftOpen);
   gitContainer.classList.toggle('hidden', leftView !== 'git');
   outlineContainer.classList.toggle('hidden', leftView !== 'outline');
+  pluginsContainer.classList.toggle('hidden', leftView !== 'plugins');
 
   const aiOpen = next === 'ai';
   aiPanel.classList.toggle('hidden', !aiOpen);
@@ -1436,6 +1617,7 @@ function setSidebarView(next: SidebarView): void {
 
   btnSidebarGit.classList.toggle('active', leftView === 'git');
   btnSidebarOutline.classList.toggle('active', leftView === 'outline');
+  btnSidebarPlugins.classList.toggle('active', leftView === 'plugins');
   btnSidebarAi.classList.toggle('active', aiOpen);
 
   if (next === 'ai') {
@@ -1446,6 +1628,10 @@ function setSidebarView(next: SidebarView): void {
   }
   if (next === 'git') {
     void gitPanel.refreshIfStale();
+  }
+  if (next === 'plugins') {
+    pluginPanel.render();
+    if (registryEntries.length === 0) void refreshRegistry();
   }
 
   editor.layout();
@@ -1516,6 +1702,10 @@ btnSidebarAi.addEventListener('click', () => {
 
 btnSidebarOutline.addEventListener('click', () => {
   setSidebarView(leftView === 'outline' ? null : 'outline');
+});
+
+btnSidebarPlugins.addEventListener('click', () => {
+  setSidebarView(leftView === 'plugins' ? null : 'plugins');
 });
 
 
@@ -1648,7 +1838,6 @@ function renderProblems(problems: Problem[]): void {
   }
 }
 
-// the timeline pairs this session's saves with the commits git already knows about
 const localSaves: { when: number; what: string }[] = [];
 
 function noteSave(what: string): void {
@@ -1912,6 +2101,13 @@ const baseCommands: PaletteCommand[] = [
     },
   },
   {
+    id: 'sidebar.plugins',
+    label: 'toggle plugins sidebar',
+    description: 'Manage what is installed, and browse the marketplace',
+    keybinding: '⌘7',
+    action: () => setSidebarView(leftView === 'plugins' ? null : 'plugins'),
+  },
+  {
     id: 'file.search',
     label: 'search in recent files',
     description: 'Find text across the files you have opened',
@@ -1925,10 +2121,34 @@ function syncRecent(): void {
   void window.electronAPI?.setRecentFiles(recentFiles.map(f => f.path));
 }
 
+async function runPluginCommand(plugin: string, command: string): Promise<void> {
+  const action = await pluginHost.runCommand(plugin, command);
+  if (action.kind === 'status') { setStatus(action.text, 'info'); return; }
+  if (action.kind === 'none') return;
+
+  const selection = editor.getSelection();
+  if (action.kind === 'replace' && selection && !selection.isEmpty()) {
+    editor.executeEdits('plugin', [{ range: selection, text: action.text }]);
+  } else {
+    const pos = editor.getPosition() ?? { lineNumber: 1, column: 1 };
+    editor.executeEdits('plugin', [{
+      range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column),
+      text: action.text,
+    }]);
+  }
+  editor.focus();
+}
+
 function refreshPaletteCommands(): void {
   const paths = recentFiles.map(f => f.path);
   palette.register([
     ...baseCommands,
+    ...pluginHost.commands().map(c => ({
+      id: `plugin.${c.plugin}.${c.id}`,
+      label: c.label,
+      description: c.description ?? `from the ${c.plugin} plugin`,
+      action: () => runPluginCommand(c.plugin, c.id),
+    })),
     ...recentFiles.map(f => {
       const { name, hint } = recentLabel(f.path, paths);
       return {
@@ -1956,7 +2176,6 @@ async function restoreSession(): Promise<void> {
     if (saved.path) {
       const result = await window.electronAPI?.readFileAt(saved.path);
       if (result?.ok) {
-        // the file on disk wins: it may have changed since the app last ran
         editor.setValue(result.content);
         void setFilename(result.path);
         startWatching(result.path);

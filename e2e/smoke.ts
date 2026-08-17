@@ -34,6 +34,48 @@ const browser = await webkit.launch();
 stage = 'opening a page';
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
 
+// there is no bun process behind a browser, so the plugin bridge is stubbed with one
+// real plugin. everything past this point — the sandbox, the macro pass, the panel and
+// the extension page — is the shipping code
+await page.addInitScript(() => {
+  const manifest = {
+    id: 'starfield', name: 'Starfield', version: '1.0.0',
+    description: 'scatters points in a spiral', author: 'desmos-ide',
+    main: 'main.js', icon: '✦',
+  };
+  const plugin = {
+    manifest,
+    main: `dsmx.macro('stars', (n) => {
+      const out = [];
+      for (let i = 0; i < n; i++) out.push('point star_' + i + ' (' + i + ', ' + i + ')');
+      return out.join('\\n');
+    });
+    dsmx.command('insert', 'starfield: insert stars', () => ({ insert: '@stars(3)\\n' }));`,
+    lib: 'fn twice(x) = 2*x\n',
+    readme: '# Starfield\n\nPuts points in a spiral.\n',
+    enabled: true,
+  };
+  const stub: Record<string, unknown> = {
+    pluginList: () => Promise.resolve([plugin]),
+    pluginRegistry: () => Promise.resolve({
+      ok: true,
+      index: { version: 1, plugins: [{ manifest, path: 'plugins/starfield' }, {
+        manifest: { ...manifest, id: 'lissajous', name: 'Lissajous', description: 'draws figures' },
+        path: 'plugins/lissajous',
+      }] },
+    }),
+    pluginSetEnabled: () => Promise.resolve({ ok: true }),
+    pluginUninstall: () => Promise.resolve({ ok: true }),
+    pluginInstall: () => Promise.resolve({ ok: false, message: 'not in this test' }),
+  };
+
+  // anything the stub does not answer behaves the way a missing bridge does, so the
+  // rest of the app is tested exactly as it was before
+  (window as unknown as { electronAPI: unknown }).electronAPI = new Proxy(stub, {
+    get: (target, prop: string) => (prop in target ? target[prop] : () => undefined),
+  });
+});
+
 const consoleErrors: string[] = [];
 page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 page.on('pageerror', e => consoleErrors.push(String(e)));
@@ -126,6 +168,55 @@ check(hint.includes('7'), `the line carries the optimizer hint (saw "${hint}")`)
 
 await page.click('#btn-tool-optimizer');
 check(await page.locator('#tool-bottom.hidden').count() === 1, 'the optimizer tab closes again');
+
+// plugins
+stage = 'checking the plugin sidebar';
+await page.click('#btn-sidebar-plugins');
+await page.waitForSelector('#plugins-sidebar-container:not(.hidden)', { timeout: 10_000 });
+await page.waitForSelector('#plugins-installed-list .plugin-row', { timeout: 10_000 });
+check(await page.locator('#plugins-installed-list .plugin-row').count() === 1, 'the installed plugin is listed');
+check(await page.locator('#plugins-market-list .plugin-row').count() === 1, 'the marketplace lists what is not installed');
+
+await page.fill('#plugins-search', 'lissajous');
+check(await page.locator('#plugins-installed-list .plugin-row').count() === 0, 'search filters the installed list');
+check(await page.locator('#plugins-market-list .plugin-row').count() === 1, 'search keeps the match');
+await page.fill('#plugins-search', '');
+
+stage = 'checking the extension page';
+await page.click('#plugins-installed-list .plugin-row');
+await page.waitForSelector('#plugin-page:not(.hidden)', { timeout: 10_000 });
+check(await page.locator('#plugin-tab:not(.hidden)').count() === 1, 'the extension page opens as a tab');
+check(
+  ((await page.locator('.plugin-page-title').textContent()) ?? '').includes('Starfield'),
+  'the extension page names the plugin',
+);
+check(await page.locator('.plugin-page-readme h2').count() === 1, 'the readme is rendered');
+check(await page.locator('.plugin-tag--code').count() === 1, 'the page says the plugin runs code');
+
+await page.click('#file-tab');
+check(await page.locator('#plugin-page.hidden').count() === 1, 'the file tab comes back');
+await page.click('#plugin-tab-close');
+check(await page.locator('#plugin-tab.hidden').count() === 1, 'the extension tab closes');
+
+stage = 'checking a plugin macro';
+await page.click('#editor-container .monaco-editor');
+await page.keyboard.press('Meta+A');
+await page.keyboard.type('use "starfield"\n@stars(3)\nb = twice(4)');
+let drew = false;
+for (let i = 0; i < 30 && !drew; i++) {
+  drew = ((await page.locator('#status-msg').textContent()) ?? '').includes('4 expression');
+  if (!drew) await page.waitForTimeout(250);
+}
+check(drew, 'a macro expands into statements the compiler draws');
+
+await page.keyboard.press('Meta+A');
+await page.keyboard.type('@nosuchmacro(1)');
+let complained = false;
+for (let i = 0; i < 30 && !complained; i++) {
+  complained = ((await page.locator('#problems-list').textContent()) ?? '').includes('No enabled plugin');
+  if (!complained) { await page.click('#btn-tool-problems'); await page.waitForTimeout(250); }
+}
+check(complained, 'a macro no plugin provides is reported as a problem');
 
 check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: ${consoleErrors[0]}` : ''}`);
 

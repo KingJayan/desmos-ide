@@ -21,6 +21,8 @@ const menuCbs: Record<'new' | 'open' | 'save' | 'saveAs' | 'exportTex', Listener
 const menuImageCbs: Listener<['png' | 'svg']>[] = [];
 const menuShareCbs: Listener<[]>[] = [];
 const menuRecentCbs: Listener<[string]>[] = [];
+const menuPluginsCbs: Listener<[]>[] = [];
+const openPluginCbs: Listener<[string]>[] = [];
 
 const rpc = Electroview.defineRPC<DesmosIdeRPC>({
   maxRequestTime: 60_000,
@@ -38,6 +40,8 @@ const rpc = Electroview.defineRPC<DesmosIdeRPC>({
       menuExportTex: () => menuCbs.exportTex.forEach(cb => cb()),
       menuExportImage: ({ format }) => menuImageCbs.forEach(cb => cb(format)),
       menuShare: () => menuShareCbs.forEach(cb => cb()),
+      menuPlugins: () => menuPluginsCbs.forEach(cb => cb()),
+      openPluginPage: ({ id }) => openPluginCbs.forEach(cb => cb(id)),
       menuOpenRecent: ({ path }) => menuRecentCbs.forEach(cb => cb(path)),
     },
   },
@@ -67,6 +71,14 @@ export const electronAPI = {
   onMenuExportImage: (cb: (format: 'png' | 'svg') => void) => subscribe(menuImageCbs, cb),
   onMenuShare: (cb: () => void) => subscribe(menuShareCbs, cb),
   onMenuOpenRecent: (cb: (path: string) => void) => subscribe(menuRecentCbs, cb),
+  onMenuPlugins: (cb: () => void) => subscribe(menuPluginsCbs, cb),
+  onOpenPluginPage: (cb: (id: string) => void) => subscribe(openPluginCbs, cb),
+
+  pluginList: () => rpc.request.pluginList().catch(() => []),
+  pluginSetEnabled: (id: string, enabled: boolean) => rpc.request.pluginSetEnabled({ id, enabled }),
+  pluginUninstall: (id: string) => rpc.request.pluginUninstall({ id }),
+  pluginRegistry: () => rpc.request.pluginRegistry(),
+  pluginInstall: (id: string) => rpc.request.pluginInstall({ id }),
 
   aiChat: (reqId: string, messages: AIMessage[], config: AIConfig, memories: string[]) =>
     rpc.send.aiChat({ reqId, messages, config, memories }),

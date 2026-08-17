@@ -1,8 +1,8 @@
 // one icon source for the whole UI
 
 import {
-  Check, ChevronRight, Copy, FileCode, FileText, FolderOpen, Pause, Play, Search, Send,
-  Square, SquarePen, X,
+  Check, ChevronRight, Copy, ExternalLink, FileCode, FileText, FolderOpen, Pause, Play,
+  Puzzle, RefreshCw, Search, Send, Square, SquarePen, Trash2, X,
 } from 'lucide';
 import { escapeHtml } from './escape';
 
@@ -12,6 +12,10 @@ const ICONS = {
   check: Check as IconNode,
   'chevron-right': ChevronRight as IconNode,
   copy: Copy as IconNode,
+  'external-link': ExternalLink as IconNode,
+  puzzle: Puzzle as IconNode,
+  'refresh-cw': RefreshCw as IconNode,
+  'trash-2': Trash2 as IconNode,
   'file-code': FileCode as IconNode,
   'file-text': FileText as IconNode,
   'folder-open': FolderOpen as IconNode,

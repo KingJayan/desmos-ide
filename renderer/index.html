@@ -55,6 +55,9 @@
           <button id="btn-sidebar-outline" class="rail-btn" title="structure  ⌘2" aria-label="structure">
             <i data-lucide="list-tree" aria-hidden="true"></i>
           </button>
+          <button id="btn-sidebar-plugins" class="rail-btn" title="plugins  ⌘7" aria-label="plugins">
+            <i data-lucide="puzzle" aria-hidden="true"></i>
+          </button>
         </div>
         <span class="rail-spacer"></span>
         <div class="rail-group">
@@ -150,6 +153,33 @@
               </section>
             </div>
 
+            <div id="plugins-sidebar-container" class="tool-body hidden">
+              <div class="sidepanel-header">
+                <div class="sidepanel-title">plugins</div>
+                <button id="plugins-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh the marketplace" aria-label="refresh the marketplace">
+                  <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                </button>
+              </div>
+
+              <input id="plugins-search" class="plugin-search" type="search" placeholder="search plugins" aria-label="search plugins" />
+
+              <section class="git-section">
+                <div class="git-section-header">
+                  <div class="git-modified-panel-title">installed</div>
+                </div>
+                <div id="plugins-installed-empty" class="git-modified-empty git-modified-empty--show">nothing installed yet</div>
+                <ul id="plugins-installed-list" class="plugin-list"></ul>
+              </section>
+
+              <section class="git-section">
+                <div class="git-section-header">
+                  <div class="git-modified-panel-title">marketplace</div>
+                </div>
+                <div id="plugins-market-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
+                <ul id="plugins-market-list" class="plugin-list"></ul>
+              </section>
+            </div>
+
             <div id="outline-sidebar-container" class="tool-body hidden">
               <div class="sidepanel-header">
                 <div class="sidepanel-title">structure</div>
@@ -171,6 +201,13 @@
                   <i data-lucide="x" aria-hidden="true"></i>
                 </button>
               </div>
+              <div id="plugin-tab" class="tab hidden" role="tab" aria-selected="false">
+                <i class="tab-icon" data-lucide="puzzle" aria-hidden="true"></i>
+                <span id="plugin-tab-label" class="tab-label">extension</span>
+                <button id="plugin-tab-close" class="tab-close" title="close extension page" aria-label="close extension page">
+                  <i data-lucide="x" aria-hidden="true"></i>
+                </button>
+              </div>
             </div>
 
             <div id="editor-stack">
@@ -189,6 +226,7 @@
                   <button id="btn-add-expr" class="action-btn">+ add expression</button>
                 </div>
               </div>
+              <div id="plugin-page" class="pane hidden"></div>
             </div>
 
             <footer id="breadcrumbs" aria-label="file path"></footer>

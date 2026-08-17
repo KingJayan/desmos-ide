@@ -35,6 +35,12 @@ export const SYNTAX_FORMS: readonly SyntaxForm[] = [
     note: 'Functions are inlined at every call site. There is no recursion.',
   },
   {
+    title: 'Plugins',
+    keywords: ['use'],
+    code: ['use "starfield"'],
+    note: 'Names a plugin this file needs. The file does not compile without it.',
+  },
+  {
     title: 'Aliases',
     keywords: ['alias'],
     code: ['alias hyp_r = hyp(a, b)'],

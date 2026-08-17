@@ -9,7 +9,7 @@ export const KEYWORDS = new Set([
 
   'spiral', 'wave', 'grid',
 
-  'alias', 'debug', 'domain', 'if', 'then', 'expr', 'loop',
+  'alias', 'debug', 'domain', 'if', 'then', 'expr', 'loop', 'use',
 
   'period', 'mirror', 'azimuth', 'elevation',
 ]);
