@@ -1,0 +1,62 @@
+name: homebrew formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: version to point the formula at, without the leading v
+        required: true
+
+concurrency:
+  group: formula
+  cancel-in-progress: false
+
+jobs:
+  tap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: read the version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: render the formula
+        run: bun run scripts/gen-formula.ts --version "${{ steps.version.outputs.value }}" --out dsmx.rb
+
+      - uses: actions/checkout@v4
+        with:
+          repository: KingJayan/desmos-ide-tap
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+
+      - name: copy it into the tap
+        run: |
+          mkdir -p tap/Formula
+          cp dsmx.rb tap/Formula/dsmx.rb
+
+      - name: push
+        working-directory: tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "the formula is already current"
+            exit 0
+          fi
+          git add Formula/dsmx.rb
+          git commit -m "dsmx ${{ steps.version.outputs.value }}"
+          git push

@@ -33,6 +33,12 @@ jobs:
       - name: view bundle
         run: bunx vite build
 
+      - name: cli bundle
+        run: |
+          bun run scripts/build-cli.ts
+          node dist/cli/dsmx.mjs --version
+          node dist/cli/dsmx.mjs build example/orbit.dsmx -o /dev/null
+
       - name: Cache native helpers
         uses: actions/cache@v4
         with:

@@ -76,6 +76,7 @@ ditto -c -k --keepParent "$APP" "$ZIP"
 
 if [[ $DRY_RUN -eq 1 ]]; then
   step "dry run: stopping before notarization"
+  bun run scripts/build-cli.ts
   shasum -a 256 "$ZIP"
   exit 0
 fi
@@ -90,10 +91,16 @@ spctl --assess --type execute --verbose=2 "$APP"
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 
+step "packing the cli"
+bun run scripts/build-cli.ts
+CLI_TGZ="build/dsmx-${VERSION}.tar.gz"
+rm -f "$CLI_TGZ"
+bun run scripts/pack-cli.ts
+
 step "publishing ${TAG}"
 git tag -a "$TAG" -m "$TAG"
 git push origin "$TAG"
-gh release create "$TAG" "$ZIP" --title "$TAG" --generate-notes
+gh release create "$TAG" "$ZIP" "$CLI_TGZ" --title "$TAG" --generate-notes
 
 echo
 shasum -a 256 "$ZIP"
