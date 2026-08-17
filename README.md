@@ -23,19 +23,18 @@
 * **cli** — `dsmx run file.dsmx` opens a live graph in the browser, no app needed
 * **ai sidebar** — streamed chat for dsl/expr generation with OpenAI, OpenRouter, Ollama, or Copilot
 
-## dsmx — the terminal graph
+## dsmx
 
-run a `.dsmx` file in a live graph without installing the app:
+run a `.dsmx` file in a live graph:
 
 ```bash
 brew install KingJayan/dsmx/dsmx
-dsmx run example/orbit.dsmx      # opens a graph, redraws on save
+dsmx run example/orbit.dsmx      # serves a graph with hmr
 dsmx build a.dsmx -o a.json      # desmos state as json
 dsmx fmt a.dsmx                  # format in place
 ```
 
-macOS and Linux. it needs `node`, and loads the Desmos API over the network the
-first time.
+macOS and Linux, req `node`, loads desmos api over network on the first time
 
 ## syntax
 
