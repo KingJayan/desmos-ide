@@ -28,7 +28,7 @@
 run a `.dsmx` file in a live graph without installing the app:
 
 ```bash
-brew install KingJayan/tap/dsmx
+brew install KingJayan/dsmx/dsmx
 dsmx run example/orbit.dsmx      # opens a graph, redraws on save
 dsmx build a.dsmx -o a.json      # desmos state as json
 dsmx fmt a.dsmx                  # format in place

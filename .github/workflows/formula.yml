@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: KingJayan/desmos-ide-tap
+          repository: KingJayan/homebrew-dsmx
           token: ${{ secrets.TAP_TOKEN }}
           path: tap
 
