@@ -10,6 +10,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*", "renderer/**/*", "bun/**/*", "electrobun.config.ts", "vite.config.ts"],
+  "include": ["src/**/*", "renderer/**/*", "bun/**/*", "cli/**/*", "electrobun.config.ts", "vite.config.ts"],
   "exclude": ["node_modules", "dist", "build", "out"]
 }
