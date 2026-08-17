@@ -9,6 +9,9 @@
     "build:view": "vite build && bun run build:native",
     "build:native": "bun run scripts/build-native.ts",
     "build:grammar": "bun run scripts/build-grammar.ts",
+    "build:cli": "bun run scripts/build-cli.ts",
+    "pack:cli": "bun run scripts/build-cli.ts && bun run scripts/pack-cli.ts",
+    "formula": "bun run scripts/gen-formula.ts",
     "build": "bun build:view && electrobun build",
     "check": "tsc --noEmit",
     "demo": "bun run src/demo.ts",
@@ -20,7 +23,8 @@
     "bump:prepatch": "bun pm version prepatch --no-git-tag-version --preid=beta",
     "ready": "bun run bump:patch && bun run build",
     "release": "bash scripts/release.sh",
-    "r": "bun run build && bun run dev"
+    "r": "bun run build && bun run dev",
+    "dsmx": "bun run cli/dsmx.ts"
   },
   "dependencies": {
     "@types/katex": "^0.16.8",
