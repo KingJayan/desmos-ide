@@ -20,10 +20,10 @@
       : 'desmos ide';
 
   const routeDescription = route === 'docs'
-    ? 'Language reference for the Desmos IDE DSL.'
+    ? 'Reference for the dsmx DSL.'
     : route === 'download'
-      ? 'Install the dsmx command line tool, or build the desktop app from source.'
-      : 'A small language that compiles to Desmos graphs, with a desktop editor and a command line tool.';
+      ? 'Install dsmx or build the desktop app from source.'
+      : 'Code your Desmos graphs.';
 
   const navItems = [
     { id: 'quick-start', label: 'quick start' },
@@ -50,9 +50,9 @@
 
   const summaryCards = [
     {
-      title: 'Start here',
-      kicker: 'orientation',
-      copy: 'The fastest route into the DSL: syntax shape, statement forms, and the smallest useful examples.',
+      title: 'start here',
+      kicker: 'basics',
+      copy: 'syntax, statement forms, short examples',
       links: [
         { id: 'quick-start', label: 'quick start' },
         { id: 'lexical-rules', label: 'lexical rules' },
@@ -60,9 +60,9 @@
       ],
     },
     {
-      title: 'Language core',
+      title: 'language core',
       kicker: 'syntax',
-      copy: 'Expressions, branching, domains, blocks, and debug-only constructs that shape the AST.',
+      copy: 'expressions, conditionals, domains, expr blocks, debug',
       links: [
         { id: 'expressions', label: 'expressions' },
         { id: 'conditionals', label: 'conditionals' },
@@ -71,9 +71,9 @@
       ],
     },
     {
-      title: 'Drawing',
+      title: 'drawing',
       kicker: 'geometry',
-      copy: 'Point, line, region, curve and generator statements, and the styling suffix they all take.',
+      copy: 'styling suffixes for point, line, region, curve, and gen stmts',
       links: [
         { id: 'geometry', label: 'geometry' },
         { id: 'curves', label: 'curves & regions' },
@@ -83,18 +83,18 @@
       ],
     },
     {
-      title: 'Motion',
+      title: 'motion',
       kicker: 'animation',
-      copy: 'Sliders, the clock every moving expression reads, and the 3d projection.',
+      copy: 'sliders, clock, 3d proj',
       links: [
         { id: 'animation', label: 'sliders & the clock' },
         { id: 'three-d', label: '3d projection' },
       ],
     },
     {
-      title: 'Compiler surface',
+      title: 'compiler surface',
       kicker: 'runtime',
-      copy: 'Built-ins, code generation, optimizer behavior, error phases, and the remaining sharp edges.',
+      copy: 'builtins, code gen, optimizer behavior, error phases, everything else',
       links: [
         { id: 'builtins', label: 'built-ins' },
         { id: 'codegen', label: 'codegen' },
@@ -150,10 +150,10 @@
   <main class="landing">
     <section class="landing-stage">
       <h1>desmos ide</h1>
-      <p class="landing-tagline">a small language that compiles to desmos graphs, with an editor built around it.</p>
+      <p class="landing-tagline">code your desmos graphs.</p>
       <div class="home-actions">
-        <a class="cta" href="/docs"><Icon icon="lucide:book-open" />read the docs</a>
-        <a class="cta" href="/download"><Icon icon="lucide:download" />downloads</a>
+        <a class="cta" href="/docs"><Icon icon="lucide:book-open" />&nbsp;read the docs</a>
+        <a class="cta" href="/download"><Icon icon="lucide:download" />&nbsp;downloads</a>
       </div>
     </section>
 
@@ -170,7 +170,7 @@
         <p class="eyebrow">downloads</p>
         <h1>install</h1>
         <p class="lede">
-          two ways to run the compiler; the terminal and the desktop editor
+          terminal or desktop ide
         </p>
       </div>
       <div class="hero-meta" aria-label="release metadata">
@@ -226,8 +226,7 @@ bun run dev</code></pre>
         <p class="eyebrow">desmos ide</p>
         <h1>dsl documentation</h1>
         <p class="lede">
-          complete reference for the dsl implemented by the compiler in this repository.
-          covers syntax, semantics, built-ins, geometry statements, codegen output, and known limitations.
+          all statements the dsl takes + their compiled latex.
         </p>
       </div>
       <div class="hero-meta" aria-label="documentation metadata">
@@ -236,12 +235,6 @@ bun run dev</code></pre>
         <a class="meta-chip icon-chip" href="/" aria-label="landing page" title="landing page">
           <Icon icon="lucide:house" />
         </a>
-      </div>
-      <div class="lens-strip" aria-label="reading lenses">
-        <span class="lens-chip">syntax</span>
-        <span class="lens-chip">examples</span>
-        <span class="lens-chip">output</span>
-        <span class="lens-chip">caveats</span>
       </div>
     </header>
 
@@ -256,14 +249,9 @@ bun run dev</code></pre>
     </aside>
 
     <div class="docs-content">
-    <section class="overview" aria-label="section atlas">
+    <section class="overview" aria-label="sections">
       <div class="overview-copy">
-        <p class="eyebrow">section atlas</p>
-        <h2>where to read first</h2>
-        <p>
-          each card clusters related sections, so the page stays scannable when the individual
-          references get dense.
-        </p>
+        <h2>sections</h2>
       </div>
       <div class="summary-grid">
         {#each summaryCards as card}
@@ -277,6 +265,7 @@ bun run dev</code></pre>
               {/each}
             </ul>
           </article>
+          <br>
         {/each}
       </div>
     </section>
@@ -410,7 +399,7 @@ expr &#123;
 
     <aside class="callout note">
       <strong>note</strong>
-      <p>all three forms lower to the same piecewise output. the choice here is readability, not behavior.</p>
+      <p>all three forms lower to the same piecewise output. pick whichever reads best.</p>
     </aside>
 
     <h3>where / else</h3>
@@ -441,7 +430,7 @@ expr &#123;
     <p>append <code>domain cond</code> to any variable binding to restrict where the expression is drawn:</p>
     <aside class="callout note">
       <strong>note</strong>
-      <p>this only filters the visible domain. it does not create a new shape or change the underlying expression.</p>
+      <p>this filters what gets drawn. the expression itself does not change.</p>
     </aside>
     <pre><code>y = x^2 domain x > 0       // only draws for x > 0
 w = sin(x) domain x >= -pi  // only draws for x >= -π</code></pre>
@@ -516,9 +505,9 @@ curve vals (n in 0..10) &#123;
     <pre><code>curve ring (t in 0..6.28 step 0.01) &#123; (cos(t), sin(t)) &#125;</code></pre>
 
     <h3>inline for-comprehension</h3>
-    <p>a compact alternative to the block <code>curve</code>:</p>
+    <p>shorter than the block <code>curve</code>:</p>
     <pre><code>pts = (cos(t), sin(t)) for t in 0..6.28</code></pre>
-    <p>semantically equivalent to the block form. compiles to the same desmos parametric expression.</p>
+    <p>same meaning as the block form, and the same compiled output.</p>
 
     <h3>region</h3>
     <p>any inequality or boolean expression can be a region body:</p>
@@ -565,7 +554,7 @@ v = map(n -> n^2, 1..10 step 1)</code></pre>
 &#125;
 
 // equivalent to writing: (2*cos(t), sin(t))</code></pre>
-    <p>the block emits a bare desmos expression — no variable name is bound. useful for parametric curves and complex inline computations that benefit from named intermediate values.</p>
+    <p>the block emits a bare desmos expression, with no variable name bound. use it when a long parametric body reads better with named intermediates.</p>
 
     <h3>rules</h3>
     <ul>
@@ -708,7 +697,7 @@ tip = project(2cos(T), 2sin(T), T/6)</code></pre>
     </p>
     <aside class="callout note">
       <strong>note</strong>
-      <p>this is a projection, not a 3d renderer. faces are drawn in source order — nothing is sorted by depth or hidden behind anything else.</p>
+      <p>this is a projection, not a 3d renderer. faces draw in source order, with no depth sorting and no hidden-surface removal.</p>
     </aside>
   </section>
 
@@ -791,7 +780,7 @@ r = dist(3, 4)   // optimized to: r = 5</code></pre>
 
   <section id="generators">
     <h2>generators</h2>
-    <p>built-in generators produce complex shapes from a few parameters. all generators accept optional styling including <code>color</code>, <code>gradient</code>, <code>lineWidth</code>, and <code>lineOpacity</code>.</p>
+    <p>generators build a shape from a few parameters. all of them take styling: <code>color</code>, <code>gradient</code>, <code>lineWidth</code>, <code>lineOpacity</code>.</p>
 
     <h3>spiral</h3>
     <p>archimedean spiral — radius grows linearly with angle. compiles to a parametric curve.</p>
@@ -946,10 +935,6 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
 
   <section id="limitations">
     <h2>current limitations</h2>
-    <aside class="callout note">
-      <strong>note</strong>
-      <p>these are deliberate boundaries, not missing polish. the docs keep them visible so the implementation surface stays honest.</p>
-    </aside>
     <ul>
       <li><strong>no bare expressions</strong> — every top-level statement must start with a dsl keyword or an <code>ident =</code> binding. <code>expr &#123;...&#125;</code> is the one exception.</li>
       <li><strong>no negative step in curve ranges</strong> — <code>t in 10..0</code> is syntactically valid but behavior is undefined.</li>
