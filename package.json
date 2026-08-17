@@ -12,6 +12,7 @@
     "build:cli": "bun run scripts/build-cli.ts",
     "pack:cli": "bun run scripts/build-cli.ts && bun run scripts/pack-cli.ts",
     "formula": "bun run scripts/gen-formula.ts",
+    "cask": "bun run scripts/gen-cask.ts",
     "build": "bun build:view && electrobun build",
     "check": "tsc --noEmit",
     "demo": "bun run src/demo.ts",

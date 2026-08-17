@@ -10,6 +10,10 @@
 #   xcrun notarytool store-credentials desmos-ide \
 #     --apple-id <id> --team-id <team> --password <app-specific-password>
 #
+# with no SIGN_IDENTITY the app is signed ad hoc and notarization is skipped.
+# an ad-hoc signature satisfies the arm64 kernel, but not Gatekeeper, so the
+# cask strips the quarantine flag after it copies the app.
+#
 # pass --dry-run to build and sign without notarizing or publishing.
 
 set -euo pipefail
@@ -24,8 +28,11 @@ step() { echo; echo "==> $*"; }
 
 [[ "$(uname)" == "Darwin" ]] || die "macOS only"
 command -v gh >/dev/null || die "gh is not installed"
-[[ -n "${SIGN_IDENTITY:-}" ]] || die "set SIGN_IDENTITY"
-if [[ $DRY_RUN -eq 0 ]]; then
+ADHOC=0
+if [[ -z "${SIGN_IDENTITY:-}" ]]; then
+  ADHOC=1
+  echo "release: no SIGN_IDENTITY — signing ad hoc, no notarization"
+elif [[ $DRY_RUN -eq 0 ]]; then
   [[ -n "${NOTARY_PROFILE:-}" ]] || die "set NOTARY_PROFILE, or pass --dry-run"
 fi
 
@@ -50,12 +57,18 @@ mkdir -p "${APP}/Contents/PlugIns"
 rm -rf "${APP}/Contents/PlugIns/DsmxQuickLook.appex"
 cp -R "$APPEX" "${APP}/Contents/PlugIns/"
 
-step "signing"
-sign() {
-  codesign --force --timestamp --options runtime \
-    --entitlements scripts/entitlements.plist \
-    --sign "$SIGN_IDENTITY" "$@"
-}
+if [[ $ADHOC -eq 1 ]]; then
+  step "signing ad hoc"
+  # no timestamp and no hardened runtime: both want a real authority
+  sign() { codesign --force --timestamp=none --sign - "$@"; }
+else
+  step "signing"
+  sign() {
+    codesign --force --timestamp --options runtime \
+      --entitlements scripts/entitlements.plist \
+      --sign "$SIGN_IDENTITY" "$@"
+  }
+fi
 
 while IFS= read -r -d '' nested; do
   sign "$nested"
@@ -81,15 +94,17 @@ if [[ $DRY_RUN -eq 1 ]]; then
   exit 0
 fi
 
-step "notarizing"
-xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+if [[ $ADHOC -eq 0 ]]; then
+  step "notarizing"
+  xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
 
-step "stapling"
-xcrun stapler staple "$APP"
-spctl --assess --type execute --verbose=2 "$APP"
+  step "stapling"
+  xcrun stapler staple "$APP"
+  spctl --assess --type execute --verbose=2 "$APP"
 
-rm -f "$ZIP"
-ditto -c -k --keepParent "$APP" "$ZIP"
+  rm -f "$ZIP"
+  ditto -c -k --keepParent "$APP" "$ZIP"
+fi
 
 step "packing the cli"
 bun run scripts/build-cli.ts

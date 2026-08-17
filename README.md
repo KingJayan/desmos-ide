@@ -36,6 +36,17 @@ dsmx fmt a.dsmx                  # format in place
 
 macOS and Linux, req `node`, loads desmos api over network on the first time
 
+## desktop app
+
+```bash
+brew install --cask KingJayan/dsmx/dsmx-app
+```
+
+macOS only. the build is signed ad hoc, not with a Developer ID, so the cask
+clears the quarantine flag after it copies the app. a manual download from the
+releases page keeps that flag and macOS refuses to open it — use the cask, or
+`xattr -dr com.apple.quarantine /Applications/desmos-ide.app`
+
 ## syntax
 
 see the [examples](example/), or the [full tour](example/demo.dsmx)

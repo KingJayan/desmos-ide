@@ -37,25 +37,38 @@ jobs:
       - name: render the formula
         run: bun run scripts/gen-formula.ts --version "${{ steps.version.outputs.value }}" --out dsmx.rb
 
+      - name: render the cask
+        id: cask
+        run: |
+          if bun run scripts/gen-cask.ts --version "${{ steps.version.outputs.value }}" --out dsmx-app.rb; then
+            echo "ok=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=0" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
         with:
           repository: KingJayan/homebrew-dsmx
           token: ${{ secrets.TAP_TOKEN }}
           path: tap
 
-      - name: copy it into the tap
+      - name: copy them into the tap
         run: |
           mkdir -p tap/Formula
           cp dsmx.rb tap/Formula/dsmx.rb
+          if [ "${{ steps.cask.outputs.ok }}" = "1" ]; then
+            mkdir -p tap/Casks
+            cp dsmx-app.rb tap/Casks/dsmx-app.rb
+          fi
 
       - name: push
         working-directory: tap
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/dsmx.rb
+          git add Formula/dsmx.rb Casks 2>/dev/null || git add Formula/dsmx.rb
           if git diff --cached --quiet; then
-            echo "the formula is already current"
+            echo "the tap is already current"
             exit 0
           fi
           git commit -m "dsmx ${{ steps.version.outputs.value }}"

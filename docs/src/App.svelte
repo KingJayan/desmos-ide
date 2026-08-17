@@ -200,14 +200,17 @@ dsmx fmt graph.dsmx      # format in place</code></pre>
       <p>
         pairs a monaco buffer and a live desmos graph with two-way sync. includes git + ai integration.
       </p>
+      <pre class="no-highlight"><code>brew install --cask KingJayan/dsmx/dsmx-app</code></pre>
       <p>
-        no signed installer yet, so build it from source:
+        macOS only for now (uses system webview). the build carries an ad-hoc signature, not a
+        Developer ID one, so the cask clears the quarantine flag after it copies the app. a manual
+        download from the releases page keeps that flag and macOS refuses to open it.
       </p>
+      <p>from source instead:</p>
       <pre class="no-highlight"><code>git clone https://github.com/KingJayan/desmos-ide
 cd desmos-ide
 bun install
 bun run dev</code></pre>
-      <p>macOS only for now (uses system webview)</p>
     </section>
 
     <footer class="footer">
