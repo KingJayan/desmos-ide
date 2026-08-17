@@ -1,7 +1,7 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/bun';
 import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
-import { exportJson, exportTex, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
+import { exportImage, exportJson, exportTex, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
 import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
 import { searchFolder, searchPaths } from './search';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
@@ -28,6 +28,7 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       saveFile: ({ path, content }) => saveFile(path, content),
       exportJson: ({ content }) => exportJson(content),
       exportTex: ({ content, defaultName }) => exportTex(content, defaultName),
+      exportImage: ({ data, defaultName, format }) => exportImage(data, defaultName, format),
       pickFolder: () => showFolderDialog(),
       watchFile: ({ path }) => {
         watchFile(path, (changedPath, content) =>
@@ -141,6 +142,9 @@ function buildMenu(): void {
       { label: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', action: 'menu:saveAs' },
       { type: 'separator' },
       { label: 'Export TeX Figure…', accelerator: 'CmdOrCtrl+Shift+T', action: 'menu:exportTex' },
+      { label: 'Export PNG…', accelerator: 'CmdOrCtrl+Shift+E', action: 'menu:exportPng' },
+      { label: 'Export SVG…', action: 'menu:exportSvg' },
+      { label: 'Copy Share Link', action: 'menu:share' },
       { type: 'separator' },
       {
         label: 'Open Recent',
@@ -180,6 +184,9 @@ ApplicationMenu.on('application-menu-clicked', (event: unknown) => {
   else if (action === 'menu:save') rpc.send.menuSave();
   else if (action === 'menu:saveAs') rpc.send.menuSaveAs();
   else if (action === 'menu:exportTex') rpc.send.menuExportTex();
+  else if (action === 'menu:exportPng') rpc.send.menuExportImage({ format: 'png' });
+  else if (action === 'menu:exportSvg') rpc.send.menuExportImage({ format: 'svg' });
+  else if (action === 'menu:share') rpc.send.menuShare();
   else if (action?.startsWith('menu:recent:')) rpc.send.menuOpenRecent({ path: action.slice('menu:recent:'.length) });
 });
 

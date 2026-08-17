@@ -28,6 +28,9 @@ function themeSettings(theme: ColorTheme): { backgroundColor: string; textColor:
 
 const SETTLE_MS = 600;
 
+/** expressions written to desmos in one frame */
+const CHUNK = 60;
+
 function fingerprint(expr: DesmosExpr): string {
   return JSON.stringify([
     expr.type, expr.latex ?? '', expr.label ?? '', expr.color ?? '',
@@ -148,7 +151,6 @@ export class DesmosGraph {
     this.theme = theme;
     this.calc.updateSettings(themeSettings(theme));
 
-    // fillOpacity is not part of the fingerprint, so a fill has to be sent again by hand
     if (DESMOS_THEMES[theme].fillScale === before) return;
     this.settleUntil = Date.now() + SETTLE_MS;
     for (const expr of this.drawn.values()) {
@@ -180,34 +182,58 @@ export class DesmosGraph {
   private settleUntil = 0;
   private observed = new Map<string, string>();
 
+  private queued = new Map<string, DesmosExpr>();
+  private flushHandle: number | null = null;
+
   update(list: DesmosExpr[]): void {
     const incoming = new Map(list.map(e => [e.id, e]));
     this.drawn = incoming;
-    const toSet: DesmosExpr[] = [];
-    const toRemove: string[] = [];
 
     for (const expr of list) {
-      const snap = fingerprint(expr);
-      if (this.snapshots.get(expr.id) !== snap) {
-        toSet.push(expr);
-        this.snapshots.set(expr.id, snap);
-      }
+      if (this.snapshots.get(expr.id) !== fingerprint(expr)) this.queued.set(expr.id, expr);
     }
 
+    const gone = [...this.queued.keys()].filter(id => !incoming.has(id));
+    for (const id of gone) this.queued.delete(id);
+
+    const toRemove: string[] = [];
     for (const id of this.snapshots.keys()) {
-      if (!incoming.has(id)) {
-        toRemove.push(id);
-        this.snapshots.delete(id);
-      }
+      if (!incoming.has(id)) toRemove.push(id);
     }
+    for (const id of toRemove) this.snapshots.delete(id);
 
-    if (toRemove.length === 0 && toSet.length === 0) return;
+    if (toRemove.length === 0 && this.queued.size === 0) return;
     this.settleUntil = Date.now() + SETTLE_MS;
     for (const id of toRemove) {
       this.calc.removeExpression({ id });
       this.observed.delete(id);
     }
-    for (const expr of toSet) this.setOne(expr);
+
+    if (this.queued.size <= CHUNK) this.flush();
+    else this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushHandle !== null) return;
+    this.flushHandle = requestAnimationFrame(() => this.flush());
+  }
+
+  private flush(): void {
+    if (this.flushHandle !== null) {
+      cancelAnimationFrame(this.flushHandle);
+      this.flushHandle = null;
+    }
+    const batch = [...this.queued.values()].slice(0, CHUNK);
+    if (batch.length === 0) return;
+
+    this.settleUntil = Date.now() + SETTLE_MS;
+    const scale = DESMOS_THEMES[this.theme].fillScale;
+    this.calc.setExpressions(batch.map(e => toSetExpression(e, scale)));
+    for (const expr of batch) {
+      this.queued.delete(expr.id);
+      this.snapshots.set(expr.id, fingerprint(expr));
+    }
+    if (this.queued.size > 0) this.scheduleFlush();
   }
 
   private setOne(expr: DesmosExpr): void {
@@ -223,13 +249,11 @@ export class DesmosGraph {
     this.selectionCb = cb;
     this.calc.observe('selectedExpressionId', () => {
       const id = this.calc.selectedExpressionId ?? null;
-      // ignore the echo of a selection this side just made
       if (id === this.selfSelected) return;
       this.selectionCb?.(id);
     });
   }
 
-  /** the other direction: put the graph's selection on a given expression */
   select(id: string | null): void {
     if (this.calc.selectedExpressionId === (id ?? undefined)) return;
     this.selfSelected = id;
@@ -254,7 +278,6 @@ export class DesmosGraph {
     this.calc.setExpression({ id, animationPeriod: period });
   }
 
-  /** moves the clock by hand, which is what scrubbing does */
   setClockValue(id: string, name: string, value: number): void {
     this.settleUntil = Date.now() + SETTLE_MS;
     this.calc.setExpression({ id, latex: `${name}=${value}`, playing: false });
@@ -273,5 +296,19 @@ export class DesmosGraph {
     } catch {
       return null;
     }
+  }
+
+  image(format: 'png' | 'svg'): Promise<string | null> {
+    if (typeof this.calc.asyncScreenshot !== 'function') {
+      return Promise.resolve(format === 'png' ? this.screenshot() : null);
+    }
+    return new Promise(resolve => {
+      const done = (data: string) => resolve(data || null);
+      try {
+        this.calc.asyncScreenshot!({ format, targetPixelRatio: format === 'png' ? 2 : 1 }, done);
+      } catch {
+        resolve(null);
+      }
+    });
   }
 }

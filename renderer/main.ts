@@ -7,7 +7,7 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import * as monaco from 'monaco-editor';
 import {
   createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
-  Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode,
+  Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode, Zap,
 } from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../src/monaco/language';
 import { builtinSignature } from '../src/compiler/builtins';
@@ -15,7 +15,8 @@ import { formatDsl } from '../src/compiler/format';
 import { findRenameEdits, isValidIdent } from '../src/compiler/rename';
 import CompileWorker from './compile.worker?worker';
 import { compileToTex } from '../src/index';
-import type { CompileResult, SymbolInfo, ExprSource } from '../src/index';
+import { shareUrl } from '../src/share';
+import type { CompileResult, SymbolInfo, ExprSource, OptimizeNote } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
 import { EnhancedPane } from './enhanced';
@@ -30,6 +31,7 @@ import { InlineSliderManager } from './inline-sliders';
 import { SearchPanel } from './search-panel';
 import { GraphLink } from './graph-link';
 import { GitPanel } from './git-panel';
+import { OptimizerPanel, groupByLine, lineHint } from './optimizer-panel';
 import { typingElsewhere } from './keys';
 import { decompile } from '../src/compiler/decompile';
 import type { Mode } from './session';
@@ -44,7 +46,7 @@ registerColorProvider();
 createIcons({
   icons: {
     GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
-    Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode,
+    Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode, Zap,
   },
   attrs: { 'stroke-width': '1.9' },
 });
@@ -98,6 +100,9 @@ const problemsCount = $('problems-count');
 const timelineBody = $('timeline-body');
 const timelineList = $('timeline-list');
 const timelineEmpty = $('timeline-empty');
+const btnToolOptimizer = $<HTMLButtonElement>('btn-tool-optimizer');
+const btnTabOptimizer = $<HTMLButtonElement>('btn-tab-optimizer');
+const optimizerBody = $('optimizer-body');
 const btnSidebarGit = $<HTMLButtonElement>('btn-sidebar-git');
 const btnSidebarAi = $<HTMLButtonElement>('btn-sidebar-ai');
 const btnSidebarOutline = $<HTMLButtonElement>('btn-sidebar-outline');
@@ -622,6 +627,33 @@ function renderOutline(symbols: SymbolInfo[]): void {
 
 let lastCompileResult: CompileResult | null = null;
 const sliderManager = new InlineSliderManager(editor);
+
+const optimizerHints = editor.createDecorationsCollection();
+const optimizerPanel = new OptimizerPanel({
+  list: $('optimizer-list'),
+  empty: $('optimizer-empty'),
+  count: $('optimizer-count'),
+  badge: $('optimizer-badge'),
+  jump: line => {
+    editor.revealLineInCenter(line);
+    editor.setPosition({ lineNumber: line, column: 1 });
+    editor.focus();
+  },
+});
+
+function renderOptimizations(notes: OptimizeNote[]): void {
+  optimizerPanel.render(notes);
+  optimizerHints.set(groupByLine(notes)
+    .filter(g => g.line <= model.getLineCount())
+    .map(g => ({
+      range: new monaco.Range(g.line, model.getLineMaxColumn(g.line), g.line, model.getLineMaxColumn(g.line)),
+      options: {
+        after: { content: `  ${lineHint(g)}`, inlineClassName: 'optimizer-hint' },
+        showIfCollapsed: true,
+      },
+    })));
+}
+
 window.addEventListener('beforeunload', () => {
   sliderManager.dispose();
   aiSidebar?.dispose();
@@ -638,11 +670,14 @@ function handleCompileResult(result: CompileResult): void {
     if (mode === 'split' || mode === 'enhanced') syncEnhanced();
     sliderManager.update(editor.getValue());
     renderOutline(result.symbols);
+    renderOptimizations(result.optimizations);
     transport.setClock(result.clock);
   } else {
     const { syntax, semantic } = errorsByPhase(result.errors, errorToMarker);
     monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', syntax);
     monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', semantic);
+
+    renderOptimizations([]);
   }
   renderProblems(
     result.success
@@ -997,7 +1032,7 @@ async function cmdSave(saveAs = false): Promise<void> {
 }
 
 async function cmdExportTex(): Promise<void> {
-  const name = currentPath?.replace(/^.*\//, '').replace(/\.dsmx$/, '') ?? 'figure';
+  const name = baseName();
   const result = compileToTex(editor.getValue(), {
     title: currentPath?.replace(/^.*\//, '') ?? 'an unsaved file',
     viewport: graph.viewport() ?? undefined,
@@ -1020,6 +1055,50 @@ async function cmdExportTex(): Promise<void> {
   } else if (!saved.canceled) {
     setStatus(saved.message, 'error');
   }
+}
+
+function baseName(): string {
+  return currentPath?.replace(/^.*\//, '').replace(/\.dsmx$/, '') ?? 'desmos-graph';
+}
+
+async function cmdExportImage(format: 'png' | 'svg'): Promise<void> {
+  const data = await graph.image(format);
+  if (!data) {
+    setStatus(`The graph cannot produce ${format.toUpperCase()} here`, 'error');
+    return;
+  }
+  const saved = await window.electronAPI?.exportImage(data, `${baseName()}.${format}`, format);
+  if (!saved) return;
+  if (saved.ok) setStatus(`Exported to ${saved.path}`, 'success');
+  else if (!saved.canceled) setStatus(saved.message, 'error');
+}
+
+async function buildShareUrl(): Promise<string | null> {
+  if (!lastCompileResult?.success) {
+    setStatus('Cannot share: the file does not compile', 'error');
+    return null;
+  }
+  const url = await shareUrl(editor.getValue());
+  if (!url) setStatus('Cannot share: the file is too big for a link — export the JSON instead', 'error');
+  return url;
+}
+
+async function cmdCopyShareLink(): Promise<void> {
+  const url = await buildShareUrl();
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    setStatus('Share link copied', 'success');
+  } catch {
+    setStatus('Could not reach the clipboard', 'error');
+  }
+}
+
+async function cmdOpenShareLink(): Promise<void> {
+  const url = await buildShareUrl();
+  if (!url) return;
+  await window.electronAPI?.openExternal(url);
+  setStatus('Opened the share link in your browser', 'success');
 }
 
 btnNew.addEventListener('click',  () => cmdNew());
@@ -1191,7 +1270,7 @@ window.addEventListener('keydown', e => {
     return;
   }
 
-  // ⌘1..⌘5 toggle the tool windows, the way the rail tooltips say
+  // ⌘1..⌘6 toggle the tool windows, the way the rail tooltips say
   if (!e.shiftKey && !e.altKey && TOOL_KEYS[k]) {
     e.preventDefault();
     TOOL_KEYS[k]();
@@ -1204,6 +1283,7 @@ const TOOL_KEYS: Record<string, () => void> = {
   '3': () => toggleBottom('problems'),
   '4': () => toggleBottom('timeline'),
   '5': () => setSidebarView(sidebarView === 'ai' ? null : 'ai'),
+  '6': () => toggleBottom('optimizer'),
 };
 
 window.addEventListener('keydown', e => {
@@ -1218,6 +1298,8 @@ window.electronAPI?.onMenuOpen(cmdOpen);
 window.electronAPI?.onMenuSave(() => cmdSave());
 window.electronAPI?.onMenuSaveAs(() => cmdSave(true));
 window.electronAPI?.onMenuExportTex(() => void cmdExportTex());
+window.electronAPI?.onMenuExportImage(format => void cmdExportImage(format));
+window.electronAPI?.onMenuShare(() => void cmdCopyShareLink());
 window.electronAPI?.onMenuOpenRecent(path => void openPath(path));
 
 window.addEventListener('focus', () => {
@@ -1464,42 +1546,52 @@ branchWidget.addEventListener('click', () => setSidebarView('git'));
 tabClose.addEventListener('click', () => void cmdNew());
 
 
-type BottomTab = 'problems' | 'timeline';
+type BottomTab = 'problems' | 'timeline' | 'optimizer';
 let bottomTab: BottomTab = 'problems';
 let bottomOpen = false;
 
+const BOTTOM_TABS: Record<BottomTab, { body: HTMLElement; tab: HTMLButtonElement; rail: HTMLButtonElement }> = {
+  problems:  { body: problemsBody,  tab: btnTabProblems,  rail: btnToolProblems },
+  timeline:  { body: timelineBody,  tab: btnTabTimeline,  rail: btnToolTimeline },
+  optimizer: { body: optimizerBody, tab: btnTabOptimizer, rail: btnToolOptimizer },
+};
+
 function setBottomTab(tab: BottomTab): void {
   bottomTab = tab;
-  problemsBody.classList.toggle('hidden', tab !== 'problems');
-  timelineBody.classList.toggle('hidden', tab !== 'timeline');
-  btnTabProblems.classList.toggle('tool-tab--active', tab === 'problems');
-  btnTabTimeline.classList.toggle('tool-tab--active', tab === 'timeline');
-  btnTabProblems.setAttribute('aria-selected', String(tab === 'problems'));
-  btnTabTimeline.setAttribute('aria-selected', String(tab === 'timeline'));
+  for (const [name, els] of Object.entries(BOTTOM_TABS) as [BottomTab, typeof BOTTOM_TABS[BottomTab]][]) {
+    const on = name === tab;
+    els.body.classList.toggle('hidden', !on);
+    els.tab.classList.toggle('tool-tab--active', on);
+    els.tab.setAttribute('aria-selected', String(on));
+  }
   if (tab === 'timeline') void refreshTimeline();
+}
+
+function syncRailActive(): void {
+  for (const [name, els] of Object.entries(BOTTOM_TABS) as [BottomTab, typeof BOTTOM_TABS[BottomTab]][]) {
+    els.rail.classList.toggle('active', bottomOpen && bottomTab === name);
+  }
 }
 
 function setBottomOpen(open: boolean, tab?: BottomTab): void {
   bottomOpen = open;
   toolBottom.classList.toggle('hidden', !open);
   bottomDivider.classList.toggle('hidden', !open);
-  btnToolProblems.classList.toggle('active', open && bottomTab === 'problems');
-  btnToolTimeline.classList.toggle('active', open && bottomTab === 'timeline');
   if (open && tab) setBottomTab(tab);
+  syncRailActive();
   editor.layout();
 }
 
 function toggleBottom(tab: BottomTab): void {
   if (bottomOpen && bottomTab === tab) setBottomOpen(false);
   else setBottomOpen(true, tab);
-  btnToolProblems.classList.toggle('active', bottomOpen && bottomTab === 'problems');
-  btnToolTimeline.classList.toggle('active', bottomOpen && bottomTab === 'timeline');
+  syncRailActive();
 }
 
-btnToolProblems.addEventListener('click', () => toggleBottom('problems'));
-btnToolTimeline.addEventListener('click', () => toggleBottom('timeline'));
-btnTabProblems.addEventListener('click', () => { setBottomTab('problems'); setBottomOpen(true); });
-btnTabTimeline.addEventListener('click', () => { setBottomTab('timeline'); setBottomOpen(true); });
+for (const [name, els] of Object.entries(BOTTOM_TABS) as [BottomTab, typeof BOTTOM_TABS[BottomTab]][]) {
+  els.rail.addEventListener('click', () => toggleBottom(name));
+  els.tab.addEventListener('click', () => { setBottomTab(name); setBottomOpen(true); });
+}
 btnBottomClose.addEventListener('click', () => setBottomOpen(false));
 
 interface Problem {
@@ -1715,22 +1807,29 @@ const baseCommands: PaletteCommand[] = [
     },
   },
   {
-    id: 'graph.export-image',
-    label: 'export as image',
-    description: 'Download the current graph as a PNG',
-    action: async () => {
-      try {
-        const url = graph.screenshot();
-        if (!url) { setStatus('Screenshot not available', 'error'); return; }
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'desmos-graph.png';
-        a.click();
-        setStatus('Graph exported as PNG', 'success');
-      } catch {
-        setStatus('Export failed', 'error');
-      }
-    },
+    id: 'share.copy',
+    label: 'copy share link',
+    description: 'A link that carries this file, so the reader gets the graph and the source',
+    action: () => cmdCopyShareLink(),
+  },
+  {
+    id: 'share.open',
+    label: 'open share link',
+    description: 'Preview the share link in your browser',
+    action: () => cmdOpenShareLink(),
+  },
+  {
+    id: 'graph.export-png',
+    label: 'export png…',
+    description: 'Write the graph as it looks now to a PNG file',
+    keybinding: '⌘⇧E',
+    action: () => cmdExportImage('png'),
+  },
+  {
+    id: 'graph.export-svg',
+    label: 'export svg…',
+    description: 'Write the graph as vector art that stays sharp at any size',
+    action: () => cmdExportImage('svg'),
   },
   {
     id: 'editor.format',
@@ -1788,6 +1887,13 @@ const baseCommands: PaletteCommand[] = [
     label: 'toggle outline sidebar',
     description: 'Open or close the symbol outline',
     action: () => setSidebarView(sidebarView === 'outline' ? null : 'outline'),
+  },
+  {
+    id: 'tool.optimizer',
+    label: 'show optimizer report',
+    description: 'List every fold, inline and drop the compiler made',
+    keybinding: '⌘6',
+    action: () => toggleBottom('optimizer'),
   },
   {
     id: 'compile.run',

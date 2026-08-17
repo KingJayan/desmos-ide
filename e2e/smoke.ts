@@ -106,6 +106,27 @@ for (let i = 0; i < 20 && !wroteBack; i++) {
 }
 check(wroteBack, 'an enhanced edit lands in the DSL file');
 
+await page.click('#editor-container .monaco-editor');
+await page.keyboard.press('Meta+A');
+await page.keyboard.type('a = 2*3 + 1');
+await page.click('#btn-tool-optimizer');
+await page.waitForSelector('#optimizer-body:not(.hidden) .optimizer-row', { timeout: 10_000 });
+check(await page.locator('#optimizer-row, #optimizer-list .optimizer-row').count() >= 2, 'the optimizer lists both folds');
+check(
+  ((await page.locator('#optimizer-list').textContent()) ?? '').includes('7'),
+  'the report shows the folded result',
+);
+
+let hint = '';
+for (let i = 0; i < 20 && !hint; i++) {
+  hint = (await page.locator('.optimizer-hint').first().textContent().catch(() => '')) ?? '';
+  if (!hint) await page.waitForTimeout(250);
+}
+check(hint.includes('7'), `the line carries the optimizer hint (saw "${hint}")`);
+
+await page.click('#btn-tool-optimizer');
+check(await page.locator('#tool-bottom.hidden').count() === 1, 'the optimizer tab closes again');
+
 check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: ${consoleErrors[0]}` : ''}`);
 
 clearTimeout(watchdog);

@@ -7,6 +7,9 @@ const PALETTE = ['#2d70b3', '#c74440', '#388c46', '#6042a6', '#fa7e19', '#000000
 // typing and dragging change the list many times a second, and every change redraws
 // the graph. the wait collects them into one redraw
 const NOTIFY_DELAY = 120;
+// katex is the cost in a row, and a generated file can fill the pane with
+// hundreds. past this many, a row waits until it is close to the viewport
+const EAGER_ROWS = 40;
 
 function renderLatex(latex: string, container: HTMLElement): void {
   if (!latex.trim()) {
@@ -32,6 +35,7 @@ export class EnhancedPane {
   private editingId: string | null = null;
   private notifyTimer: ReturnType<typeof setTimeout> | null = null;
   private rows = new Map<string, HTMLElement>();
+  private lazyMath: IntersectionObserver | null = null;
 
   constructor(
     private listEl: HTMLElement,
@@ -52,6 +56,25 @@ export class EnhancedPane {
   dispose(): void {
     if (this.notifyTimer !== null) clearTimeout(this.notifyTimer);
     this.notifyTimer = null;
+    this.lazyMath?.disconnect();
+    this.lazyMath = null;
+  }
+
+  /** draws the math when its row comes close to the viewport, and never again */
+  private observeMath(el: HTMLElement, latex: string): void {
+    if (!this.lazyMath) {
+      this.lazyMath = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const target = entry.target as HTMLElement;
+          this.lazyMath!.unobserve(target);
+          renderLatex(target.dataset.latex ?? '', target);
+        }
+      }, { root: this.listEl, rootMargin: '400px' });
+    }
+    el.dataset.latex = latex;
+    el.textContent = latex;
+    this.lazyMath.observe(el);
   }
 
   syncFromGraph(graphList: DesmosExpr[]): void {
@@ -124,6 +147,9 @@ export class EnhancedPane {
   private render(): void {
     this.listEl.replaceChildren();
     this.rows.clear();
+    // every row is rebuilt, so nothing the observer still holds is on screen
+    this.lazyMath?.disconnect();
+    this.lazyMath = null;
     const frag = document.createDocumentFragment();
     for (const expr of this.list) {
       const row = this.buildRow(expr);
@@ -173,7 +199,8 @@ export class EnhancedPane {
     } else {
       const mathEl = document.createElement('div');
       mathEl.className = 'expr-math';
-      renderLatex(expr.latex ?? '', mathEl);
+      if (this.list.length > EAGER_ROWS) this.observeMath(mathEl, expr.latex ?? '');
+      else renderLatex(expr.latex ?? '', mathEl);
       mathEl.title = expr.latex ? `LaTeX: ${expr.latex}` : 'click to edit';
       mathEl.tabIndex = 0;
       mathEl.setAttribute('role', 'button');

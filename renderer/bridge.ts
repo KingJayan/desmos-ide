@@ -18,6 +18,8 @@ const fileChangedCbs: Listener<[string, string]>[] = [];
 const menuCbs: Record<'new' | 'open' | 'save' | 'saveAs' | 'exportTex', Listener<[]>[]> = {
   new: [], open: [], save: [], saveAs: [], exportTex: [],
 };
+const menuImageCbs: Listener<['png' | 'svg']>[] = [];
+const menuShareCbs: Listener<[]>[] = [];
 const menuRecentCbs: Listener<[string]>[] = [];
 
 const rpc = Electroview.defineRPC<DesmosIdeRPC>({
@@ -34,6 +36,8 @@ const rpc = Electroview.defineRPC<DesmosIdeRPC>({
       menuSave: () => menuCbs.save.forEach(cb => cb()),
       menuSaveAs: () => menuCbs.saveAs.forEach(cb => cb()),
       menuExportTex: () => menuCbs.exportTex.forEach(cb => cb()),
+      menuExportImage: ({ format }) => menuImageCbs.forEach(cb => cb(format)),
+      menuShare: () => menuShareCbs.forEach(cb => cb()),
       menuOpenRecent: ({ path }) => menuRecentCbs.forEach(cb => cb(path)),
     },
   },
@@ -52,12 +56,16 @@ export const electronAPI = {
   saveFile: (path: string | null, content: string) => rpc.request.saveFile({ path, content }),
   exportJson: (content: string) => rpc.request.exportJson({ content }),
   exportTex: (content: string, defaultName: string) => rpc.request.exportTex({ content, defaultName }),
+  exportImage: (data: string, defaultName: string, format: 'png' | 'svg') =>
+    rpc.request.exportImage({ data, defaultName, format }),
 
   onMenuNew: (cb: () => void) => subscribe(menuCbs.new, cb),
   onMenuOpen: (cb: () => void) => subscribe(menuCbs.open, cb),
   onMenuSave: (cb: () => void) => subscribe(menuCbs.save, cb),
   onMenuSaveAs: (cb: () => void) => subscribe(menuCbs.saveAs, cb),
   onMenuExportTex: (cb: () => void) => subscribe(menuCbs.exportTex, cb),
+  onMenuExportImage: (cb: (format: 'png' | 'svg') => void) => subscribe(menuImageCbs, cb),
+  onMenuShare: (cb: () => void) => subscribe(menuShareCbs, cb),
   onMenuOpenRecent: (cb: (path: string) => void) => subscribe(menuRecentCbs, cb),
 
   aiChat: (reqId: string, messages: AIMessage[], config: AIConfig, memories: string[]) =>

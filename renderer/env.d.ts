@@ -33,6 +33,10 @@ interface DesmosCalculator {
   controller?: { dispatch?(action: Record<string, unknown>): void };
 
   HelperExpression?(opts: { latex: string }): DesmosHelper;
+  asyncScreenshot?(
+    opts: { format?: 'png' | 'svg'; targetPixelRatio?: number; preserveAxisNumbers?: boolean },
+    cb: (data: string) => void,
+  ): void;
 }
 
 interface DesmosHelper {

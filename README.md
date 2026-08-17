@@ -12,6 +12,8 @@
 * **native DSL** — write clean math that compiles to Desmos in real time
 * **live graph** — fast updates as you type via expression id diffing
 * **formatter** — ⇧⌥F or format-on-save
+* **optimizer report** — ⌘6 lists every fold, inline and drop, with a hint on the line
+* **export** — PNG, SVG, TeX figure, or a share link that carries the source
 * **persistence** — reopens your files exactly where you left off; autosave is opt-in
 * **timeline** — declare a `time` clock for play, pause, speed, and scrub controls
 * **anim presets** — shape the clock with `ease`, `pulse`, `bounce`, `wobble`, and `orbit`

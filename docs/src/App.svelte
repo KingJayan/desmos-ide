@@ -883,6 +883,7 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
       <li><strong>algebraic identities</strong>: <code>x+0→x</code>, <code>x*1→x</code>, <code>x*0→0</code>, <code>x^1→x</code>, <code>x^0→1</code>, <code>0/x→0</code>.</li>
       <li><strong>shadow-safe substitution</strong> — loop variables in <code>map</code>/<code>curve</code>/<code>for</code> shadow outer bindings during substitution; inner scope is never polluted.</li>
     </ul>
+    <p>every transform is recorded, so <code>CompileSuccess.optimizations</code> lists each fold, identity, inline and drop with the position it happened at. the app shows that list in the optimizer tool window (<code>⌘6</code>) and prints the outermost result after the line it belongs to.</p>
   </section>
 
   <section id="errors">

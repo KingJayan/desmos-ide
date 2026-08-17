@@ -92,6 +92,31 @@ export function exportTex(content: string, defaultName: string): Promise<FileRes
   return exportAs(content, { defaultName, extension: 'tex', prompt: 'Export a pgfplots figure' });
 }
 
+// a png arrives as a data uri, an svg as markup
+export async function exportImage(
+  data: string,
+  defaultName: string,
+  format: 'png' | 'svg',
+): Promise<FileResult<{ path: string }>> {
+  if (typeof data !== 'string' || !data) {
+    return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'The graph produced no image.' };
+  }
+  try {
+    const path = await showSaveDialog({ defaultName, extension: format, prompt: `Export the graph as ${format.toUpperCase()}` });
+    if (!path) return CANCELED;
+
+    if (format === 'svg') {
+      await withRetry(() => writeFile(path, data, 'utf-8'));
+    } else {
+      const base64 = data.replace(/^data:image\/\w+;base64,/, '');
+      await withRetry(() => writeFile(path, Buffer.from(base64, 'base64')));
+    }
+    return { ok: true, path };
+  } catch (err) {
+    return fileError(err);
+  }
+}
+
 type WatcherEntry = { watcher: FSWatcher; debounce: ReturnType<typeof setTimeout> | null };
 const fileWatchers = new Map<string, WatcherEntry>();
 

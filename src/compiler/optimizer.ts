@@ -2,9 +2,33 @@
 
 import * as T from './types';
 import { ANIMATION_PRESETS } from './builtins';
+import { printShort } from './print';
 
 interface FnDef { params: string[]; body: T.Expr; }
-interface Env { fns: Map<string, FnDef>; }
+interface Env { fns: Map<string, FnDef>; notes: OptimizeNote[] | null; seen: Set<string>; }
+
+export type OptimizeKind = 'fold' | 'identity' | 'inline' | 'drop';
+
+/** one transform the optimizer made, for the report the editor shows */
+export interface OptimizeNote {
+  kind: OptimizeKind;
+  line: number;
+  col: number;
+  before: string;
+  after: string;
+}
+
+function note(env: Env, kind: OptimizeKind, pos: T.Pos, before: string, after: string, depth = 0): void {
+  // a nested transform inside an inlined body carries the position of the fn
+  // declaration, where nothing of the sort happened, so only the top level speaks
+  if (!env.notes || before === after || depth > 0) return;
+  // a fn body is optimized once on its own and again at every call site, so the
+  // same transform arrives many times with one position
+  const key = `${pos.line}:${pos.col}:${before}>${after}`;
+  if (env.seen.has(key)) return;
+  env.seen.add(key);
+  env.notes.push({ kind, line: pos.line, col: pos.col, before, after });
+}
 
 function collectAllRefs(program: T.Program): Set<string> {
   const refs = new Set<string>();
@@ -52,8 +76,8 @@ function collectAllRefs(program: T.Program): Set<string> {
   return refs;
 }
 
-export function optimize(program: T.Program): T.Program {
-  const env: Env = { fns: new Map() };
+export function optimize(program: T.Program, notes: OptimizeNote[] | null = null): T.Program {
+  const env: Env = { fns: new Map(), notes, seen: new Set() };
 
   for (const stmt of program.body) {
     if (stmt.type === 'FnDecl') {
@@ -69,10 +93,16 @@ export function optimize(program: T.Program): T.Program {
       body.push({ ...stmt, body: optimizeExpr(stmt.body, env) });
       continue;
     }
-    if (stmt.type === 'DebugDecl') continue;
+    if (stmt.type === 'DebugDecl') {
+      note(env, 'drop', stmt.pos, `debug ${printShort(stmt.expr)}`, 'no output');
+      continue;
+    }
 
     // strip unreferenced aliases — they produce no graph output when unused
-    if (stmt.type === 'AliasDecl' && !usedRefs.has(stmt.name)) continue;
+    if (stmt.type === 'AliasDecl' && !usedRefs.has(stmt.name)) {
+      note(env, 'drop', stmt.pos, `alias ${stmt.name}`, 'never used');
+      continue;
+    }
 
     if (stmt.type === 'ExprBlockDecl') {
       body.push(lowerExprBlock(stmt, env));
@@ -222,46 +252,63 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
 
     case 'UnaryOp': {
       const operand = ox(expr.operand);
-      if (operand.type === 'NumLit') return num(-operand.value, expr.pos);
-      if (operand.type === 'UnaryOp' && operand.op === '-') return operand.operand;
-      return { ...expr, operand };
+      const folded = ((): T.Expr | null => {
+        if (operand.type === 'NumLit') return num(-operand.value, expr.pos);
+        if (operand.type === 'UnaryOp' && operand.op === '-') return operand.operand;
+        return null;
+      })();
+      if (!folded) return { ...expr, operand };
+      const source: T.Expr = { ...expr, operand };
+      note(env, operand.type === 'NumLit' ? 'fold' : 'identity', expr.pos, printShort(source), printShort(folded), depth);
+      return folded;
     }
 
     case 'BinOp': {
       const left  = ox(expr.left);
       const right = ox(expr.right);
+      const source: T.Expr = { ...expr, left, right };
 
       if (left.type === 'NumLit' && right.type === 'NumLit') {
         const v = foldBinOp(expr.op, left.value, right.value);
-        if (v !== null) return num(v, expr.pos);
+        if (v !== null) {
+          const folded = num(v, expr.pos);
+          note(env, 'fold', expr.pos, printShort(source), printShort(folded), depth);
+          return folded;
+        }
       }
 
-      switch (expr.op) {
-        case '+':
-          if (isZero(left))  return right;
-          if (isZero(right)) return left;
-          break;
-        case '-':
-          if (isZero(right)) return left;
-          if (isZero(left))  return { type: 'UnaryOp', op: '-', operand: right, pos: expr.pos };
-          break;
-        case '*':
-          if (isOne(left))   return right;
-          if (isOne(right))  return left;
-          if (isZero(left) || isZero(right)) return num(0, expr.pos);
-          break;
-        case '/':
-          if (isOne(right))  return left;
-          if (isZero(left))  return num(0, expr.pos);
-          break;
-        case '^':
-          if (isOne(right))  return left;
-          if (isZero(right)) return num(1, expr.pos);
-          if (isZero(left))  return num(0, expr.pos);
-          break;
-      }
+      const identity = ((): T.Expr | null => {
+        switch (expr.op) {
+          case '+':
+            if (isZero(left))  return right;
+            if (isZero(right)) return left;
+            return null;
+          case '-':
+            if (isZero(right)) return left;
+            if (isZero(left))  return { type: 'UnaryOp', op: '-', operand: right, pos: expr.pos };
+            return null;
+          case '*':
+            if (isOne(left))   return right;
+            if (isOne(right))  return left;
+            if (isZero(left) || isZero(right)) return num(0, expr.pos);
+            return null;
+          case '/':
+            if (isOne(right))  return left;
+            if (isZero(left))  return num(0, expr.pos);
+            return null;
+          case '^':
+            if (isOne(right))  return left;
+            if (isZero(right)) return num(1, expr.pos);
+            if (isZero(left))  return num(0, expr.pos);
+            return null;
+          default:
+            return null;
+        }
+      })();
 
-      return { ...expr, left, right };
+      if (!identity) return source;
+      note(env, 'identity', expr.pos, printShort(source), printShort(identity), depth);
+      return identity;
     }
 
     case 'CompareExpr':
@@ -293,7 +340,9 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
         if (args.length !== fn.params.length) {
           throw new Error(`'${expr.fn}' expects ${fn.params.length} argument(s), got ${args.length}`);
         }
-        return inlineCall(fn, args, env, depth);
+        const inlined = inlineCall(fn, args, env, depth);
+        note(env, 'inline', expr.pos, printShort({ ...expr, args, kwargs }), printShort(inlined), depth);
+        return inlined;
       }
 
       return { ...expr, args, kwargs };

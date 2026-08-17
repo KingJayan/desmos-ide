@@ -2,7 +2,7 @@
 
 import { tokenize, LexError } from './compiler/lexer';
 import { parse, ParseError } from './compiler/parser';
-import { optimize } from './compiler/optimizer';
+import { optimize, OptimizeNote } from './compiler/optimizer';
 import { codegenWithSourceMap, ClockInfo, DesmosState, DesmosExpr, ExprSource } from './compiler/codegen';
 import { analyze } from './compiler/analyze';
 import { toTex, TexOptions, TexResult } from './compiler/tex';
@@ -11,6 +11,8 @@ import type { Program, Statement, Expr } from './compiler/types';
 export type { TexOptions, TexResult, TexSkip, TexViewport } from './compiler/tex';
 
 export type { DesmosState, DesmosExpr, DesmosSlider, ExprSource } from './compiler/codegen';
+
+export type { OptimizeKind, OptimizeNote } from './compiler/optimizer';
 
 export type SymbolKind =
   | 'var' | 'fn' | 'alias'
@@ -44,6 +46,8 @@ export interface CompileSuccess {
   sourceMap: ExprSource[];
   /** the clock the transport drives, or null when the source declares no `time` */
   clock: ClockInfo | null;
+  /** every transform the optimizer made, innermost first inside a line */
+  optimizations: OptimizeNote[];
 }
 
 export interface CompileError {
@@ -209,12 +213,13 @@ export function compile(src: string): CompileResult {
       };
     }
 
-    const optimized = optimize(ast);
+    const optimizations: OptimizeNote[] = [];
+    const optimized = optimize(ast, optimizations);
     const { state, sourceMap, clock } = codegenWithSourceMap(optimized);
     const symbols   = extractSymbols(ast);
     const warnings  = checkWarnings(ast);
 
-    return { success: true, state, warnings, symbols, sourceMap, clock };
+    return { success: true, state, warnings, symbols, sourceMap, clock, optimizations };
   } catch (e) {
     if (e instanceof LexError)
       return { success: false, errors: [mkError(e.message, 1, e.line, e.col)] };
