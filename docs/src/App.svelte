@@ -1,86 +1,29 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { highlightSnippets } from './highlight.js';
+  import Icon from '@iconify/svelte';
+  import Nav from './Nav.svelte';
   import pkg from '../package.json';
   import dsl from '../../package.json';
 
   const path = window.location.pathname.replace(/\/$/, '') || '/';
   const route = /^\/docs(?:\/|$)/.test(path)
     ? 'docs'
-    : /^\/download\/electron(?:\/|$)/.test(path)
-      ? 'download-electron'
-      : /^\/download\/extension(?:\/|$)/.test(path)
-        ? 'download-extension'
-        : 'home';
+    : /^\/download(?:\/|$)/.test(path)
+      ? 'download'
+      : 'home';
 
   const routeTitle = route === 'docs'
     ? 'docs | desmos dsl'
-    : route === 'download-electron'
-      ? 'electron ide download | desmos ide'
-      : route === 'download-extension'
-        ? 'vscode extension | desmos ide'
-        : 'desmos ide | docs and tools';
+    : route === 'download'
+      ? 'downloads | desmos ide'
+      : 'desmos ide';
 
   const routeDescription = route === 'docs'
-    ? 'Detailed documentation for the Desmos IDE DSL.'
-    : route === 'download-electron'
-      ? 'Download page placeholder for the Desmos IDE Electron app.'
-      : route === 'download-extension'
-        ? 'Download page placeholder for the Desmos IDE VS Code extension.'
-        : 'Landing page for Desmos IDE tools, docs, and download placeholders.';
-
-  const downloadPage = route === 'download-electron'
-    ? {
-      eyebrow: 'desktop app',
-      title: 'electron ide download',
-      summary: 'The Electron build is not released yet. This page will host installers and release notes once packaging is ready.',
-      chips: ['macOS coming soon', 'windows coming soon', 'linux coming soon'],
-    }
-    : route === 'download-extension'
-      ? {
-        eyebrow: 'vscode extension',
-        title: 'extension download',
-        summary: 'The VS Code extension is not released yet. This page will host the marketplace link and changelog when it ships.',
-        chips: ['marketplace link soon', 'manual .vsix soon', 'docs integration planned'],
-      }
-      : null;
-
-  const homeSignals = [
-    { label: 'docs', value: 'language reference' },
-    { label: 'desktop', value: 'electron ide' },
-    { label: 'extension', value: 'VS Code extension' },
-    { label: 'core', value: 'compiler pipeline' },
-  ];
-
-  const homeProducts = [
-    {
-      kicker: 'desktop app',
-      title: 'Electron IDE',
-      copy: 'interactive graphing with a built-in compiler. edit with Monaco, run the full pipeline locally, and iterate in real time.',
-      href: '/download/electron',
-      links: [
-        { href: '/download/electron', label: 'download' },
-        { href: 'https://github.com/KingJayan/desmos-ide', label: 'view source' },
-        { href: '/docs', label: 'docs' },
-      ],
-      featured: true,
-    },
-    {
-      kicker: 'reference',
-      title: 'DSL docs',
-      copy: 'detailed syntax, semantics, and compiler behavior—with dense examples and section-level navigation.',
-      href: '/docs',
-      links: [{ href: '/docs', label: 'read the docs' }],
-    },
-    {
-      kicker: 'editor slot',
-      title: 'VS Code extension',
-      copy: 'editor-native tooling (in progress).',
-      href: '/download/extension',
-      links: [{ href: '/download/extension', label: 'download' }],
-      muted: true,
-    },
-  ];
+    ? 'Language reference for the Desmos IDE DSL.'
+    : route === 'download'
+      ? 'Install the dsmx command line tool, or build the desktop app from source.'
+      : 'A small language that compiles to Desmos graphs, with a desktop editor and a command line tool.';
 
   const navItems = [
     { id: 'quick-start', label: 'quick start' },
@@ -92,10 +35,12 @@
     { id: 'geometry', label: 'geometry' },
     { id: 'curves', label: 'curves & regions' },
     { id: 'generators-map', label: 'map generator' },
+    { id: 'generators', label: 'spiral, wave, grid' },
     { id: 'expr-block', label: 'expr block' },
     { id: 'debug', label: 'debug' },
     { id: 'styling', label: 'styling' },
-    { id: 'animation', label: 'sliders & animation' },
+    { id: 'animation', label: 'sliders & the clock' },
+    { id: 'three-d', label: '3d projection' },
     { id: 'builtins', label: 'built-ins' },
     { id: 'codegen', label: 'codegen' },
     { id: 'optimizer', label: 'optimizer' },
@@ -126,15 +71,24 @@
       ],
     },
     {
-      title: 'Geometry layer',
-      kicker: 'drawing',
-      copy: 'Point, line, region, curve, and generator statements, plus the styling model that makes them feel alive.',
+      title: 'Drawing',
+      kicker: 'geometry',
+      copy: 'Point, line, region, curve and generator statements, and the styling suffix they all take.',
       links: [
         { id: 'geometry', label: 'geometry' },
         { id: 'curves', label: 'curves & regions' },
         { id: 'generators-map', label: 'map generator' },
+        { id: 'generators', label: 'spiral, wave, grid' },
         { id: 'styling', label: 'styling' },
-        { id: 'animation', label: 'sliders & animation' },
+      ],
+    },
+    {
+      title: 'Motion',
+      kicker: 'animation',
+      copy: 'Sliders, the clock every moving expression reads, and the 3d projection.',
+      links: [
+        { id: 'animation', label: 'sliders & the clock' },
+        { id: 'three-d', label: '3d projection' },
       ],
     },
     {
@@ -190,106 +144,78 @@
   <meta name="description" content={routeDescription} />
 </svelte:head>
 
-{#if route === 'home'}
-  <main class="page landing">
-    <header class="hero home-hero landing-hero">
-      <div class="hero-copy">
-        <p class="eyebrow">let's get started</p>
-        <h1>desmos ide</h1>
-        <p class="lede">
-          a focused environment for building, creating, and experimenting with advanced desmos.
+<Nav {route} />
 
-          docs define the language, the desktop app runs the graphing pipeline, and the VS Code extension brings tooling directly into your editor
+{#if route === 'home'}
+  <main class="landing">
+    <section class="landing-stage">
+      <h1>desmos ide</h1>
+      <p class="landing-tagline">a small language that compiles to desmos graphs, with an editor built around it.</p>
+      <div class="home-actions">
+        <a class="cta" href="/docs"><Icon icon="lucide:book-open" />read the docs</a>
+        <a class="cta" href="/download"><Icon icon="lucide:download" />downloads</a>
+      </div>
+    </section>
+
+    <div class="install-strip">
+      <span>install dsmx: </span>
+      <code><Icon icon="lucide:terminal" />&nbsp;brew install KingJayan/dsmx/dsmx</code>
+      <a href="/download">other ways</a>
+    </div>
+  </main>
+{:else if route === 'download'}
+  <main class="page">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">downloads</p>
+        <h1>install</h1>
+        <p class="lede">
+          two ways to run the compiler; the terminal and the desktop editor
         </p>
       </div>
-      <aside class="hero-stage" aria-label="product map">
-        <div class="hero-orbit">
-          <div class="orbit-core">
-            <span>core</span>
-            <strong>compiler pipeline</strong>
-          </div>
-          <div class="orbit-node orbit-docs">
-            <span>docs</span>
-            <strong>lang reference</strong>
-          </div>
-          <div class="orbit-node orbit-desktop">
-            <span>desktop</span>
-            <strong>electron ide</strong>
-          </div>
-          <div class="orbit-node orbit-extension">
-            <span>extension</span>
-            <strong>vscode (wip)</strong>
-          </div>
-        </div>
-        <div class="signal-head">
-          <p class="summary-kicker">surface map</p>
-          <p>docs, desktop app, and extension.</p>
-        </div>
-        <div class="signal-grid">
-          {#each homeSignals as signal}
-            <article>
-              <span>{signal.label}</span>
-              <strong>{signal.value}</strong>
-            </article>
-          {/each}
-        </div>
-      </aside>
+      <div class="hero-meta" aria-label="release metadata">
+        <span class="meta-chip">v{dsl.version}</span>
+        <a class="meta-chip" href="https://github.com/KingJayan/desmos-ide/releases">
+          <Icon icon="lucide:tag" />release notes
+        </a>
+      </div>
     </header>
 
-    <section class="overview launch" aria-label="product atlas">
-      <div class="overview-copy">
-        <p class="eyebrow">products</p>
-        <h2>choose a tool</h2>
-        <p>
-          each surface is designed for a different part of the workflow -- pick where you want to start.        
-        </p>
-      </div>
-      <div class="launch-grid">
-        {#each homeProducts as product}
-          <article class="summary-card launch-card" class:launch-card-feature={product.featured} class:launch-card-muted={product.muted}>
-            <p class="summary-kicker">{product.kicker}</p>
-            <h3>
-              {#if product.href}
-                <a class="card-title-link" href={product.href}>{product.title}</a>
-              {:else}
-                {product.title}
-              {/if}
-            </h3>
-            <p>{product.copy}</p>
-            <ul>
-              {#each product.links as link}
-                <li>
-                  {#if link.href}
-                    <a href={link.href}>{link.label}</a>
-                  {:else}
-                    <span>{link.label}</span>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-          </article>
-        {/each}
-      </div>
+    <section id="cli">
+      <h2><Icon icon="lucide:terminal" />dsmx cli</h2>
+      <p>through Homebrew (macOS + Linux):</p>
+      <pre class="no-highlight"><code>brew install KingJayan/dsmx/dsmx</code></pre>
+      <p>then:</p>
+      <pre class="no-highlight"><code>dsmx run graph.dsmx      # open it in the browser, and redraw on every save
+dsmx build graph.dsmx    # write the desmos state as json
+dsmx fmt graph.dsmx      # format in place</code></pre>
+      <p>
+        <code>run</code> loads desmos api, requires an internet connection. <code>build</code> and <code>fmt</code> do not. the formula also installs the
+        example files, viewable with <code>brew --prefix dsmx</code>.
+      </p>
     </section>
 
-  </main>
-{:else if route === 'download-electron' || route === 'download-extension'}
-  <main class="page coming-page">
-    <section class="coming-card" aria-label="download placeholder">
-      <p class="eyebrow">{downloadPage.eyebrow}</p>
-      <h1>{downloadPage.title}</h1>
-      <p class="lede">{downloadPage.summary}</p>
-      <div class="coming-chips" aria-label="release status">
-        {#each downloadPage.chips as chip}
-          <span class="meta-chip">{chip}</span>
-        {/each}
-      </div>
-      <div class="coming-actions" aria-label="navigation links">
-        <a class="meta-chip" href="/">back to landing</a>
-        <a class="meta-chip" href="/docs">open docs</a>
-        <a class="meta-chip" href="https://github.com/KingJayan/desmos-ide">github</a>
-      </div>
+    <section id="desktop">
+      <h2><Icon icon="lucide:monitor" />desktop editor</h2>
+      <p>
+        pairs a monaco buffer and a live desmos graph with two-way sync. includes git + ai integration.
+      </p>
+      <p>
+        no signed installer yet, so build it from source:
+      </p>
+      <pre class="no-highlight"><code>git clone https://github.com/KingJayan/desmos-ide
+cd desmos-ide
+bun install
+bun run dev</code></pre>
+      <p>macOS only for now (uses system webview)</p>
     </section>
+
+    <footer class="footer">
+      <p class="footer-line">
+        project is open source on
+        &nbsp;<a class="icon-link" href="https://github.com/KingJayan/desmos-ide"><Icon icon="simple-icons:github" />GitHub</a>.
+      </p>
+    </footer>
   </main>
 {:else}
   <div class="progress" style="width: {scrollPct}%"></div>
@@ -307,8 +233,9 @@
       <div class="hero-meta" aria-label="documentation metadata">
         <span class="meta-chip">docs v{pkg.version}</span>
         <span class="meta-chip">dsl v{dsl.version}</span>
-        <span class="meta-chip">{navItems.length} sections</span>
-        <a class="meta-chip" href="/">landing page</a>
+        <a class="meta-chip icon-chip" href="/" aria-label="landing page" title="landing page">
+          <Icon icon="lucide:house" />
+        </a>
       </div>
       <div class="lens-strip" aria-label="reading lenses">
         <span class="lens-chip">syntax</span>
@@ -318,19 +245,24 @@
       </div>
     </header>
 
-    <nav class="toc" aria-label="table of contents">
-      {#each navItems as item}
-        <a href={`#${item.id}`} class:active={activeId === item.id}>{item.label}</a>
-      {/each}
-    </nav>
+    <div class="docs-body">
+    <aside class="toc-rail">
+      <nav class="toc" aria-label="table of contents">
+        <p class="toc-head">on this page</p>
+        {#each navItems as item}
+          <a href={`#${item.id}`} class:active={activeId === item.id}>{item.label}</a>
+        {/each}
+      </nav>
+    </aside>
 
+    <div class="docs-content">
     <section class="overview" aria-label="section atlas">
       <div class="overview-copy">
         <p class="eyebrow">section atlas</p>
         <h2>where to read first</h2>
         <p>
-          four quick paths into the reference. each card clusters related sections so the page stays
-          scannable even when the individual references get dense.
+          each card clusters related sections, so the page stays scannable when the individual
+          references get dense.
         </p>
       </div>
       <div class="summary-grid">
@@ -387,10 +319,11 @@ expr &#123;
     <h2>lexical rules</h2>
     <ul>
       <li><strong>comments:</strong> single-line, start with <code>//</code>.</li>
-      <li><strong>whitespace:</strong> spaces, tabs, and newlines are ignored except for position tracking.</li>
-      <li><strong>numbers:</strong> integers and decimals. write <code>0.5</code>, not <code>.5</code>.</li>
-      <li><strong>identifiers:</strong> <code>[A-Za-z_][A-Za-z0-9_]*</code></li>
-      <li><strong>keywords:</strong> <code>fn</code> <code>alias</code> <code>debug</code> <code>in</code> <code>map</code> <code>point</code> <code>circle</code> <code>line</code> <code>curve</code> <code>region</code> <code>polygon</code> <code>segment</code> <code>text</code> <code>group</code> <code>as</code> <code>at</code> <code>for</code> <code>step</code> <code>where</code> <code>else</code> <code>if</code> <code>then</code> <code>domain</code> <code>expr</code> <code>loop</code> <code>time</code> <code>project</code> <code>camera</code> <code>spiral</code> <code>wave</code> <code>grid</code></li>
+      <li><strong>statements:</strong> one per line. a newline ends a statement, unless it falls inside <code>()</code>, <code>[]</code> or <code>&#123;&#125;</code>, or right after a token that still needs a right-hand side — so blocks, piecewise and trailing operators can span lines.</li>
+      <li><strong>numbers:</strong> integers, decimals and scientific notation (<code>1e5</code>). write <code>0.5</code>, not <code>.5</code>.</li>
+      <li><strong>identifiers:</strong> <code>[A-Za-z_][A-Za-z0-9_]*</code>. greek letters are identifier characters and normalise to their ascii names, so <code>α</code> and <code>alpha</code> are one variable.</li>
+      <li><strong>implicit multiplication:</strong> adjacent factors multiply, as they do in desmos — <code>2x</code>, <code>3sin(t)</code>, <code>2(x+1)</code>. the factors must touch: a space is what keeps <code>expr &#123; &#125;</code> bindings apart.</li>
+      <li><strong>keywords:</strong> <code>fn</code> <code>alias</code> <code>debug</code> <code>in</code> <code>map</code> <code>point</code> <code>circle</code> <code>line</code> <code>curve</code> <code>region</code> <code>polygon</code> <code>segment</code> <code>text</code> <code>group</code> <code>as</code> <code>at</code> <code>for</code> <code>step</code> <code>where</code> <code>else</code> <code>if</code> <code>then</code> <code>domain</code> <code>expr</code> <code>loop</code> <code>time</code> <code>period</code> <code>mirror</code> <code>project</code> <code>camera</code> <code>azimuth</code> <code>elevation</code> <code>spiral</code> <code>wave</code> <code>grid</code></li>
       <li><strong>range tokens:</strong>
         <ul>
           <li><code>..</code> — range separator (<code>0..6.28</code>)</li>
@@ -429,6 +362,8 @@ expr &#123;
         <tr><td><code>region name = inequality</code></td><td>filled inequality region</td></tr>
         <tr><td><code>text name = "label" at (x, y)</code></td><td>text label at position</td></tr>
         <tr><td><code>group name as "Folder label"</code></td><td>desmos folder</td></tr>
+        <tr><td><code>time name = a..b period ms</code></td><td>the clock — one auto-playing slider, see <a href="#animation">animation</a></td></tr>
+        <tr><td><code>camera name = azimuth(a), elevation(e)</code></td><td>the view angles <code>project()</code> reads</td></tr>
         <tr><td><code>spiral name = spiral(turns, spacing)</code></td><td>archimedean spiral</td></tr>
         <tr><td><code>wave name = wave(freq, amp)</code></td><td>sine wave</td></tr>
         <tr><td><code>grid name = grid(cols, rows)</code></td><td>cartesian grid lines</td></tr>
@@ -577,7 +512,8 @@ curve ring (t in 0..6.28) &#123;
 curve vals (n in 0..10) &#123;
   n^2
 &#125;</code></pre>
-    <p>the range <code>start..end</code> is passed directly to desmos as the parametric domain.</p>
+    <p>the range <code>start..end</code> is passed directly to desmos as the parametric domain. add <code>step n</code> to sample it instead:</p>
+    <pre><code>curve ring (t in 0..6.28 step 0.01) &#123; (cos(t), sin(t)) &#125;</code></pre>
 
     <h3>inline for-comprehension</h3>
     <p>a compact alternative to the block <code>curve</code>:</p>
@@ -666,10 +602,8 @@ pts = (cos(i), sin(i)) for i in 0..6.28 step 0.1 as gradient(rgb(123, 33, 22), "
         <tr><td><code>opacity</code></td><td>number 0–1</td><td>all</td></tr>
         <tr><td><code>fill</code></td><td>(flag, no value)</td><td>region, circle, polygon</td></tr>
         <tr><td><code>pointSize</code></td><td>number</td><td>point</td></tr>
-        <tr><td><code>lineStyle</code></td><td><code>solid</code> / <code>dashed</code> / <code>dotted</code></td><td>line, curve, segment</td></tr>
         <tr><td><code>lineWidth</code></td><td>number</td><td>line, curve, segment, spiral, wave, grid</td></tr>
         <tr><td><code>lineOpacity</code></td><td>number 0–1</td><td>curve, segment, spiral, wave, grid</td></tr>
-        <tr><td><code>hidden</code></td><td>(flag, no value)</td><td>all</td></tr>
       </tbody>
     </table>
 
@@ -713,11 +647,69 @@ a = slider(3, 0, 10, step=0.1, speed=1, loop) // step + looping auto-play</code>
         <tr><td>positional 1</td><td>number</td><td>initial value</td></tr>
         <tr><td>positional 2</td><td>number</td><td>minimum</td></tr>
         <tr><td>positional 3</td><td>number</td><td>maximum</td></tr>
+        <tr><td>positional 4</td><td>number</td><td>speed, the same as <code>speed=</code></td></tr>
         <tr><td><code>step=n</code></td><td>kwarg</td><td>increment per step</td></tr>
         <tr><td><code>speed=n</code></td><td>kwarg</td><td>animation speed (sets <code>animationPeriod = round(1000/n)</code>)</td></tr>
         <tr><td><code>loop</code></td><td>flag</td><td>enables <code>LOOP_FORWARD</code> and <code>isPlaying: true</code></td></tr>
       </tbody>
     </table>
+
+    <h3>the clock</h3>
+    <p>
+      <code>time</code> declares one auto-playing slider that everything else can read. a file may hold
+      at most one, and the ide draws it as the timeline bar under the graph.
+    </p>
+    <pre><code>time T = 0..6.28 period 14000        // one sweep every 14 seconds
+time T                              // 0..1, period 4000, looping
+time T = 0..1 period 2000 mirror    // runs forward, then back</code></pre>
+    <table>
+      <thead><tr><th>part</th><th>meaning</th><th>default</th></tr></thead>
+      <tbody>
+        <tr><td><code>= a..b</code></td><td>the range it sweeps</td><td><code>0..1</code></td></tr>
+        <tr><td><code>period ms</code></td><td>milliseconds for one sweep</td><td><code>4000</code></td></tr>
+        <tr><td><code>loop</code> / <code>mirror</code></td><td><code>LOOP_FORWARD</code> / <code>LOOP_FORWARD_REVERSE</code></td><td><code>loop</code></td></tr>
+      </tbody>
+    </table>
+    <p>read the clock anywhere a number goes — a body drawn at <code>T</code> instead of at <code>t</code> moves:</p>
+    <pre><code>time T = 0..6.28 period 12000
+
+curve path (t in 0..6.28) &#123; (2cos(t), 2sin(t)) &#125;
+point body (2cos(T), 2sin(T)) as &#123; color blue pointSize 12 &#125;</code></pre>
+    <div class="output-tags" aria-label="clock output hints">
+      <span class="output-tag">one per file</span>
+      <span class="output-tag">plain desmos slider</span>
+    </div>
+  </section>
+
+  <section id="three-d">
+    <h2>3d projection</h2>
+    <p>
+      <code>camera</code> fixes two view angles, and <code>project(x, y, z)</code> flattens a 3d point
+      through them onto the 2d graph. the projection is done in latex at compile time, so the result is
+      an ordinary desmos point — anything that takes a point takes a projected one.
+    </p>
+    <pre><code>camera cam = azimuth(0.6), elevation(0.4)
+
+time T = 0..6.28 period 10000
+
+// a coil that climbs as it turns
+coil = project(2cos(u), 2sin(u), u/6) for u in 0..12.57 step 0.02
+
+// the same expression read at the clock, so it rides the coil
+tip = project(2cos(T), 2sin(T), T/6)</code></pre>
+    <p>
+      <code>project</code> returns a point, so it goes where a point goes — a <code>for</code> body, a
+      binding, a curve. it is not accepted where the grammar wants a literal tuple, so
+      <code>point p project(...)</code> is a parse error; bind it instead.
+    </p>
+    <p>
+      a camera declaration emits two plain variables, <code>cam_az</code> and <code>cam_el</code>, so the
+      angles stay draggable in desmos. one camera per file; without one the projection uses azimuth 0.6 and elevation 0.4.
+    </p>
+    <aside class="callout note">
+      <strong>note</strong>
+      <p>this is a projection, not a 3d renderer. faces are drawn in source order — nothing is sorted by depth or hidden behind anything else.</p>
+    </aside>
   </section>
 
   <section id="builtins">
@@ -735,6 +727,7 @@ a = slider(3, 0, 10, step=0.1, speed=1, loop) // step + looping auto-play</code>
         <tr><td><code>arctan(x)</code></td><td><code>\arctan\left(x\right)</code></td></tr>
         <tr><td><code>ln(x)</code></td><td><code>\ln\left(x\right)</code></td></tr>
         <tr><td><code>log(x)</code></td><td><code>\log\left(x\right)</code></td></tr>
+        <tr><td><code>exp(x)</code></td><td><code>\exp\left(x\right)</code></td></tr>
         <tr><td><code>min(a, b)</code></td><td><code>\min\left(a,b\right)</code></td></tr>
         <tr><td><code>max(a, b)</code></td><td><code>\max\left(a,b\right)</code></td></tr>
         <tr><td><code>floor(x)</code></td><td><code>\operatorname&#123;floor&#125;\left(x\right)</code></td></tr>
@@ -752,12 +745,23 @@ a = slider(3, 0, 10, step=0.1, speed=1, loop) // step + looping auto-play</code>
       <thead><tr><th>call</th><th>behavior</th></tr></thead>
       <tbody>
         <tr><td><code>slider(init, min, max)</code></td><td>creates a desmos slider expression with the given domain.</td></tr>
-        <tr><td><code>time(start, end, speed)</code></td><td>auto-playing slider. <code>animationPeriod = round(1000 / speed)</code>.</td></tr>
         <tr><td><code>rgb(r, g, b)</code></td><td>color value. r/g/b each 0–255.</td></tr>
         <tr><td><code>hsv(h, s, v)</code></td><td>color value. h: 0–360, s/v: 0–1.</td></tr>
-        <tr><td><code>gradient(from, to)</code></td><td>style suffix — interpolates color along curve/list parameter. colors can be named, hex strings, rgb(), or hsv().</td></tr>
-        <tr><td><code>project(...)</code></td><td>stub — emits the first argument unchanged as latex passthrough.</td></tr>
-        <tr><td><code>camera(...)</code></td><td>reserved — passes through the optimizer unmodified.</td></tr>
+        <tr><td><code>gradient(from, to)</code></td><td>style suffix only — interpolates color along the curve or list parameter. colors can be named, hex strings, rgb(), or hsv().</td></tr>
+        <tr><td><code>project(x, y, z)</code></td><td>projects a 3d point onto the graph through the declared camera. <code>z</code> defaults to 0.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>animation presets</h3>
+    <p>each preset takes a sweep value <code>u</code> and lowers to plain latex — no runtime helper is emitted. feed them the clock.</p>
+    <table>
+      <thead><tr><th>call</th><th>shape</th><th>latex</th></tr></thead>
+      <tbody>
+        <tr><td><code>ease(u)</code></td><td>smoothstep — starts and ends at rest</td><td><code>u^&#123;2&#125;(3-2u)</code></td></tr>
+        <tr><td><code>pulse(u)</code></td><td>rises 0 → 1 → 0</td><td><code>1-\left|2u-1\right|</code></td></tr>
+        <tr><td><code>bounce(u)</code></td><td>a bounce off zero, eased at the top</td><td><code>\left|\sin(\pi u)\right|</code></td></tr>
+        <tr><td><code>wobble(u, amp)</code></td><td>one full sine cycle. amp defaults to 1</td><td><code>amp\sin(2\pi u)</code></td></tr>
+        <tr><td><code>orbit(u, r)</code></td><td>a point once around a circle. r defaults to 1</td><td><code>(r\cos(2\pi u), r\sin(2\pi u))</code></td></tr>
       </tbody>
     </table>
 
@@ -860,10 +864,12 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
       <thead><tr><th>statement</th><th>notable desmos fields</th></tr></thead>
       <tbody>
         <tr><td><code>point</code></td><td><code>showLabel: true</code>, <code>label</code> set to dsl name</td></tr>
-        <tr><td><code>circle</code></td><td><code>fill: true</code>, <code>fillOpacity: "0.4"</code></td></tr>
+        <tr><td><code>circle</code></td><td><code>fill: true</code>, <code>fillOpacity: "0.1"</code> unless <code>opacity</code> is styled</td></tr>
         <tr><td><code>line</code></td><td>bare expression, no extra fields</td></tr>
         <tr><td><code>segment</code></td><td>compiled as a two-vertex polygon</td></tr>
-        <tr><td><code>polygon</code></td><td><code>fill: true</code></td></tr>
+        <tr><td><code>polygon</code></td><td><code>fill: true</code>, <code>fillOpacity: "0.2"</code></td></tr>
+        <tr><td><code>time</code></td><td>slider with <code>isPlaying</code>, <code>animationPeriod</code>, <code>loopMode</code></td></tr>
+        <tr><td><code>camera</code></td><td>two plain variables, <code>name_az</code> and <code>name_el</code></td></tr>
         <tr><td><code>curve</code> (tuple body)</td><td>parametric with domain bounds</td></tr>
         <tr><td><code>curve</code> (scalar body)</td><td>list comprehension</td></tr>
         <tr><td><code>region</code></td><td>inequality expression, fill determined by styling</td></tr>
@@ -915,17 +921,26 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
     <table>
       <thead><tr><th>check</th><th>example</th></tr></thead>
       <tbody>
+        <tr><td>undefined variable</td><td><code>[2:9] Semantic error: undefined variable 'raduis'</code></td></tr>
         <tr><td>undefined function</td><td><code>[1:5] Semantic error: undefined function 'foo'</code></td></tr>
-        <tr><td>arity mismatch</td><td><code>[3:1] Semantic error: 'hyp' expects 2 arguments, got 1</code></td></tr>
+        <tr><td>arity mismatch</td><td><code>[3:1] Semantic error: 'hyp' expects 2 argument(s), got 1</code></td></tr>
         <tr><td>non-positive generator step</td><td><code>[5:20] Semantic error: generator step must be positive</code></td></tr>
+        <tr><td>second clock or camera</td><td><code>Only one 'time' declaration is allowed</code></td></tr>
       </tbody>
     </table>
+    <p>
+      every identifier must be declared by some statement, so a typo is a compile error and not a new
+      silent desmos variable. <code>x</code>, <code>y</code>, <code>t</code>, <code>r</code>,
+      <code>theta</code>, <code>e</code> and <code>pi</code> are the exceptions — desmos gives those
+      a meaning already.
+    </p>
 
     <h3>warnings</h3>
     <p>warnings do not block compilation. they surface in the ide as yellow underlines:</p>
     <ul>
       <li>redeclaring a desmos built-in (<code>t</code>, <code>r</code>, <code>theta</code>)</li>
       <li>duplicate name in the same program</li>
+      <li>an <code>alias</code> or <code>fn</code> that nothing uses</li>
     </ul>
   </section>
 
@@ -936,10 +951,10 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
       <p>these are deliberate boundaries, not missing polish. the docs keep them visible so the implementation surface stays honest.</p>
     </aside>
     <ul>
-      <li><strong>no implicit multiplication</strong> — write <code>2*x</code>, not <code>2x</code>.</li>
-      <li><strong>no bare expressions</strong> — every top-level statement must start with a dsl keyword or an <code>ident =</code> binding.</li>
+      <li><strong>no bare expressions</strong> — every top-level statement must start with a dsl keyword or an <code>ident =</code> binding. <code>expr &#123;...&#125;</code> is the one exception.</li>
       <li><strong>no negative step in curve ranges</strong> — <code>t in 10..0</code> is syntactically valid but behavior is undefined.</li>
-      <li><strong><code>project</code> and <code>camera</code> are stubs</strong> — reserved keywords with no full implementation.</li>
+      <li><strong>one clock, one camera</strong> — a second <code>time</code> or <code>camera</code> declaration is a semantic error.</li>
+      <li><strong>3d is a projection, not a renderer</strong> — <code>project</code> flattens a point onto the 2d graph. there is no depth sorting and no hidden-surface removal.</li>
       <li><strong>no multi-return functions</strong> — <code>fn</code> definitions are single-expression only.</li>
       <li><strong>no recursion</strong> — recursive <code>fn</code> calls produce an infinite loop in the optimizer.</li>
     </ul>
@@ -948,9 +963,12 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
   <footer class="footer">
     <p class="footer-kicker">made by jayan patel, 2026</p>
     <p class="footer-line">
-      project is open source on <a href="https://github.com/KingJayan/desmos-ide">GitHub</a>
+      project is open source on
+      <a class="icon-link" href="https://github.com/KingJayan/desmos-ide"><Icon icon="simple-icons:github" />GitHub</a>
     </p>
     <p class="footer-meta">docs v{pkg.version}, dsl v{dsl.version}</p>
   </footer>
+    </div>
+    </div>
   </main>
 {/if}

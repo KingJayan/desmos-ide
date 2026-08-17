@@ -1,7 +1,7 @@
 {
   "name": "desmos-ide-docs",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@iconify/svelte": "^4",
     "svelte": "^4.2.18"
   },
   "devDependencies": {
