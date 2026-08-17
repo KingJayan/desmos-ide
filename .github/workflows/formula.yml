@@ -53,10 +53,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet; then
+          git add Formula/dsmx.rb
+          if git diff --cached --quiet; then
             echo "the formula is already current"
             exit 0
           fi
-          git add Formula/dsmx.rb
           git commit -m "dsmx ${{ steps.version.outputs.value }}"
           git push
