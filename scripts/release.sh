@@ -10,9 +10,10 @@
 #   xcrun notarytool store-credentials desmos-ide \
 #     --apple-id <id> --team-id <team> --password <app-specific-password>
 #
-# with no SIGN_IDENTITY the app is signed ad hoc and notarization is skipped.
-# an ad-hoc signature satisfies the arm64 kernel, but not Gatekeeper, so the
-# cask strips the quarantine flag after it copies the app.
+# with no SIGN_IDENTITY the nested binaries are signed ad hoc and notarization is
+# skipped. the app bundle itself is left unsigned, because any signature on it
+# stops the electrobun launcher before it spawns bun. an ad-hoc signature does
+# not satisfy Gatekeeper anyway, so the cask strips the quarantine flag.
 #
 # pass --dry-run to build and sign without notarizing or publishing.
 
@@ -105,10 +106,6 @@ sign "$APPEX_DEST"
 sign_inside "$APP"
 
 if [[ $ADHOC -eq 1 ]]; then
-  # the outer bundle is left unsigned on purpose. a signature on it, ad hoc or
-  # not, makes the electrobun launcher die before it spawns bun, so the app
-  # opens to nothing. the nested binaries still carry one, which is what the
-  # arm64 kernel asks for, and the cask strips quarantine either way
   codesign --verify --strict --verbose=2 "$APPEX_DEST"
 else
   sign "$APP"
