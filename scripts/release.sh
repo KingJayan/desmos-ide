@@ -51,8 +51,6 @@ APP="$(find build/stable-* -maxdepth 2 -name '*.app' -type d 2>/dev/null | head 
 APP_NAME="$(basename "$APP" .app)"
 [[ "$APP" == build/stable-* ]] || die "refusing to touch ${APP}"
 
-# electrobun wraps the real bundle in a self-extractor, and that launcher
-# segfaults in fs.path.resolve, so what gets shipped is the payload it carries
 PAYLOAD="$(find "${APP}/Contents/Resources" -maxdepth 1 -name '*.tar.zst' | head -1)"
 if [[ -n "$PAYLOAD" ]]; then
   step "unpacking the app bundle"
@@ -104,10 +102,18 @@ sign_inside() {
 
 sign_inside "$APPEX_DEST"
 sign "$APPEX_DEST"
-
 sign_inside "$APP"
-sign "$APP"
-codesign --verify --deep --strict --verbose=2 "$APP"
+
+if [[ $ADHOC -eq 1 ]]; then
+  # the outer bundle is left unsigned on purpose. a signature on it, ad hoc or
+  # not, makes the electrobun launcher die before it spawns bun, so the app
+  # opens to nothing. the nested binaries still carry one, which is what the
+  # arm64 kernel asks for, and the cask strips quarantine either way
+  codesign --verify --strict --verbose=2 "$APPEX_DEST"
+else
+  sign "$APP"
+  codesign --verify --deep --strict --verbose=2 "$APP"
+fi
 
 ZIP="build/${APP_NAME}-${VERSION}-$(uname -m).zip"
 step "packing ${ZIP}"
