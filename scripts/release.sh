@@ -43,10 +43,11 @@ TAG="v${VERSION}"
 git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && die "tag ${TAG} already exists"
 
 step "building ${TAG}"
-bun run build
+rm -rf build/stable-*
+bun run build:release
 
-APP="$(find build -maxdepth 3 -name '*.app' -type d | head -1)"
-[[ -n "$APP" ]] || die "no .app under build/"
+APP="$(find build/stable-* -maxdepth 2 -name '*.app' -type d 2>/dev/null | head -1)"
+[[ -n "$APP" ]] || die "no .app under build/stable-* — did electrobun build --env=stable run?"
 APP_NAME="$(basename "$APP" .app)"
 echo "app: ${APP}"
 
@@ -59,7 +60,6 @@ cp -R "$APPEX" "${APP}/Contents/PlugIns/"
 
 if [[ $ADHOC -eq 1 ]]; then
   step "signing ad hoc"
-  # no timestamp and no hardened runtime: both want a real authority
   sign() { codesign --force --timestamp=none --sign - "$@"; }
 else
   step "signing"
@@ -70,15 +70,25 @@ else
   }
 fi
 
-while IFS= read -r -d '' nested; do
-  sign "$nested"
-done < <(find "${APP}/Contents" \
-  \( -name '*.dylib' -o -name '*.framework' -o -name '*.appex' \) -print0)
+main_executable() { plutil -extract CFBundleExecutable raw -o - "$1/Contents/Info.plist"; }
 
-while IFS= read -r -d '' candidate; do
-  if file -b "$candidate" | grep -q 'Mach-O'; then sign "$candidate"; fi
-done < <(find "${APP}/Contents" -type f -perm -u+x -print0)
+APPEX_DEST="${APP}/Contents/PlugIns/DsmxQuickLook.appex"
 
+sign_inside() {
+  local bundle="$1" main
+  main="$(main_executable "$bundle")"
+  while IFS= read -r -d '' candidate; do
+    [[ "$(basename "$candidate")" == "$main" ]] && continue
+    file -b "$candidate" | grep -q 'Mach-O' || continue
+    sign "$candidate"
+  done < <(find "${bundle}/Contents" -path "${APPEX_DEST}" -prune -o \
+    -type f \( -perm -u+x -o -name '*.dylib' \) -print0)
+}
+
+sign_inside "$APPEX_DEST"
+sign "$APPEX_DEST"
+
+sign_inside "$APP"
 sign "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
