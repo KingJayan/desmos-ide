@@ -20,11 +20,26 @@
 * **source control** — Git branches, history, and remotes for the active file's repo
 * **custom editor** — configure fonts, minimap, line numbers, word wrap, and themes
 * **file ops** — open and save native `.dsmx` files
+* **cli** — `dsmx run file.dsmx` opens a live graph in the browser, no app needed
 * **ai sidebar** — streamed chat for dsl/expr generation with OpenAI, OpenRouter, Ollama, or Copilot
+
+## dsmx — the terminal graph
+
+run a `.dsmx` file in a live graph without installing the app:
+
+```bash
+brew install KingJayan/tap/dsmx
+dsmx run example/orbit.dsmx      # opens a graph, redraws on save
+dsmx build a.dsmx -o a.json      # desmos state as json
+dsmx fmt a.dsmx                  # format in place
+```
+
+macOS and Linux. it needs `node`, and loads the Desmos API over the network the
+first time.
 
 ## syntax
 
-see an [example file](example/demo.dsmx)
+see the [examples](example/), or the [full tour](example/demo.dsmx)
 
 [![Documentation](https://img.shields.io/badge/see%20full%20documentation-blue?style=for-the-badge&logo=readthedocs)](https://desmos-ide.vercel.app)
 
@@ -38,6 +53,8 @@ bun run build  # prod build → build/<channel>-<platform>/
 bun test       # compiler + editor tests
 bun test:e2e   # webkit over built app
 bun demo       # run compiler in the terminal w/o app shell
+bun dsmx       # the cli, straight from source
+bun pack:cli   # bundle + tarball the cli for a release
 ```
 
 ## troubleshooting
@@ -47,6 +64,7 @@ bun demo       # run compiler in the terminal w/o app shell
 | window opens blank | run `bun run build:view` (serves built `dist/`) |
 | AI sidebar does nothing | open the provider popover and set a model + API key |
 | source control panel is empty | follows the open file; save the file inside a repo first |
+| `dsmx run` shows a pink bar about the API | it needs a network connection the first time; the browser caches it after |
 
 or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
 
