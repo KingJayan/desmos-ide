@@ -94,7 +94,7 @@ class Parser {
 
   private recoverToNextStatement(): void {
     const stmtStartKws = new Set([
-      'fn', 'alias', 'debug', 'expr',
+      'fn', 'alias', 'debug', 'expr', 'use',
       'point', 'circle', 'line', 'curve', 'region', 'polygon', 'segment', 'text', 'group',
       'spiral', 'wave', 'grid',
     ]);
@@ -115,6 +115,7 @@ class Parser {
         case 'fn':      return this.parseFnDecl();
         case 'alias':   return this.parseAliasDecl();
         case 'debug':   return this.parseDebugDecl();
+        case 'use':     return this.parseUseDecl();
         case 'expr':    return this.parseExprBlockDecl();
         case 'point':   return this.parsePointStatement();
         case 'circle':  return this.parseCircleStatement();
@@ -138,7 +139,7 @@ class Parser {
     }
 
     throw new ParseError(
-      'Expected statement (fn / alias / debug / expr / point / circle / line / curve / region / polygon / segment / text / group / ident = expr)',
+      'Expected statement (use / fn / alias / debug / expr / point / circle / line / curve / region / polygon / segment / text / group / ident = expr)',
       t,
     );
   }
@@ -173,6 +174,13 @@ class Parser {
     this.eat('kw', 'debug');
     const expr = this.parseExpr();
     return { type: 'DebugDecl', expr, pos };
+  }
+
+  private parseUseDecl(): T.UseDecl {
+    const pos = this.curPos();
+    this.eat('kw', 'use');
+    const plugin = this.eat('str').value;
+    return { type: 'UseDecl', plugin, pos };
   }
 
   private parseExprBlockDecl(): T.ExprBlockDecl {

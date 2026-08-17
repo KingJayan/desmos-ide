@@ -93,12 +93,12 @@ export function optimize(program: T.Program, notes: OptimizeNote[] | null = null
       body.push({ ...stmt, body: optimizeExpr(stmt.body, env) });
       continue;
     }
+    if (stmt.type === 'UseDecl') continue;
     if (stmt.type === 'DebugDecl') {
       note(env, 'drop', stmt.pos, `debug ${printShort(stmt.expr)}`, 'no output');
       continue;
     }
 
-    // strip unreferenced aliases — they produce no graph output when unused
     if (stmt.type === 'AliasDecl' && !usedRefs.has(stmt.name)) {
       note(env, 'drop', stmt.pos, `alias ${stmt.name}`, 'never used');
       continue;

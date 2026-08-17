@@ -29,7 +29,8 @@ export type Statement =
   | WaveDecl
   | GridDecl
   | TimeDecl
-  | CameraDecl;
+  | CameraDecl
+  | UseDecl;
 
 /** a = expr [domain cond] */
 export interface VarDecl {
@@ -45,6 +46,13 @@ export interface AliasDecl {
   type: 'AliasDecl';
   name: string;
   value: Expr;
+  pos: Pos;
+}
+
+/** use "plugin-id"  — names a plugin the file needs, no output */
+export interface UseDecl {
+  type: 'UseDecl';
+  plugin: string;
   pos: Pos;
 }
 

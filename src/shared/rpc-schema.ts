@@ -2,6 +2,8 @@
  * replaces Electron `ipcMain.handle` / `ipcRenderer.invoke` channel names with a schema that both sides import
  */
 
+import type { InstalledPlugin, RegistryIndex } from '../plugin/manifest';
+
 export type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot';
 export type AIMessage = { role: 'user' | 'assistant'; content: string };
 export type AIConfig = { provider: AIProvider; model: string; baseUrl: string; apiKey: string };
@@ -61,6 +63,10 @@ export type CopilotModelsResult =
   | { ok: true; models: string[] }
   | { ok: false; error: string };
 
+export type PluginActionResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 export type DesmosIdeRPC = {
   bun: {
     requests: {
@@ -102,6 +108,12 @@ export type DesmosIdeRPC = {
       copilotRevoke: { params: void; response: { ok: true } };
       copilotGetModels: { params: { githubToken: string }; response: CopilotModelsResult };
 
+      pluginList: { params: void; response: InstalledPlugin[] };
+      pluginSetEnabled: { params: { id: string; enabled: boolean }; response: PluginActionResult };
+      pluginUninstall: { params: { id: string }; response: PluginActionResult };
+      pluginRegistry: { params: void; response: { ok: true; index: RegistryIndex } | { ok: false; message: string } };
+      pluginInstall: { params: { id: string }; response: { ok: true; plugin: InstalledPlugin } | { ok: false; message: string } };
+
       openExternal: { params: { url: string }; response: void };
       setRecentFiles: { params: { paths: string[] }; response: void };
       confirm: { params: { message: string }; response: boolean };
@@ -125,6 +137,8 @@ export type DesmosIdeRPC = {
       menuExportTex: void;
       menuExportImage: { format: 'png' | 'svg' };
       menuShare: void;
+      menuPlugins: void;
+      openPluginPage: { id: string };
       menuOpenRecent: { path: string };
     };
   };

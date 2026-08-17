@@ -42,12 +42,15 @@ export interface CompileSuccess {
   state: DesmosState;
   warnings: WarningMarker[];
   symbols: SymbolInfo[];
-  /** maps each graph expression back to the statement that produced it */
   sourceMap: ExprSource[];
-  /** the clock the transport drives, or null when the source declares no `time` */
   clock: ClockInfo | null;
-  /** every transform the optimizer made, innermost first inside a line */
   optimizations: OptimizeNote[];
+  uses: string[];
+}
+
+export interface CompileOptions {
+  prelude?: string;
+  available?: readonly string[];
 }
 
 export interface CompileError {
@@ -193,7 +196,7 @@ function mkError(raw: string, phase: 1 | 2, line?: number, col?: number, tokenLe
   return { error: raw, message, phase, line, col, endCol: (col != null && tokenLen) ? col + tokenLen : undefined, fix };
 }
 
-export function compile(src: string): CompileResult {
+export function compile(src: string, opts: CompileOptions = {}): CompileResult {
   try {
     const tokens = tokenize(src);
     const { ast, parseErrors } = parse(tokens);
@@ -203,6 +206,46 @@ export function compile(src: string): CompileResult {
         success: false,
         errors: parseErrors.map(e => mkError(e.error, 1, e.line, e.col, e.tokenLen)),
       };
+    }
+
+    const uses = ast.body.flatMap(s => (s.type === 'UseDecl' ? [s.plugin] : []));
+    if (opts.available) {
+      const have = new Set(opts.available);
+      const missing = ast.body.filter(
+        (s): s is Extract<Statement, { type: 'UseDecl' }> => s.type === 'UseDecl' && !have.has(s.plugin),
+      );
+      if (missing.length > 0) {
+        return {
+          success: false,
+          errors: missing.map(s => mkError(
+            `Plugin '${s.plugin}' is not installed`,
+            2, s.pos.line, s.pos.col,
+            undefined,
+            'Install it from the marketplace, or delete this line',
+          )),
+        };
+      }
+    }
+
+    const userAst: Program = { type: 'Program', body: [...ast.body] };
+    const fromPlugin = new Set<string>();
+    if (opts.prelude) {
+      const prelude = parse(tokenize(opts.prelude));
+      const contributed = prelude.ast.body.filter(
+        (s): s is Extract<Statement, { type: 'FnDecl' | 'AliasDecl' }> =>
+          s.type === 'FnDecl' || s.type === 'AliasDecl',
+      );
+      const asProgram: Program = { type: 'Program', body: contributed };
+      if (prelude.parseErrors.length === 0 && analyze(asProgram).length === 0) {
+        const declared = new Set(userAst.body.flatMap(s => {
+          const sym = stmtSymbol(s);
+          return sym ? [sym.name] : [];
+        }));
+        for (const s of contributed) {
+          if (!declared.has(s.name)) fromPlugin.add(s.name);
+        }
+        ast.body.unshift(...contributed);
+      }
     }
 
     const semanticErrors = analyze(ast);
@@ -215,11 +258,15 @@ export function compile(src: string): CompileResult {
 
     const optimizations: OptimizeNote[] = [];
     const optimized = optimize(ast, optimizations);
-    const { state, sourceMap, clock } = codegenWithSourceMap(optimized);
-    const symbols   = extractSymbols(ast);
-    const warnings  = checkWarnings(ast);
+    const drawn: Program = {
+      type: 'Program',
+      body: optimized.body.filter(s => !('name' in s && fromPlugin.has(s.name))),
+    };
+    const { state, sourceMap, clock } = codegenWithSourceMap(drawn);
+    const symbols   = extractSymbols(userAst);
+    const warnings  = checkWarnings(userAst);
 
-    return { success: true, state, warnings, symbols, sourceMap, clock, optimizations };
+    return { success: true, state, warnings, symbols, sourceMap, clock, optimizations, uses };
   } catch (e) {
     if (e instanceof LexError)
       return { success: false, errors: [mkError(e.message, 1, e.line, e.col)] };

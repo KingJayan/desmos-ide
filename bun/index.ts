@@ -1,8 +1,9 @@
-import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/bun';
+import Electrobun, { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/bun';
 import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
 import { exportImage, exportJson, exportTex, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
 import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
+import { fetchRegistry, installPlugin, listPlugins, setPluginEnabled, uninstallPlugin } from './plugins';
 import { searchFolder, searchPaths } from './search';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import {
@@ -66,6 +67,12 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       copilotPollDeviceFlow: ({ deviceCode }) => copilotPollDeviceFlow(deviceCode),
       copilotRevoke: () => copilotRevoke(),
       copilotGetModels: ({ githubToken }) => copilotGetModels(githubToken),
+
+      pluginList: () => listPlugins(),
+      pluginSetEnabled: ({ id, enabled }) => setPluginEnabled(id, enabled),
+      pluginUninstall: ({ id }) => uninstallPlugin(id),
+      pluginRegistry: () => fetchRegistry(),
+      pluginInstall: ({ id }) => installPlugin(id),
 
       openExternal: ({ url }) => {
         if (/^https?:\/\//i.test(url)) Utils.openExternal(url);
@@ -146,6 +153,8 @@ function buildMenu(): void {
       { label: 'Export SVG…', action: 'menu:exportSvg' },
       { label: 'Copy Share Link', action: 'menu:share' },
       { type: 'separator' },
+      { label: 'Plugins…', accelerator: 'CmdOrCtrl+7', action: 'menu:plugins' },
+      { type: 'separator' },
       {
         label: 'Open Recent',
         submenu: recentPaths.length
@@ -187,7 +196,15 @@ ApplicationMenu.on('application-menu-clicked', (event: unknown) => {
   else if (action === 'menu:exportPng') rpc.send.menuExportImage({ format: 'png' });
   else if (action === 'menu:exportSvg') rpc.send.menuExportImage({ format: 'svg' });
   else if (action === 'menu:share') rpc.send.menuShare();
+  else if (action === 'menu:plugins') rpc.send.menuPlugins();
   else if (action?.startsWith('menu:recent:')) rpc.send.menuOpenRecent({ path: action.slice('menu:recent:'.length) });
+});
+
+// the marketplace on the website opens a plugin in the app with dsmx://plugin/<id>
+Electrobun.events.on('open-url', (event: unknown) => {
+  const url = (event as { data?: { url?: string } })?.data?.url;
+  const id = /^dsmx:\/\/plugin\/([a-z0-9-]{2,40})\/?$/i.exec(url ?? '')?.[1];
+  if (id) rpc.send.openPluginPage({ id: id.toLowerCase() });
 });
 
 win.on('close', () => {

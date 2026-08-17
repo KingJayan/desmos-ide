@@ -13,3 +13,4 @@ docs/src/App.svelte.bak
 build
 dist
 artifacts
+registry/

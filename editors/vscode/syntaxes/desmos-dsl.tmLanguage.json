@@ -61,7 +61,7 @@
     },
     "keyword": {
       "name": "keyword.control.dsmx",
-      "match": "\\b(?:elevation|azimuth|polygon|project|segment|camera|circle|domain|mirror|period|region|spiral|alias|curve|debug|group|point|where|else|expr|grid|line|loop|step|text|then|time|wave|for|map|as|at|fn|if|in)\\b"
+      "match": "\\b(?:elevation|azimuth|polygon|project|segment|camera|circle|domain|mirror|period|region|spiral|alias|curve|debug|group|point|where|else|expr|grid|line|loop|step|text|then|time|wave|for|map|use|as|at|fn|if|in)\\b"
     },
     "builtin": {
       "name": "support.function.dsmx",

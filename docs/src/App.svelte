@@ -44,6 +44,7 @@
     { id: 'builtins', label: 'built-ins' },
     { id: 'codegen', label: 'codegen' },
     { id: 'optimizer', label: 'optimizer' },
+    { id: 'plugins', label: 'plugins' },
     { id: 'errors', label: 'errors' },
     { id: 'limitations', label: 'limitations' },
   ];
@@ -99,6 +100,7 @@
         { id: 'builtins', label: 'built-ins' },
         { id: 'codegen', label: 'codegen' },
         { id: 'optimizer', label: 'optimizer' },
+        { id: 'plugins', label: 'plugins' },
         { id: 'errors', label: 'errors' },
         { id: 'limitations', label: 'limitations' },
       ],
@@ -884,6 +886,19 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
       <li><strong>shadow-safe substitution</strong> — loop variables in <code>map</code>/<code>curve</code>/<code>for</code> shadow outer bindings during substitution; inner scope is never polluted.</li>
     </ul>
     <p>every transform is recorded, so <code>CompileSuccess.optimizations</code> lists each fold, identity, inline and drop with the position it happened at. the app shows that list in the optimizer tool window (<code>⌘6</code>) and prints the outermost result after the line it belongs to.</p>
+  </section>
+
+  <section id="plugins">
+    <h2>plugins</h2>
+    <p>a plugin adds to the language and to the editor without changing either. it is a manifest plus up to three parts, all optional: <code>lib.dsmx</code>, whose <code>fn</code> declarations reach every compile as a prelude; <code>main.js</code>, which runs in a worker with no network, no storage and no DOM; and a declarative theme.</p>
+    <p>plugins are client-side. a share link carries the file, never the plugin, so anything you send has to compile without it.</p>
+    <ul>
+      <li><strong>generators</strong> — <code>main.js</code> registers a macro, and <code>@name(1, "two")</code> on a line of its own expands into DSL before the compiler runs. the expansion keeps a line map, so an error inside generated code is reported against the line you wrote.</li>
+      <li><strong>libraries</strong> — <code>lib.dsmx</code> may declare only <code>fn</code> and <code>alias</code>. the declarations are inlined at their call sites and never drawn, so a plugin cannot put anything on your graph.</li>
+      <li><strong>pinning</strong> — <code>use "starfield"</code> names a plugin the file needs. without it the file fails to compile instead of quietly drawing nothing.</li>
+      <li><strong>commands</strong> — a plugin can add palette entries that hand back text to insert or replace.</li>
+    </ul>
+    <p>a macro that runs longer than a second and a half is stopped and its plugin reloaded, because a worker cannot be interrupted any other way. browse what exists on the <a href="/marketplace">marketplace</a>, or in the app with <code>⌘7</code>.</p>
   </section>
 
   <section id="errors">
