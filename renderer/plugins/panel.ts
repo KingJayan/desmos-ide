@@ -1,5 +1,6 @@
 import { iconEl } from '../icons';
 import { matches, mergeViews } from './actions';
+import { pluginIcon } from './icon';
 import type { PluginActions, PluginView } from './actions';
 
 export interface PanelElements {
@@ -52,9 +53,7 @@ export class PluginPanel {
     li.setAttribute('role', 'button');
     li.title = manifest.description;
 
-    const icon = document.createElement('span');
-    icon.className = 'plugin-row-icon';
-    icon.textContent = manifest.icon ?? '◆';
+    const icon = pluginIcon(manifest, 'plugin-row-icon');
 
     const body = document.createElement('div');
     body.className = 'plugin-row-body';

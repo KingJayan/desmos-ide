@@ -318,3 +318,201 @@
     code { padding: 0; background: none; }
   }
 }
+
+/* a picture icon sits in the same box the character one does */
+.plugin-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-xs);
+}
+
+.plugin-row-icon .plugin-icon-img { width: 18px; height: 18px; }
+.plugin-page-icon .plugin-icon-img { width: 100%; height: 100%; }
+
+.plugin-page-readme {
+  img { max-width: 100%; border-radius: var(--radius-md); }
+  ol { margin: 0 0 12px; padding-left: 20px; }
+  hr { margin: 16px 0; border: 0; border-top: 1px solid var(--border); }
+  blockquote {
+    margin: 0 0 12px;
+    padding-left: 12px;
+    border-left: 2px solid var(--border-strong);
+    color: var(--overlay2);
+  }
+}
+
+/* views a plugin contributed, above the installed list */
+.plugin-views {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plugin-view {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.plugin-view-title {
+  margin-bottom: 8px;
+  color: var(--overlay2);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.plugin-view-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plugin-widget-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--subtext0);
+  font-size: var(--fs-micro);
+}
+
+.plugin-widget-value {
+  color: var(--overlay2);
+  font-family: var(--font-mono);
+}
+
+.plugin-widget-label {
+  margin: 0;
+  color: var(--subtext1);
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+}
+
+.plugin-widget-label--muted { color: var(--overlay1); }
+
+.plugin-widget hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.plugin-widget-btn {
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface0);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-micro);
+  cursor: pointer;
+
+  &:hover { background: var(--hover); }
+}
+
+.plugin-widget-btn--primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--crust);
+}
+
+.plugin-widget-input,
+.plugin-widget-select {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--panel-sunken);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-micro);
+}
+
+.plugin-widget-slider { width: 100%; accent-color: var(--accent); }
+
+.plugin-widget-check {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--subtext1);
+  font-size: var(--fs-micro);
+  cursor: pointer;
+
+  input { accent-color: var(--accent); }
+}
+
+.plugin-widget-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plugin-widget-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-micro);
+}
+
+.plugin-widget-row-title { color: var(--subtext1); }
+.plugin-widget-row-detail { color: var(--overlay1); font-family: var(--font-mono); }
+
+.plugin-widget-row--clickable {
+  cursor: pointer;
+
+  &:hover { background: var(--hover); }
+}
+
+/* the right-click menu for the areas that have none of their own */
+.plugin-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+}
+
+.plugin-menu-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-micro);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover, &:focus-visible { background: var(--hover); outline: none; }
+}
+
+.plugin-menu-from { color: var(--overlay0); }
+
+/* what a plugin put in the status bar */
+.status-plugins {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.status-fact--plugin {
+  border: 0;
+  background: none;
+  color: var(--overlay2);
+  font: inherit;
+  cursor: default;
+}
+
+button.status-fact--plugin {
+  cursor: pointer;
+
+  &:hover { color: var(--text); }
+}

@@ -895,10 +895,11 @@ grid g = grid(cols=6, rows=6, xmin=-3, xmax=3, ymin=-3, ymax=3)</code></pre>
     <ul>
       <li><strong>generators</strong> — <code>main.js</code> registers a macro, and <code>@name(1, "two")</code> on a line of its own expands into DSL before the compiler runs. the expansion keeps a line map, so an error inside generated code is reported against the line you wrote.</li>
       <li><strong>libraries</strong> — <code>lib.dsmx</code> may declare only <code>fn</code> and <code>alias</code>. the declarations are inlined at their call sites and never drawn, so a plugin cannot put anything on your graph.</li>
-      <li><strong>pinning</strong> — <code>use "starfield"</code> names a plugin the file needs. without it the file fails to compile instead of quietly drawing nothing.</li>
-      <li><strong>commands</strong> — a plugin can add palette entries that hand back text to insert or replace.</li>
+      <li><strong>pinning</strong> — <code>use "polar-lab"</code> names a plugin the file needs. without it the file fails to compile instead of quietly drawing nothing.</li>
+      <li><strong>commands</strong> — palette entries that hand back text to insert or replace. commands can have keybindings and show up in the right-click menu.</li>
+      <li><strong>panels</strong> — a plugin sends widgets as data and the app builds them, so its markup never reaches the page. state can be kept per plugin or per folder.</li>
     </ul>
-    <p>a macro that runs longer than a second and a half is stopped and its plugin reloaded, because a worker cannot be interrupted any other way. browse what exists on the <a href="/marketplace">marketplace</a>, or in the app with <code>⌘7</code>.</p>
+    <p>a macro that runs longer than a second and a half is stopped and its plugin reloaded, because a worker cannot be interrupted any other way. browse what exists on the <a href="/marketplace">marketplace</a>, or in the app with <code>⌘7</code>. the registry has the api reference and six examples.</p>
   </section>
 
   <section id="errors">

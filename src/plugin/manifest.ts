@@ -1,8 +1,5 @@
-// the one plugin contract. the app, the sandbox, the registry and the docs site all
-// read these types, so a plugin the marketplace lists is a plugin the app can load.
 
 export interface PluginTheme {
-  /** monaco base to inherit from */
   dark: boolean;
   editor: Record<string, string>;
   tokens: Record<string, string>;
@@ -17,16 +14,29 @@ export interface PluginManifest {
   license?: string;
   homepage?: string;
   keywords?: string[];
-  /** sandboxed javascript, relative to the plugin folder */
   main?: string;
-  /** dsl source folded into every compile as a prelude */
   lib?: string;
   theme?: PluginTheme;
-  /** one emoji, shown in the plugin list and the marketplace card */
   icon?: string;
 }
 
-/** a plugin as it sits on disk, with its files already read */
+const IMAGE = /\.(?:png|svg|webp)$/i;
+
+export function iconIsImage(icon: string | undefined): boolean {
+  return !!icon && IMAGE.test(icon);
+}
+
+export const IMAGE_TYPES: Record<string, string> = {
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+};
+
+export function imageType(path: string): string | null {
+  const ext = /\.([a-z]+)$/i.exec(path)?.[1]?.toLowerCase();
+  return (ext && IMAGE_TYPES[ext]) ?? null;
+}
+
 export interface InstalledPlugin {
   manifest: PluginManifest;
   main: string | null;
@@ -35,10 +45,15 @@ export interface InstalledPlugin {
   enabled: boolean;
 }
 
-/** one row of the registry index */
+export interface PluginState {
+  global: Record<string, unknown>;
+  workspace: Record<string, unknown>;
+  storagePath: string | null;
+  globalStoragePath: string | null;
+}
+
 export interface RegistryEntry {
   manifest: PluginManifest;
-  /** folder inside the registry repo */
   path: string;
   updated?: string;
 }
@@ -50,8 +65,7 @@ export interface RegistryIndex {
 
 const ID = /^[a-z][a-z0-9-]{1,38}[a-z0-9]$/;
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9a-z.-]+)?$/i;
-// a plugin file is read from disk and from the network, so a path may not climb out
-// of the plugin folder
+
 const REL_PATH = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/i;
 
 function str(v: unknown, max: number): string | null {
@@ -83,7 +97,6 @@ function theme(v: unknown): PluginTheme | undefined {
   return { dark: t['dark'] !== false, editor, tokens };
 }
 
-/** returns null for anything that is not a plugin this app can load */
 export function parseManifest(raw: unknown): PluginManifest | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
@@ -113,8 +126,14 @@ export function parseManifest(raw: unknown): PluginManifest | null {
   if (lib) manifest.lib = lib;
   const t = theme(m['theme']);
   if (t) manifest.theme = t;
-  const icon = str(m['icon'], 8);
-  if (icon) manifest.icon = icon;
+
+  const icon = str(m['icon'], 128);
+  if (icon && iconIsImage(icon)) {
+    const path = relPath(icon);
+    if (path) manifest.icon = path;
+  } else if (icon && icon.length <= 8) {
+    manifest.icon = icon;
+  }
 
   return manifest;
 }
@@ -142,10 +161,10 @@ export function parseRegistry(raw: unknown): RegistryIndex {
   return { version: 1, plugins };
 }
 
-/** the files one plugin is allowed to carry, in the order they are fetched */
 export function pluginFiles(manifest: PluginManifest): string[] {
   const files = ['plugin.json', 'README.md'];
   if (manifest.main) files.push(manifest.main);
   if (manifest.lib) files.push(manifest.lib);
+  if (iconIsImage(manifest.icon)) files.push(manifest.icon!);
   return [...new Set(files)];
 }

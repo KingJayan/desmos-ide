@@ -1,19 +1,15 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { parseManifest, parseRegistry, pluginFiles } from '../src/plugin/manifest';
+import { iconIsImage, imageType, parseManifest, parseRegistry, pluginFiles } from '../src/plugin/manifest';
 import type { InstalledPlugin, PluginManifest, RegistryIndex } from '../src/plugin/manifest';
 
-// plugins live outside the app bundle, so an app update never deletes them and an
-// install needs no write access to the bundle
 const ROOT = join(homedir(), '.dsmx', 'plugins');
 const STATE = join(ROOT, 'state.json');
 
 const REGISTRY_INDEX = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main/index.json';
 const REGISTRY_RAW = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main';
 
-// a plugin file is code, so its size is capped before it is written and again before
-// it is read back
 const MAX_FILE = 512 * 1024;
 
 export type PluginResult<T> = ({ ok: true } & T) | { ok: false; message: string };
@@ -56,8 +52,6 @@ async function readPlugin(id: string, enabled: boolean): Promise<InstalledPlugin
   try { parsed = JSON.parse(raw); } catch { return null; }
 
   const manifest = parseManifest(parsed);
-  // the folder name is the identity. a manifest that claims another id would let one
-  // plugin answer for another
   if (!manifest || manifest.id !== id) return null;
 
   return {
@@ -146,8 +140,6 @@ export async function installPlugin(id: string): Promise<PluginResult<{ plugin: 
     if (text !== null) files.set(name, text);
   }
 
-  // the index is a listing, not the truth. what installs is the manifest that ships
-  // beside the code, and only if it agrees about who it is
   const shipped = files.get('plugin.json');
   const manifest: PluginManifest | null = shipped ? parseManifest(safeJson(shipped)) : null;
   if (!manifest || manifest.id !== id) {
@@ -181,4 +173,55 @@ export async function installPlugin(id: string): Promise<PluginResult<{ plugin: 
 
 function safeJson(text: string): unknown {
   try { return JSON.parse(text); } catch { return null; }
+}
+
+const MAX_ICON = 256 * 1024;
+
+function dataUri(type: string, bytes: Uint8Array): string {
+  return `data:${type};base64,${Buffer.from(bytes).toString('base64')}`;
+}
+
+async function registryEntry(id: string): Promise<{ base: string; manifest: PluginManifest } | null> {
+  const registry = await fetchRegistry();
+  if (!registry.ok) return null;
+  const entry = registry.index.plugins.find(p => p.manifest.id === id);
+  return entry ? { base: `${REGISTRY_RAW}/${entry.path}`, manifest: entry.manifest } : null;
+}
+
+export async function pluginIcon(id: string): Promise<string | null> {
+  const local = await readPlugin(id, true);
+  const manifest = local?.manifest ?? (await registryEntry(id))?.manifest ?? null;
+  if (!manifest || !iconIsImage(manifest.icon)) return null;
+
+  const type = imageType(manifest.icon!);
+  if (!type) return null;
+
+  if (local) {
+    try {
+      const bytes = await readFile(join(ROOT, id, manifest.icon!));
+      return bytes.length > MAX_ICON ? null : dataUri(type, bytes);
+    } catch {
+      return null;
+    }
+  }
+
+  const entry = await registryEntry(id);
+  if (!entry) return null;
+  try {
+    const res = await fetch(`${entry.base}/${manifest.icon!}`);
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return bytes.length > MAX_ICON ? null : dataUri(type, bytes);
+  } catch {
+    return null;
+  }
+}
+
+export async function pluginReadme(id: string): Promise<string | null> {
+  const local = await readPlugin(id, true);
+  if (local?.readme) return local.readme;
+
+  const entry = await registryEntry(id);
+  if (!entry) return null;
+  return getText(`${entry.base}/README.md`);
 }

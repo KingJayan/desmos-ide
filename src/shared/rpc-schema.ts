@@ -2,7 +2,7 @@
  * replaces Electron `ipcMain.handle` / `ipcRenderer.invoke` channel names with a schema that both sides import
  */
 
-import type { InstalledPlugin, RegistryIndex } from '../plugin/manifest';
+import type { InstalledPlugin, PluginState, RegistryIndex } from '../plugin/manifest';
 
 export type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot';
 export type AIMessage = { role: 'user' | 'assistant'; content: string };
@@ -113,6 +113,17 @@ export type DesmosIdeRPC = {
       pluginUninstall: { params: { id: string }; response: PluginActionResult };
       pluginRegistry: { params: void; response: { ok: true; index: RegistryIndex } | { ok: false; message: string } };
       pluginInstall: { params: { id: string }; response: { ok: true; plugin: InstalledPlugin } | { ok: false; message: string } };
+      pluginIcon: { params: { id: string }; response: string | null };
+      pluginReadme: { params: { id: string }; response: string | null };
+      pluginState: { params: { id: string; workspace: string | null }; response: PluginState };
+      pluginStateUpdate: {
+        params: { id: string; scope: 'global' | 'workspace'; workspace: string | null; key: string; value: unknown };
+        response: boolean;
+      };
+      pluginStateSync: { params: { id: string; keys: string[] }; response: boolean };
+      pluginSecret: { params: { id: string; key: string }; response: string | null };
+      pluginSecretStore: { params: { id: string; key: string; value: string }; response: boolean };
+      pluginSecretDelete: { params: { id: string; key: string }; response: boolean };
 
       openExternal: { params: { url: string }; response: void };
       setRecentFiles: { params: { paths: string[] }; response: void };

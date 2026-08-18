@@ -140,8 +140,11 @@ function saveSettings(s: EditorSettings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 
+export interface ExtraTheme { id: string; label: string }
+
 export class SettingsPanel {
   private overlay: HTMLElement;
+  private extraThemes: ExtraTheme[] = [];
   private settings: EditorSettings;
   private onChange: (s: EditorSettings) => void;
   private previousFocus: HTMLElement | null = null;
@@ -155,6 +158,28 @@ export class SettingsPanel {
       icons: { X },
       attrs: { 'stroke-width': '2' },
     });
+  }
+
+  /** themes a plugin defined, so an installed theme is one a user can pick */
+  setExtraThemes(themes: ExtraTheme[]): void {
+    this.extraThemes = themes;
+    const select = this.overlay.querySelector('#s-editor-theme') as HTMLSelectElement | null;
+    if (!select) return;
+
+    select.querySelector('#s-plugin-themes')?.remove();
+    if (themes.length === 0) return;
+
+    const group = document.createElement('optgroup');
+    group.id = 's-plugin-themes';
+    group.label = 'from plugins';
+    for (const theme of themes) {
+      const option = document.createElement('option');
+      option.value = theme.id;
+      option.textContent = theme.label;
+      group.appendChild(option);
+    }
+    select.appendChild(group);
+    select.value = this.settings.editorTheme;
   }
 
   private build(): HTMLElement {

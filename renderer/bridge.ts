@@ -79,6 +79,16 @@ export const electronAPI = {
   pluginUninstall: (id: string) => rpc.request.pluginUninstall({ id }),
   pluginRegistry: () => rpc.request.pluginRegistry(),
   pluginInstall: (id: string) => rpc.request.pluginInstall({ id }),
+  pluginIcon: (id: string) => rpc.request.pluginIcon({ id }).catch(() => null),
+  pluginReadme: (id: string) => rpc.request.pluginReadme({ id }).catch(() => null),
+  pluginState: (params: { id: string; workspace: string | null }) => rpc.request.pluginState(params),
+  pluginStateUpdate: (params: {
+    id: string; scope: 'global' | 'workspace'; workspace: string | null; key: string; value: unknown;
+  }) => rpc.request.pluginStateUpdate(params),
+  pluginStateSync: (params: { id: string; keys: string[] }) => rpc.request.pluginStateSync(params),
+  pluginSecret: (params: { id: string; key: string }) => rpc.request.pluginSecret(params),
+  pluginSecretStore: (params: { id: string; key: string; value: string }) => rpc.request.pluginSecretStore(params),
+  pluginSecretDelete: (params: { id: string; key: string }) => rpc.request.pluginSecretDelete(params),
 
   aiChat: (reqId: string, messages: AIMessage[], config: AIConfig, memories: string[]) =>
     rpc.send.aiChat({ reqId, messages, config, memories }),

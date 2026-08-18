@@ -2,10 +2,12 @@
   import { onMount } from 'svelte';
   import Icon from '@iconify/svelte';
   import Nav from './Nav.svelte';
-  import { parseRegistry } from '../../src/plugin/manifest.ts';
+  import { iconIsImage, parseRegistry } from '../../src/plugin/manifest.ts';
+  import { renderMarkdown } from '../../src/plugin/markdown.ts';
 
   const INDEX = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main/index.json';
   const REPO = 'https://github.com/KingJayan/dsmx-registry';
+  const RAW = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main';
 
   let state = 'loading';
   let error = '';
@@ -13,6 +15,34 @@
   let query = '';
   let selected = null;
   let copied = '';
+  // the readme of the open plugin, rendered by the same code the app uses, so one
+  // readme reads the same in both places
+  let readme = '';
+  let readmeFor = '';
+
+  function fileUrl(entry, name) {
+    return `${RAW}/${entry.path}/${name}`;
+  }
+
+  function iconUrl(entry) {
+    return iconIsImage(entry.manifest.icon) ? fileUrl(entry, entry.manifest.icon) : null;
+  }
+
+  async function loadReadme(entry) {
+    readmeFor = entry.manifest.id;
+    readme = '';
+    try {
+      const res = await fetch(fileUrl(entry, 'README.md'));
+      if (!res.ok) return;
+      const text = await res.text();
+      // a relative image in a readme is a file beside it in the registry
+      if (readmeFor === entry.manifest.id) {
+        readme = renderMarkdown(text, src => fileUrl(entry, src));
+      }
+    } catch {
+      readme = '';
+    }
+  }
 
   // /marketplace/<id> opens straight on that plugin, so a link can point at one
   function idFromPath() {
@@ -67,6 +97,7 @@
   });
 
   $: current = selected ? plugins.find(p => p.manifest.id === selected) ?? null : null;
+  $: if (current && current.manifest.id !== readmeFor) loadReadme(current);
 </script>
 
 <svelte:head>
@@ -84,7 +115,13 @@
 
     <article class="detail">
       <header>
-        <div class="detail-icon">{current.manifest.icon ?? '◆'}</div>
+        <div class="detail-icon">
+          {#if iconUrl(current)}
+            <img src={iconUrl(current)} alt="" />
+          {:else}
+            {current.manifest.icon ?? '◆'}
+          {/if}
+        </div>
         <div>
           <h1>{current.manifest.name}</h1>
           <div class="facts">
@@ -136,6 +173,15 @@
           {/if}
         </ul>
       </section>
+
+      {#if readme}
+        <section class="readme">
+          <h2>readme</h2>
+          <!-- rendered by src/plugin/markdown.ts, which escapes first and only then
+               puts back the few marks it knows -->
+          {@html readme}
+        </section>
+      {/if}
     </article>
   {:else}
     <header class="head">
@@ -160,7 +206,13 @@
       <div class="grid">
         {#each shown as plugin (plugin.manifest.id)}
           <button class="card" on:click={() => open(plugin.manifest.id)}>
-            <div class="card-icon">{plugin.manifest.icon ?? '◆'}</div>
+            <div class="card-icon">
+              {#if iconUrl(plugin)}
+                <img src={iconUrl(plugin)} alt="" />
+              {:else}
+                {plugin.manifest.icon ?? '◆'}
+              {/if}
+            </div>
             <div class="card-body">
               <div class="card-title">
                 <span class="card-name">{plugin.manifest.name}</span>
@@ -330,6 +382,36 @@
     gap: 20px;
     padding-bottom: 26px;
     border-bottom: 1px solid var(--border);
+  }
+
+  .card-icon img,
+  .detail-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 6px;
+  }
+
+  .readme {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border, #2a2a35);
+    line-height: 1.65;
+  }
+
+  .readme :global(h2),
+  .readme :global(h3),
+  .readme :global(h4) { margin: 24px 0 8px; }
+  .readme :global(p) { margin: 0 0 12px; }
+  .readme :global(ul),
+  .readme :global(ol) { margin: 0 0 14px; padding-left: 22px; }
+  .readme :global(img) { max-width: 100%; border-radius: 8px; }
+  .readme :global(hr) { margin: 20px 0; border: 0; border-top: 1px solid var(--border, #2a2a35); }
+  .readme :global(blockquote) {
+    margin: 0 0 12px;
+    padding-left: 14px;
+    border-left: 2px solid var(--border, #2a2a35);
+    opacity: 0.85;
   }
 
   .detail-icon {
