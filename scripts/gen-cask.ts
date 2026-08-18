@@ -4,9 +4,6 @@
 //   bun run scripts/gen-cask.ts                      # version from package.json
 //   bun run scripts/gen-cask.ts --version 1.4.0 --out /tmp/dsmx-app.rb
 //   bun run scripts/gen-cask.ts --zip build/desmos-ide-1.4.0-x86_64.zip
-//
-// a release can carry one arch or both. the cask names only the arch it finds,
-// so an install on the other one stops with a message instead of a broken url.
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
