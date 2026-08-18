@@ -3,7 +3,10 @@ import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
 import { exportImage, exportJson, exportTex, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
 import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
-import { fetchRegistry, installPlugin, listPlugins, setPluginEnabled, uninstallPlugin } from './plugins';
+import { fetchRegistry, installPlugin, listPlugins, pluginIcon, pluginReadme, setPluginEnabled, uninstallPlugin } from './plugins';
+import {
+  deletePluginSecret, getPluginSecret, pluginState, setSyncKeys, storePluginSecret, updatePluginState,
+} from './plugin-storage';
 import { searchFolder, searchPaths } from './search';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import {
@@ -73,6 +76,15 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       pluginUninstall: ({ id }) => uninstallPlugin(id),
       pluginRegistry: () => fetchRegistry(),
       pluginInstall: ({ id }) => installPlugin(id),
+      pluginIcon: ({ id }) => pluginIcon(id),
+      pluginReadme: ({ id }) => pluginReadme(id),
+      pluginState: ({ id, workspace }) => pluginState(id, workspace),
+      pluginStateUpdate: ({ id, scope, workspace, key, value }) =>
+        updatePluginState(id, scope, workspace, key, value),
+      pluginStateSync: ({ id, keys }) => setSyncKeys(id, keys),
+      pluginSecret: ({ id, key }) => getPluginSecret(id, key),
+      pluginSecretStore: ({ id, key, value }) => storePluginSecret(id, key, value),
+      pluginSecretDelete: ({ id, key }) => deletePluginSecret(id, key),
 
       openExternal: ({ url }) => {
         if (/^https?:\/\//i.test(url)) Utils.openExternal(url);

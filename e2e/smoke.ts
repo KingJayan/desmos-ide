@@ -50,7 +50,37 @@ await page.addInitScript(() => {
       for (let i = 0; i < n; i++) out.push('point star_' + i + ' (' + i + ', ' + i + ')');
       return out.join('\\n');
     });
-    dsmx.command('insert', 'starfield: insert stars', () => ({ insert: '@stars(3)\\n' }));`,
+    dsmx.command('insert', 'starfield: insert stars', () => ({ insert: '@stars(3)\\n' }));
+
+    let count = dsmx.globalState.get('count', 3);
+
+    dsmx.window.registerView({
+      id: 'shaper',
+      title: 'starfield',
+      widgets: [
+        { kind: 'slider', id: 'count', label: 'count', value: count, min: 1, max: 9, step: 1 },
+        { kind: 'button', id: 'go', label: 'scatter', primary: true },
+        { kind: 'iframe', src: 'https://example.dev' },
+      ],
+    }, (widget, value) => {
+      if (widget === 'count') {
+        count = value;
+        dsmx.globalState.update('count', value);
+        dsmx.window.updateView('shaper', [
+          { kind: 'slider', id: 'count', label: 'count', value: count, min: 1, max: 9, step: 1 },
+          { kind: 'button', id: 'go', label: 'scatter', primary: true },
+        ]);
+        return;
+      }
+      if (widget === 'go') {
+        dsmx.editor.insert('@stars(' + count + ')\\n');
+        dsmx.window.showInformationMessage('scattered ' + count + ' stars');
+      }
+    });
+
+    dsmx.window.registerStatusBarItem({ id: 'count', text: 'stars', command: 'insert' });
+    dsmx.keybindings.register('Alt+K', 'insert');
+    dsmx.menus.register('graph', 'insert', 'Insert stars');`,
     lib: 'fn twice(x) = 2*x\n',
     readme: '# Starfield\n\nPuts points in a spiral.\n',
     enabled: true,
@@ -67,6 +97,16 @@ await page.addInitScript(() => {
     pluginSetEnabled: () => Promise.resolve({ ok: true }),
     pluginUninstall: () => Promise.resolve({ ok: true }),
     pluginInstall: () => Promise.resolve({ ok: false, message: 'not in this test' }),
+    pluginIcon: () => Promise.resolve(null),
+    pluginReadme: () => Promise.resolve('# Lissajous\n\nDraws figures.\n'),
+    pluginState: () => Promise.resolve({
+      global: {}, workspace: {}, storagePath: null, globalStoragePath: null,
+    }),
+    pluginStateUpdate: () => Promise.resolve(true),
+    pluginStateSync: () => Promise.resolve(true),
+    pluginSecret: () => Promise.resolve(null),
+    pluginSecretStore: () => Promise.resolve(true),
+    pluginSecretDelete: () => Promise.resolve(true),
   };
 
   // anything the stub does not answer behaves the way a missing bridge does, so the
@@ -193,10 +233,64 @@ check(
 check(await page.locator('.plugin-page-readme h2').count() === 1, 'the readme is rendered');
 check(await page.locator('.plugin-tag--code').count() === 1, 'the page says the plugin runs code');
 
+stage = 'checking a readme the app had to fetch';
+await page.click('#file-tab');
+await page.click('#plugins-market-list .plugin-row');
+await page.waitForSelector('#plugin-page:not(.hidden)', { timeout: 10_000 });
+let fetched = '';
+for (let i = 0; i < 20 && !fetched.includes('Lissajous'); i++) {
+  fetched = (await page.locator('.plugin-page-readme').textContent()) ?? '';
+  if (!fetched.includes('Lissajous')) await page.waitForTimeout(200);
+}
+check(fetched.includes('Lissajous'), 'a plugin that is not installed still shows its readme');
+
+await page.click('#plugins-installed-list .plugin-row');
+await page.waitForSelector('#plugin-page:not(.hidden)', { timeout: 10_000 });
+
 await page.click('#file-tab');
 check(await page.locator('#plugin-page.hidden').count() === 1, 'the file tab comes back');
 await page.click('#plugin-tab-close');
 check(await page.locator('#plugin-tab.hidden').count() === 1, 'the extension tab closes');
+
+stage = 'checking a plugin view';
+await page.waitForSelector('#plugins-views .plugin-view', { timeout: 10_000 });
+check(
+  ((await page.locator('.plugin-view-title').first().textContent()) ?? '').includes('starfield'),
+  'a view the plugin registered is drawn',
+);
+check(
+  await page.locator('#plugins-views .plugin-widget--slider').count() === 1,
+  'the slider the plugin asked for is there',
+);
+check(
+  await page.locator('#plugins-views iframe').count() === 0,
+  'a widget kind nothing knows never reaches the page',
+);
+check(
+  ((await page.locator('#status-plugins').textContent()) ?? '').includes('stars'),
+  'the plugin put an item in the status bar',
+);
+
+stage = 'checking a plugin view event';
+await page.click('#editor-container .monaco-editor');
+await page.keyboard.press('Meta+A');
+await page.keyboard.press('Backspace');
+// the rail button toggles, so it only gets a click when the sidebar is away
+if (await page.locator('#plugins-sidebar-container.hidden').count() === 1) {
+  await page.click('#btn-sidebar-plugins');
+}
+await page.waitForSelector('#plugins-sidebar-container:not(.hidden)', { timeout: 10_000 });
+await page.locator('#plugins-views .plugin-widget-btn').first().click();
+let scattered = false;
+for (let i = 0; i < 30 && !scattered; i++) {
+  scattered = ((await page.locator('#editor-container').textContent()) ?? '').includes('@stars(');
+  if (!scattered) await page.waitForTimeout(200);
+}
+check(scattered, 'a button in a plugin view writes into the editor');
+check(
+  ((await page.locator('#toast-stack').textContent()) ?? '').includes('scattered'),
+  'a plugin message shows as a toast',
+);
 
 stage = 'checking a plugin macro';
 await page.click('#editor-container .monaco-editor');

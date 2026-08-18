@@ -1,0 +1,81 @@
+/* messages a plugin raises, which have to outlive the next compile */
+
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--status-h) + 16px);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-left-width: 2px;
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  animation: toast-in 140ms ease-out;
+}
+
+.toast--leaving {
+  opacity: 0;
+  transition: opacity 150ms ease-in;
+}
+
+.toast--info    { border-left-color: var(--accent); }
+.toast--warning { border-left-color: var(--peach); }
+.toast--error   { border-left-color: var(--red); }
+
+.toast--info .toast-icon    { color: var(--accent); }
+.toast--warning .toast-icon { color: var(--peach); }
+.toast--error .toast-icon   { color: var(--red); }
+
+.toast-icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.toast-body { flex: 1; min-width: 0; }
+
+.toast-source {
+  margin-bottom: 2px;
+  color: var(--overlay1);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.toast-text {
+  color: var(--subtext1);
+  font-size: var(--fs-micro);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  flex: none;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--overlay1);
+  cursor: pointer;
+
+  &:hover { background: var(--hover); color: var(--text); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}

@@ -1,12 +1,16 @@
 import { iconEl } from '../icons';
 import { mergeViews } from './actions';
 import type { PluginActions } from './actions';
-import { renderMarkdown } from './markdown';
+import { renderMarkdown } from '../../src/plugin/markdown';
+import { pluginIcon } from './icon';
 import type { InstalledPlugin } from '../../src/plugin/manifest';
 
 /** the extension page, shown as an editor tab the way an ide shows a readme */
 export class PluginPage {
   private id: string | null = null;
+  // the readme of a plugin nobody installed comes off the registry, so the page reads
+  // the same before an install as after one
+  private readmes = new Map<string, string | null>();
 
   constructor(
     private readonly root: HTMLElement,
@@ -44,7 +48,7 @@ export class PluginPage {
     const local = this.actions.installed().find(p => p.manifest.id === id) ?? null;
 
     this.root.appendChild(this.header(view.installed, view.enabled, manifest, local));
-    this.root.appendChild(this.body(manifest, local));
+    this.root.appendChild(this.body(id, manifest, local));
   }
 
   private header(
@@ -56,9 +60,7 @@ export class PluginPage {
     const head = document.createElement('header');
     head.className = 'plugin-page-head';
 
-    const icon = document.createElement('div');
-    icon.className = 'plugin-page-icon';
-    icon.textContent = manifest.icon ?? '◆';
+    const icon = pluginIcon(manifest, 'plugin-page-icon');
 
     const meta = document.createElement('div');
     meta.className = 'plugin-page-meta';
@@ -116,7 +118,7 @@ export class PluginPage {
     return head;
   }
 
-  private body(manifest: InstalledPlugin['manifest'], local: InstalledPlugin | null): HTMLElement {
+  private body(id: string, manifest: InstalledPlugin['manifest'], local: InstalledPlugin | null): HTMLElement {
     const body = document.createElement('div');
     body.className = 'plugin-page-body';
 
@@ -125,12 +127,24 @@ export class PluginPage {
 
     const readme = document.createElement('article');
     readme.className = 'plugin-page-readme';
-    readme.innerHTML = local?.readme
-      ? renderMarkdown(local.readme)
-      : '<p>This plugin ships no readme. Install it to see what it adds.</p>';
+
+    const text = local?.readme ?? this.readmes.get(id) ?? null;
+    if (text) {
+      readme.innerHTML = renderMarkdown(text);
+    } else if (this.readmes.has(id)) {
+      readme.innerHTML = '<p>This plugin ships no readme.</p>';
+    } else {
+      readme.innerHTML = '<p>Reading the readme…</p>';
+      void this.fetchReadme(id);
+    }
     body.appendChild(readme);
 
     return body;
+  }
+
+  private async fetchReadme(id: string): Promise<void> {
+    this.readmes.set(id, (await window.electronAPI?.pluginReadme(id)) ?? null);
+    if (this.id === id) this.render();
   }
 
   private contributions(manifest: InstalledPlugin['manifest'], local: InstalledPlugin | null): HTMLElement | null {

@@ -42,6 +42,11 @@ import {
 import { registerColorProvider } from './color-provider';
 import { iconEl } from './icons';
 import { PluginHost } from './plugins/host';
+import type { HostServices } from './plugins/host';
+import { PluginViews } from './plugins/views';
+import { PluginContextMenu } from './plugins/menu';
+import { forgetIcon } from './plugins/icon';
+import { Toasts } from './toast';
 import { PluginPanel } from './plugins/panel';
 import { PluginPage } from './plugins/page';
 import type { PluginActions } from './plugins/actions';
@@ -79,6 +84,7 @@ const statusMsg = $('status-msg');
 const statusBranch = $('status-branch');
 const statusSave = $('status-save');
 const statusPos = $('status-pos');
+const statusPlugins = $('status-plugins');
 const dividerEl = $('divider');
 const leftPanel = $('editor-island');
 const workspace = $('upper-row');
@@ -912,14 +918,55 @@ const gitPanel = new GitPanel({
 // plugins
 let registryEntries: RegistryEntry[] = [];
 
+const toasts = new Toasts();
+
+// the app commands a plugin may run, and the only ones. the host refuses anything not
+// named here before it ever reaches this map
+const appCommands: Record<string, () => void | Promise<void>> = {
+  format: () => runEditorAction('editor.action.formatDocument'),
+  compile: () => { runCompile(); },
+  save: () => cmdSave(),
+  'export.png': () => cmdExportImage('png'),
+  'export.svg': () => cmdExportImage('svg'),
+  'export.link': () => cmdCopyShareLink(),
+  'view.dsl': () => applyMode('dsl'),
+  'view.enhanced': () => applyMode('enhanced'),
+  'panel.optimizer': () => setBottomOpen(true, 'optimizer'),
+  'panel.problems': () => setBottomOpen(true, 'problems'),
+};
+
+const pluginServices: HostServices = {
+  notify: (kind, text) => toasts.show(kind, text, 'plugin'),
+  status: text => setStatus(text, 'info'),
+  editorText: () => editor.getValue(),
+  editorSelection: () => {
+    const selection = editor.getSelection();
+    const model = editor.getModel();
+    return selection && model && !selection.isEmpty() ? model.getValueInRange(selection) : '';
+  },
+  editorInsert: text => insertAtCursor(text),
+  editorReplace: text => replaceSelection(text),
+  editorSetText: text => { editor.setValue(text); editor.focus(); },
+  // a file keeps its state with the folder it sits in, so every file beside it sees
+  // the same workspace state
+  workspace: () => folderOf(currentPath),
+  runApp: async command => { await appCommands[command]?.(); },
+};
+
 const pluginHost = new PluginHost(() => {
   pluginPanel.render();
   pluginPage.render();
+  pluginViews.render(pluginHost.views());
+  renderPluginStatusItems();
+  syncEditorMenu();
   refreshPaletteCommands();
   registerPluginThemes();
-});
+}, pluginServices);
+
+let pluginThemes: { id: string; label: string }[] = [];
 
 function registerPluginThemes(): void {
+  const defined: { id: string; label: string }[] = [];
   for (const plugin of pluginHost.enabled()) {
     const theme = plugin.manifest.theme;
     if (!theme) continue;
@@ -933,7 +980,10 @@ function registerPluginThemes(): void {
       })),
       colors: Object.fromEntries(Object.entries(theme.editor).map(([k, v]) => [k, hex(v)])),
     });
+    defined.push({ id: `plugin-${plugin.manifest.id}`, label: plugin.manifest.name });
   }
+  pluginThemes = defined;
+  settingsPanel?.setExtraThemes(defined);
 }
 
 const pluginActions: PluginActions = {
@@ -961,6 +1011,7 @@ const pluginActions: PluginActions = {
       return;
     }
     if (pluginPage.openId === id) closePluginTab();
+    forgetIcon(id);
     await pluginHost.refresh();
     void runCompile();
     setStatus(`Removed ${id}`, 'success');
@@ -992,6 +1043,76 @@ const pluginPanel = new PluginPanel({
 }, pluginActions);
 
 const pluginPage = new PluginPage(pluginPageEl, pluginActions);
+
+const pluginViews = new PluginViews($('plugins-views'), (plugin, view, widget, value) => {
+  pluginHost.sendEvent(plugin, { view, widget, value });
+});
+
+const pluginMenu = new PluginContextMenu(pluginHost, (plugin, command) => {
+  void runPluginCommand(plugin, command);
+});
+
+/** what a plugin put in the status bar, redrawn whole every time anything changes */
+function renderPluginStatusItems(): void {
+  statusPlugins.replaceChildren();
+  for (const { plugin, item } of pluginHost.statusItems()) {
+    const el = document.createElement(item.command ? 'button' : 'span');
+    el.className = 'status-fact status-fact--plugin';
+    el.textContent = item.text;
+    el.title = item.tooltip ?? `${plugin}`;
+    if (item.command) {
+      const command = item.command;
+      (el as HTMLButtonElement).type = 'button';
+      el.addEventListener('click', () => void runPluginCommand(plugin, command));
+    }
+    statusPlugins.appendChild(el);
+  }
+}
+
+// alt changes what a key reports on macOS, so the combo is read off the physical key
+function comboOf(e: KeyboardEvent): string | null {
+  const code = e.code;
+  const base = /^Key([A-Z])$/.exec(code)?.[1]?.toLowerCase()
+    ?? /^Digit(\d)$/.exec(code)?.[1]
+    ?? (/^F([1-9]|1[0-2])$/.test(code) ? code.toLowerCase() : null);
+  if (!base) return null;
+
+  const mods: string[] = [];
+  if (e.altKey) mods.push('alt');
+  if (e.shiftKey) mods.push('shift');
+  if (e.ctrlKey) mods.push('ctrl');
+  if (e.metaKey) mods.push('meta');
+  if (!mods.includes('alt')) return null;
+  return [...mods, base].join('+');
+}
+
+window.addEventListener('keydown', e => {
+  const combo = comboOf(e);
+  if (!combo) return;
+  const owner = pluginHost.keyOwner(combo);
+  if (!owner) return;
+  e.preventDefault();
+  void runPluginCommand(owner.plugin, owner.command);
+});
+
+// the editor already has monaco's menu, so a plugin item joins that one rather than
+// putting a second menu over it
+let editorMenuActions: { dispose(): void }[] = [];
+
+function syncEditorMenu(): void {
+  for (const held of editorMenuActions) held.dispose();
+  editorMenuActions = pluginHost.menuItems('editor').map(({ plugin, item }) =>
+    editor.addAction({
+      id: `plugin.${plugin}.${item.command}`,
+      label: item.label,
+      contextMenuGroupId: 'plugin',
+      run: () => { void runPluginCommand(plugin, item.command); },
+    }));
+}
+
+pluginMenu.attach('graph', graphContainer);
+pluginMenu.attach('expressions', $('expr-list'));
+pluginMenu.attach('plugins', pluginsContainer);
 
 async function refreshRegistry(): Promise<void> {
   const result = await window.electronAPI?.pluginRegistry();
@@ -1091,8 +1212,16 @@ btnEnhanced.addEventListener('click', () => showMode('enhanced'));
 let currentPath: string | null = null;
 let watchedPath: string | null = null;
 
+function folderOf(p: string | null): string | null {
+  return p ? p.replace(/[\\/][^\\/]*$/, '') : null;
+}
+
 function setFilename(p: string | null): Promise<unknown> {
+  // a plugin keeps workspace state per folder, so moving to another one hands every
+  // plugin the state that belongs there
+  const moved = folderOf(p) !== folderOf(currentPath);
   currentPath = p;
+  if (moved) void pluginHost.reloadWorkspace();
   if (p) rememberRecent(p);
   const name = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
   filenameEl.textContent = name;
@@ -1927,6 +2056,7 @@ function ensureSettingsPanel(): SettingsPanel {
       wordWrap:    s.wordWrap,
     });
   });
+  settingsPanel.setExtraThemes(pluginThemes);
   return settingsPanel;
 }
 
@@ -2121,22 +2251,29 @@ function syncRecent(): void {
   void window.electronAPI?.setRecentFiles(recentFiles.map(f => f.path));
 }
 
+function insertAtCursor(text: string): void {
+  const pos = editor.getPosition() ?? { lineNumber: 1, column: 1 };
+  editor.executeEdits('plugin', [{
+    range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column),
+    text,
+  }]);
+  editor.focus();
+}
+
+/** with nothing selected a replace is an insert, which is what a plugin means by it */
+function replaceSelection(text: string): void {
+  const selection = editor.getSelection();
+  if (!selection || selection.isEmpty()) { insertAtCursor(text); return; }
+  editor.executeEdits('plugin', [{ range: selection, text }]);
+  editor.focus();
+}
+
 async function runPluginCommand(plugin: string, command: string): Promise<void> {
   const action = await pluginHost.runCommand(plugin, command);
   if (action.kind === 'status') { setStatus(action.text, 'info'); return; }
   if (action.kind === 'none') return;
-
-  const selection = editor.getSelection();
-  if (action.kind === 'replace' && selection && !selection.isEmpty()) {
-    editor.executeEdits('plugin', [{ range: selection, text: action.text }]);
-  } else {
-    const pos = editor.getPosition() ?? { lineNumber: 1, column: 1 };
-    editor.executeEdits('plugin', [{
-      range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column),
-      text: action.text,
-    }]);
-  }
-  editor.focus();
+  if (action.kind === 'replace') replaceSelection(action.text);
+  else insertAtCursor(action.text);
 }
 
 function refreshPaletteCommands(): void {
