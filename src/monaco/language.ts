@@ -97,7 +97,7 @@ export const monarchTokens = {
       [/[+\-*/^=<>!]/, 'operator'],
 
       [/[{}]/, 'delimiter.brace'],
-      [/[\[\]]/, 'delimiter.bracket'],
+      [/[[\]]/, 'delimiter.bracket'],
       [/[()]/, 'delimiter.parenthesis'],
 
       [/[,:]/, 'delimiter'],

@@ -1,4 +1,4 @@
-import * as monaco from 'monaco-editor';
+import * as monaco from './monaco';
 import { parseSliderVars, sliderRange } from '../src/monaco/sliders';
 import type { SliderVar } from '../src/monaco/sliders';
 
@@ -137,16 +137,17 @@ export class InlineSliderManager {
         this.vars.set(key, info);
         this.editor.layoutContentWidget(this.widgets.get(key)!);
       } else {
-        let w!: SliderWidget;
-        w = new SliderWidget(this.editor, info, (line, col, oldLen, newVal) => {
+        const held: { widget?: SliderWidget } = {};
+        const w = new SliderWidget(this.editor, info, (line, col, oldLen, newVal) => {
           const stored = this.vars.get(key);
-          if (!stored) return;
+          if (!stored || !held.widget) return;
           const range = new monaco.Range(line, col, line, col + oldLen);
           this.editor.executeEdits('inline-slider', [{ range, text: newVal }]);
           stored.numStr = newVal;
           stored.value = parseFloat(newVal);
-          this.editor.layoutContentWidget(w);
+          this.editor.layoutContentWidget(held.widget);
         });
+        held.widget = w;
         this.editor.addContentWidget(w);
         this.widgets.set(key, w);
         this.vars.set(key, info);

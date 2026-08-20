@@ -1,7 +1,7 @@
 import Sandbox from './sandbox.worker?worker';
 import type {
-  CommandAction, CommandInfo, HostCall, LoadedPlugin, MacroCall, MacroResult, SandboxRequest,
-  SandboxResponse, ViewEvent,
+  CommandAction, CommandInfo, HostCall, LoadedPlugin, LoadRequest, MacroCall, MacroResult,
+  SandboxRequest, SandboxResponse, ViewEvent,
 } from './protocol';
 import { applyMacros, findMacros } from '../../src/plugin/macro';
 import type { Expanded, MacroError } from '../../src/plugin/macro';
@@ -13,6 +13,7 @@ const EXPAND_TIMEOUT = 1500;
 const COMMAND_TIMEOUT = 3000;
 
 interface Pending {
+  plugin: string;
   resolve: (value: never) => void;
   timer: ReturnType<typeof setTimeout>;
 }
@@ -39,7 +40,8 @@ export const APP_COMMANDS = [
 ] as const;
 
 export class PluginHost {
-  private worker: Worker | null = null;
+  private workers = new Map<string, Worker>();
+  private requests = new Map<string, LoadRequest>();
   private installed: InstalledPlugin[] = [];
   private loaded = new Map<string, LoadedPlugin>();
   private macroOwner = new Map<string, string>();
@@ -120,8 +122,9 @@ export class PluginHost {
   private reset(): void {
     for (const p of this.pending.values()) clearTimeout(p.timer);
     this.pending.clear();
-    this.worker?.terminate();
-    this.worker = null;
+    for (const worker of this.workers.values()) worker.terminate();
+    this.workers.clear();
+    this.requests.clear();
   }
 
   private async reload(): Promise<void> {
@@ -150,18 +153,7 @@ export class PluginHost {
       };
     }));
 
-    this.worker = new Sandbox();
-    this.worker.addEventListener('message', e => this.onMessage(e as MessageEvent<SandboxResponse>));
-
-    const loaded = await new Promise<LoadedPlugin[]>(resolve => {
-      const done = (event: MessageEvent<SandboxResponse>) => {
-        if (event.data.type !== 'loaded') return;
-        this.worker?.removeEventListener('message', done);
-        resolve(event.data.plugins);
-      };
-      this.worker?.addEventListener('message', done);
-      this.send({ type: 'load', plugins: requests });
-    });
+    const loaded = await Promise.all(requests.map(request => this.spawn(request)));
 
     for (const plugin of loaded) {
       this.loaded.set(plugin.id, plugin);
@@ -171,29 +163,61 @@ export class PluginHost {
     }
   }
 
-  private send(msg: SandboxRequest): void {
-    this.worker?.postMessage(msg);
+  private spawn(request: LoadRequest): Promise<LoadedPlugin> {
+    this.requests.set(request.id, request);
+    this.workers.get(request.id)?.terminate();
+
+    const worker = new Sandbox();
+    this.workers.set(request.id, worker);
+    worker.addEventListener('message', e =>
+      this.onMessage(request.id, e as MessageEvent<SandboxResponse>));
+
+    return new Promise<LoadedPlugin>(resolve => {
+      const done = (event: MessageEvent<SandboxResponse>) => {
+        if (event.data.type !== 'loaded') return;
+        worker.removeEventListener('message', done);
+        resolve(event.data.plugins[0] ?? { id: request.id, macros: [], commands: [], error: null });
+      };
+      worker.addEventListener('message', done);
+      worker.postMessage({ type: 'load', plugins: [request] } satisfies SandboxRequest);
+    });
   }
 
-  private onMessage(event: MessageEvent<SandboxResponse>): void {
+  private async restart(id: string): Promise<void> {
+    const request = this.requests.get(id);
+    if (!request) return;
+    for (const [callId, held] of this.pending) {
+      if (held.plugin !== id) continue;
+      clearTimeout(held.timer);
+      this.pending.delete(callId);
+    }
+    const plugin = await this.spawn(request);
+    this.loaded.set(id, plugin);
+  }
+
+  private send(plugin: string, msg: SandboxRequest): void {
+    this.workers.get(plugin)?.postMessage(msg);
+  }
+
+  private onMessage(owner: string, event: MessageEvent<SandboxResponse>): void {
     const msg = event.data;
     if (msg.type === 'loaded') return;
 
     if (msg.type === 'contributes') {
-      this.contributed.set(msg.plugin, parseContributions(msg.plugin, msg.contributions));
+      this.contributed.set(owner, parseContributions(owner, msg.contributions));
       this.recount();
       this.onChange();
       return;
     }
 
     if (msg.type === 'commands') {
-      this.extraCommands.set(msg.plugin, msg.commands.filter(c => c.plugin === msg.plugin));
+      this.extraCommands.set(owner, msg.commands.map(c => ({ ...c, plugin: owner })));
       this.onChange();
       return;
     }
 
     if (msg.type === 'host') {
-      void this.serve(msg);
+      void this.serve(owner, msg);
       return;
     }
 
@@ -212,12 +236,12 @@ export class PluginHost {
     this.keyClashes = clashes;
   }
 
-  private async serve(msg: Extract<SandboxResponse, { type: 'host' }>): Promise<void> {
+  private async serve(owner: string, msg: Extract<SandboxResponse, { type: 'host' }>): Promise<void> {
     const reply = (ok: boolean, value?: unknown, error?: string) =>
-      this.send({ type: 'hostReply', id: msg.id, ok, value, error });
+      this.send(owner, { type: 'hostReply', id: msg.id, ok, value, error });
 
     try {
-      reply(true, await this.call(msg.plugin, msg.call, msg.args));
+      reply(true, await this.call(owner, msg.call, msg.args));
     } catch (err) {
       reply(false, undefined, err instanceof Error ? err.message : String(err));
     }
@@ -288,17 +312,19 @@ export class PluginHost {
     }
   }
 
-  private ask<T extends SandboxResponse>(msg: (id: number) => SandboxRequest, ms: number, onTimeout: T): Promise<T> {
-    if (!this.worker) return Promise.resolve(onTimeout);
+  private ask<T extends SandboxResponse>(
+    plugin: string, msg: (id: number) => SandboxRequest, ms: number, onTimeout: T,
+  ): Promise<T> {
+    if (!this.workers.has(plugin)) return Promise.resolve(onTimeout);
     const id = this.nextId++;
     return new Promise<T>(resolve => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        void this.reload();
+        void this.restart(plugin);
         resolve(onTimeout);
       }, ms);
-      this.pending.set(id, { resolve: resolve as (value: never) => void, timer });
-      this.send(msg(id));
+      this.pending.set(id, { plugin, resolve: resolve as (value: never) => void, timer });
+      this.send(plugin, msg(id));
     });
   }
 
@@ -324,19 +350,26 @@ export class PluginHost {
       calls.push({ key: String(site.line), plugin, macro: site.macro, args: site.args });
     }
 
-    let results: MacroResult[] = [];
-    if (calls.length > 0) {
-      const reply = await this.ask<Extract<SandboxResponse, { type: 'expanded' }>>(
-        id => ({ type: 'expand', id, calls }),
+    const byPlugin = new Map<string, MacroCall[]>();
+    for (const call of calls) {
+      const held = byPlugin.get(call.plugin);
+      if (held) held.push(call);
+      else byPlugin.set(call.plugin, [call]);
+    }
+
+    const replies = await Promise.all([...byPlugin].map(([plugin, mine]) =>
+      this.ask<Extract<SandboxResponse, { type: 'expanded' }>>(
+        plugin,
+        id => ({ type: 'expand', id, calls: mine }),
         EXPAND_TIMEOUT,
         {
           type: 'expanded',
           id: 0,
-          results: calls.map(c => ({ key: c.key, dsl: null, error: 'the plugin took too long and was stopped' })),
+          results: mine.map(c => ({ key: c.key, dsl: null, error: 'the plugin took too long and was stopped' })),
         },
-      );
-      results = reply.results;
-    }
+      )));
+
+    const results: MacroResult[] = replies.flatMap(reply => reply.results);
 
     const expansions = new Map<number, string>();
     const failed: MacroError[] = [...unknown];
@@ -351,6 +384,7 @@ export class PluginHost {
 
   async runCommand(plugin: string, command: string): Promise<CommandAction> {
     const reply = await this.ask<Extract<SandboxResponse, { type: 'commandDone' }>>(
+      plugin,
       id => ({ type: 'command', id, plugin, command }),
       COMMAND_TIMEOUT,
       { type: 'commandDone', id: 0, action: { kind: 'status', text: 'The plugin took too long and was stopped' }, error: null },
@@ -360,7 +394,7 @@ export class PluginHost {
   }
 
   sendEvent(plugin: string, event: ViewEvent): void {
-    this.send({ type: 'event', plugin, event });
+    this.send(plugin, { type: 'event', plugin, event });
   }
 
   dispose(): void {

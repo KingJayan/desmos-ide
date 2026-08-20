@@ -2,6 +2,7 @@
 
 import { readdir, readFile, stat } from 'fs/promises';
 import { extname, join } from 'path';
+import { allowed, allowedRoot } from './paths';
 import type { SearchHit, SearchResult } from '../src/shared/rpc-schema';
 
 const MAX_HITS = 200;
@@ -89,10 +90,11 @@ export async function searchFolder(
   query: string,
   useRegex: boolean,
 ): Promise<SearchResult> {
-  if (typeof root !== 'string' || !root) {
+  const full = allowedRoot(root);
+  if (!full) {
     return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'No folder to search.' };
   }
-  return searchPaths(await collectFiles(root), query, useRegex);
+  return searchPaths(await collectFiles(full), query, useRegex);
 }
 
 export async function searchPaths(
@@ -108,8 +110,10 @@ export async function searchPaths(
   const hits: SearchHit[] = [];
   let scanned = 0;
 
-  for (const path of paths) {
+  for (const raw of paths) {
     if (hits.length >= MAX_HITS) break;
+    const path = allowed(raw);
+    if (!path) continue;
     try {
       if ((await stat(path)).size > MAX_BYTES) continue;
       const content = await readFile(path, 'utf-8');

@@ -1,9 +1,16 @@
 import { readFile, writeFile } from 'fs/promises';
 import { watch, type FSWatcher } from 'fs';
 import { showOpenDialog, showSaveDialog } from './dialogs';
+import { allowFile, allowed } from './paths';
 import type { FileResult } from '../src/shared/rpc-schema';
 
 const CANCELED = { ok: false, canceled: true, errorCode: 'CANCELED', message: '' } as const;
+
+const NOT_ALLOWED = {
+  ok: false,
+  errorCode: 'NOT_ALLOWED',
+  message: 'This app has not been given that path. Open it through File → Open once.',
+} as const;
 
 function fileError(err: unknown): FileResult<never> {
   const e = err as NodeJS.ErrnoException;
@@ -31,8 +38,10 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 300): P
 }
 
 export async function openFile(): Promise<FileResult<{ path: string; content: string }>> {
-  const path = await showOpenDialog({ extensions: ['dsmx'] });
-  if (!path) return CANCELED;
+  const picked = await showOpenDialog({ extensions: ['dsmx'] });
+  if (!picked) return CANCELED;
+  const path = allowFile(picked);
+  if (!path) return NOT_ALLOWED;
   try {
     const content = await withRetry(() => readFile(path, 'utf-8'));
     return { ok: true, path, content };
@@ -41,11 +50,12 @@ export async function openFile(): Promise<FileResult<{ path: string; content: st
   }
 }
 
-// opens a known path with no dialog, for the recent-files list and search results
-export async function readFileAt(path: string): Promise<FileResult<{ path: string; content: string }>> {
-  if (typeof path !== 'string' || !path) {
+export async function readFileAt(raw: string): Promise<FileResult<{ path: string; content: string }>> {
+  if (typeof raw !== 'string' || !raw) {
     return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Path must be a string.' };
   }
+  const path = allowed(raw);
+  if (!path) return NOT_ALLOWED;
   try {
     return { ok: true, path, content: await withRetry(() => readFile(path, 'utf-8')) };
   } catch (err) {
@@ -55,11 +65,14 @@ export async function readFileAt(path: string): Promise<FileResult<{ path: strin
 
 export async function saveFile(path: string | null, content: string): Promise<FileResult<{ path: string }>> {
   if (typeof content !== 'string') return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Content must be a string.' };
-  let savePath = path;
+  let savePath = path ? allowed(path) : null;
+  if (path && !savePath) return NOT_ALLOWED;
   try {
     if (!savePath) {
-      savePath = await showSaveDialog({ defaultName: 'untitled.dsmx', extension: 'dsmx', prompt: 'Save DSL file' });
-      if (!savePath) return CANCELED;
+      const picked = await showSaveDialog({ defaultName: 'untitled.dsmx', extension: 'dsmx', prompt: 'Save DSL file' });
+      if (!picked) return CANCELED;
+      savePath = allowFile(picked);
+      if (!savePath) return NOT_ALLOWED;
     }
     await withRetry(() => writeFile(savePath!, content, 'utf-8'));
     noteSelfWrite(savePath, content);
@@ -140,7 +153,8 @@ export function unwatchAll(): void {
   for (const path of [...fileWatchers.keys()]) unwatchFile(path);
 }
 
-export function watchFile(path: string, onChange: (path: string, content: string) => void): void {
+export function watchFile(raw: string, onChange: (path: string, content: string) => void): void {
+  const path = allowed(raw);
   if (!path) return;
   unwatchFile(path);
   const entry: WatcherEntry = { watcher: null!, debounce: null };

@@ -15,11 +15,37 @@ const DESMOS_IMPLICIT = new Set([
   'Infinity', 'inf',
 ]);
 
-export function analyze(program: T.Program): SemanticError[] {
+/** remembers which statements came back clean, for as long as the declarations around
+ * them stay the same. a statement's verdict depends on nothing else. */
+export interface AnalyzeCache {
+  vars: Set<string> | null;
+  fns: Map<string, number> | null;
+  clean: WeakSet<T.Statement>;
+}
+
+export function createAnalyzeCache(): AnalyzeCache {
+  return { vars: null, fns: null, clean: new WeakSet() };
+}
+
+function sameVars(a: Set<string> | null, b: Set<string>): boolean {
+  if (!a || a.size !== b.size) return false;
+  for (const n of b) if (!a.has(n)) return false;
+  return true;
+}
+
+function sameFns(a: Map<string, number> | null, b: Map<string, { params: string[] }>): boolean {
+  if (!a || a.size !== b.size) return false;
+  for (const [n, def] of b) if (a.get(n) !== def.params.length) return false;
+  return true;
+}
+
+export function analyze(program: T.Program, cache?: AnalyzeCache): SemanticError[] {
   const errors: SemanticError[] = [];
 
   const declaredFns = new Map<string, { params: string[]; pos: T.Pos }>();
   const declaredVars = new Set<string>(DESMOS_IMPLICIT);
+  const times: T.Statement[] = [];
+  const cameras: T.Statement[] = [];
 
   for (const stmt of program.body) {
     switch (stmt.type) {
@@ -41,21 +67,44 @@ export function analyze(program: T.Program): SemanticError[] {
       case 'SpiralDecl':  declaredVars.add(stmt.name); break;
       case 'WaveDecl':    declaredVars.add(stmt.name); break;
       case 'GridDecl':    declaredVars.add(stmt.name); break;
-      case 'TimeDecl':    declaredVars.add(stmt.name); break;
-      case 'CameraDecl':  declaredVars.add(stmt.name); break;
+      case 'TimeDecl':    declaredVars.add(stmt.name); times.push(stmt);   break;
+      case 'CameraDecl':  declaredVars.add(stmt.name); cameras.push(stmt); break;
     }
   }
 
   // project() reads one camera and the transport drives one clock, so a second of
   // either has no way to say which one is meant
-  onlyOne(program, 'TimeDecl', 'time', errors);
-  onlyOne(program, 'CameraDecl', 'camera', errors);
+  onlyOne(times, 'time', errors);
+  onlyOne(cameras, 'camera', errors);
+
+  if (!cache) {
+    for (const stmt of program.body) checkStmt(stmt, declaredFns, declaredVars, errors);
+    return errors;
+  }
+
+  if (!sameVars(cache.vars, declaredVars) || !sameFns(cache.fns, declaredFns)) {
+    cache.vars = new Set(declaredVars);
+    cache.fns = new Map([...declaredFns].map(([n, d]) => [n, d.params.length]));
+    cache.clean = new WeakSet();
+  }
 
   for (const stmt of program.body) {
+    if (cache.clean.has(stmt)) continue;
+    const before = errors.length;
     checkStmt(stmt, declaredFns, declaredVars, errors);
+    if (errors.length === before) cache.clean.add(stmt);
   }
 
   return errors;
+}
+
+/** adds names to the shared scope set, runs f, then removes only what it added.
+ * copying the set per scope was quadratic. removing only what this scope added is
+ * what keeps a param shadowing a real declaration from erasing it */
+function withScope<R>(vars: Set<string>, names: readonly string[], f: () => R): R {
+  const added = names.filter(n => !vars.has(n));
+  for (const n of added) vars.add(n);
+  try { return f(); } finally { for (const n of added) vars.delete(n); }
 }
 
 function checkStmt(
@@ -64,7 +113,7 @@ function checkStmt(
   vars: Set<string>,
   errors: SemanticError[],
 ): void {
-  const cx = (e: T.Expr, localVars = vars) => checkExpr(e, fns, localVars, errors);
+  const cx = (e: T.Expr) => checkExpr(e, fns, vars, errors);
 
   switch (stmt.type) {
     case 'VarDecl':
@@ -78,18 +127,20 @@ function checkStmt(
       cx(stmt.expr);
       break;
     case 'ExprBlockDecl': {
-      const localVars = new Set(vars);
-      for (const b of stmt.bindings) {
-        cx(b.value, localVars);
-        localVars.add(b.name);
+      const added: string[] = [];
+      try {
+        for (const b of stmt.bindings) {
+          cx(b.value);
+          if (!vars.has(b.name)) { vars.add(b.name); added.push(b.name); }
+        }
+        cx(stmt.result);
+      } finally {
+        for (const n of added) vars.delete(n);
       }
-      cx(stmt.result, localVars);
       break;
     }
     case 'FnDecl': {
-      const localVars = new Set(vars);
-      for (const p of stmt.params) localVars.add(p);
-      cx(stmt.body, localVars);
+      withScope(vars, stmt.params, () => cx(stmt.body));
       break;
     }
     case 'PointDecl':
@@ -106,11 +157,9 @@ function checkStmt(
       if (stmt.expr)      cx(stmt.expr);
       break;
     case 'CurveDecl': {
-      const localVars = new Set(vars);
-      localVars.add(stmt.var);
       cx(stmt.start); cx(stmt.end);
       if (stmt.step) cx(stmt.step);
-      cx(stmt.body, localVars);
+      withScope(vars, [stmt.var], () => cx(stmt.body));
       break;
     }
     case 'RegionDecl':    cx(stmt.expr);  break;
@@ -151,13 +200,12 @@ function checkStmt(
 
 /** reports every declaration of a kind past the first */
 function onlyOne(
-  program: T.Program,
-  kind: 'TimeDecl' | 'CameraDecl',
+  found: readonly T.Statement[],
   keyword: string,
   errors: SemanticError[],
 ): void {
-  const found = program.body.filter(s => s.type === kind);
-  for (const extra of found.slice(1)) {
+  for (let k = 1; k < found.length; k++) {
+    const extra = found[k];
     errors.push({
       error: `Only one '${keyword}' declaration is allowed`,
       line: extra.pos.line,
@@ -173,7 +221,7 @@ function checkExpr(
   vars: Set<string>,
   errors: SemanticError[],
 ): void {
-  const cx = (e: T.Expr, localVars = vars) => checkExpr(e, fns, localVars, errors);
+  const cx = (e: T.Expr) => checkExpr(e, fns, vars, errors);
 
   switch (expr.type) {
     case 'NumLit':
@@ -263,18 +311,14 @@ function checkExpr(
 
     case 'MapExpr': {
       cx(expr.range);
-      const localVars = new Set(vars);
-      localVars.add(expr.var);
-      cx(expr.body, localVars);
+      withScope(vars, [expr.var], () => cx(expr.body));
       break;
     }
 
     case 'ForExpr': {
       cx(expr.start); cx(expr.end);
       if (expr.step) cx(expr.step);
-      const localVars = new Set(vars);
-      localVars.add(expr.var);
-      cx(expr.body, localVars);
+      withScope(vars, [expr.var], () => cx(expr.body));
       break;
     }
   }

@@ -1,4 +1,4 @@
-import * as monaco from 'monaco-editor';
+import * as monaco from './monaco';
 import { LANGUAGE_ID } from '../src/monaco/language';
 
 export const DESMOS_NAMED: Record<string, string> = {

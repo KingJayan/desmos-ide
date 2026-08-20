@@ -119,7 +119,8 @@ export class SearchPanel {
   }
 
   toggle(): void {
-    this.open ? this.close() : this.show();
+    if (this.open) this.close();
+    else this.show();
   }
 
   /** the folder search would walk, whether the user picked it or the open file implies it */

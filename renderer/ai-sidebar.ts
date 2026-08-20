@@ -262,7 +262,7 @@ export class AISidebar {
       for (const p of PROVIDERS) this.providerConfigs[p.id].apiKey = this.secrets.get(p.id);
       this.syncProviderUi();
       const copilotToken = this.getProviderConfig('github-copilot').apiKey;
-      if (copilotToken) this.fetchCopilotModels(copilotToken);
+      if (copilotToken) void this.fetchCopilotModels(copilotToken);
     });
   }
 
@@ -563,7 +563,7 @@ export class AISidebar {
       this.configEl.hidden = false;
       setTimeout(() => { this.cfgModelEl.focus(); }, 0);
       if (this.provider === 'github-copilot' && cfg.apiKey && !this.copilotModels) {
-        this.fetchCopilotModels(cfg.apiKey).then(() => {
+        void this.fetchCopilotModels(cfg.apiKey).then(() => {
           if (!this.configEl.hidden) this.populateModelSelect(this.provider, this.cfgModelEl.value);
         });
       }
@@ -811,7 +811,7 @@ export class AISidebar {
       link.href = this.copilotAuth.verificationUri;
       link.addEventListener('click', e => {
         e.preventDefault();
-        window.electronAPI?.openExternal(this.copilotAuth!.verificationUri);
+        void window.electronAPI?.openExternal(this.copilotAuth!.verificationUri);
       });
       codeWrap.hidden = false;
     } else {
@@ -838,7 +838,7 @@ export class AISidebar {
         pollTimer: null,
       };
       this.renderCopilotStatus();
-      window.electronAPI?.openExternal(result.verification_uri);
+      void window.electronAPI?.openExternal(result.verification_uri);
       this.copilotAuth.pollTimer = setInterval(() => this.pollCopilotAuth(), this.copilotAuth!.interval * 1000);
     } catch (e) {
       this.appendSystemMsg(`Copilot auth failed: ${e}`);
@@ -860,7 +860,7 @@ export class AISidebar {
         this.saveProviderConfigs();
         this.syncProviderUi();
         this.renderCopilotStatus();
-        this.fetchCopilotModels(result.githubToken);
+        void this.fetchCopilotModels(result.githubToken);
         this.appendSystemMsg('GitHub Copilot connected successfully.');
       } else if (result.error === 'slow_down' && this.copilotAuth) {
         // GitHub asked us to back off — increase interval by 5s
@@ -955,13 +955,13 @@ export class AISidebar {
     this.contextDisabledForMsg = false;
     this.ctxPillEl.hidden = true;
     if (text.startsWith('/')) { this.handleCommand(text); return; }
-    this.send(text);
+    void this.send(text);
   }
 
   // public: send a message programmatically (used by inline AI actions)
   sendMessage(prompt: string): void {
     if (this.streaming) return;
-    this.send(prompt);
+    void this.send(prompt);
   }
 
   private handleCommand(cmd: string): void {
@@ -985,7 +985,7 @@ export class AISidebar {
     }
 
     if (name === '/compact') {
-      this.compact();
+      void this.compact();
       return;
     }
 
@@ -1163,7 +1163,7 @@ export class AISidebar {
     copyBtn.title = 'Copy message';
     copyBtn.innerHTML = iconSvg('copy', { size: 12 });
     copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(text);
+      void navigator.clipboard.writeText(text);
       const orig = copyBtn.innerHTML;
       copyBtn.innerHTML = iconSvg('check', { size: 12 });
       setTimeout(() => { copyBtn.innerHTML = orig; }, 1500);
@@ -1237,7 +1237,7 @@ export class AISidebar {
     copyBtn.title = 'Copy code';
     copyBtn.innerHTML = iconSvg('copy', { size: 14 });
     copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(code);
+      void navigator.clipboard.writeText(code);
       const orig = copyBtn.textContent;
       copyBtn.innerHTML = iconSvg('check', { size: 14 });
       setTimeout(() => { copyBtn.innerHTML = orig || iconSvg('copy', { size: 14 }); }, 1500);

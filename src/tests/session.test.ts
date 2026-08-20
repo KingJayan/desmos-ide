@@ -5,6 +5,7 @@ import {
   pushRecent, removeRecent, recentLabel, parseRecent, parseSession, RECENT_LIMIT,
 } from '../../renderer/session';
 import { buildMatcher, collectFiles, findMatches, searchFolder, searchPaths } from '../../bun/search';
+import { allowRoot } from '../../bun/paths';
 import { fileURLToPath } from 'node:url';
 
 describe('recent files', () => {
@@ -147,6 +148,7 @@ describe('search across recent files', () => {
 
 describe('searching real files', () => {
   const example = fileURLToPath(new URL('../../example/demo.dsmx', import.meta.url));
+  allowRoot(fileURLToPath(new URL('../../', import.meta.url)));
 
   test('finds a term in the example file', async () => {
     const r = await searchPaths([example], 'slider', false);
@@ -175,6 +177,7 @@ describe('searching real files', () => {
 describe('searching a folder', () => {
   const repo = fileURLToPath(new URL('../../', import.meta.url));
   const exampleDir = fileURLToPath(new URL('../../example/', import.meta.url));
+  allowRoot(repo);
 
   test('walks the folder and finds the example', async () => {
     const files = await collectFiles(exampleDir);
@@ -206,10 +209,16 @@ describe('searching a folder', () => {
   });
 
   test('a folder that does not exist gives no hits, not an error', async () => {
-    const r = await searchFolder('/no/such/folder', 'x', false);
+    const inside = `${repo}no-such-folder`;
+    const r = await searchFolder(inside, 'x', false);
     assert.equal(r.ok, true);
     if (!r.ok) return;
     assert.equal(r.hits.length, 0);
+  });
+
+  test('a folder no dialog ever picked is refused', async () => {
+    const r = await searchFolder('/etc', 'x', false);
+    assert.equal(r.ok, false);
   });
 
   test('an empty root is refused', async () => {

@@ -1,5 +1,7 @@
 // lexer + tokenizer
 
+import type { Pos } from './types';
+
 export const KEYWORDS = new Set([
   'fn', 'in', 'map', 'point', 'circle', 'line',
   'time', 'project', 'camera',
@@ -41,6 +43,12 @@ export interface Token {
   spaceBefore: boolean;
   /** the source text, present only where normalising changed it (`α` -> `alpha`) */
   raw?: string;
+  /** set by the incremental lexer: a position that follows its chunk as lines shift */
+  pos?: Pos;
+}
+
+export function posOf(t: Token): Pos {
+  return t.pos ?? { line: t.line, col: t.col };
 }
 
 export class LexError extends Error {

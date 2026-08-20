@@ -6,20 +6,15 @@
   import pkg from '../package.json';
   import dsl from '../../package.json';
 
-  const path = window.location.pathname.replace(/\/$/, '') || '/';
-  const route = /^\/docs(?:\/|$)/.test(path)
-    ? 'docs'
-    : /^\/download(?:\/|$)/.test(path)
-      ? 'download'
-      : 'home';
+  export let route = 'home';
 
-  const routeTitle = route === 'docs'
+  $: routeTitle = route === 'docs'
     ? 'docs | desmos dsl'
     : route === 'download'
       ? 'downloads | desmos ide'
       : 'desmos ide';
 
-  const routeDescription = route === 'docs'
+  $: routeDescription = route === 'docs'
     ? 'Reference for the dsmx DSL.'
     : route === 'download'
       ? 'Install dsmx or build the desktop app from source.'
@@ -162,7 +157,7 @@
     <div class="install-strip">
       <span>install dsmx: </span>
       <code><Icon icon="lucide:terminal" />&nbsp;brew install KingJayan/dsmx/dsmx</code>
-      <a href="/download">other ways</a>
+      <a href="/download" style="text-decoration:underline">other ways</a>
     </div>
   </main>
 {:else if route === 'download'}

@@ -9,14 +9,27 @@ const STRIPPED = [
   'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts',
   'indexedDB', 'caches', 'Worker', 'SharedWorker', 'BroadcastChannel',
   'Notification', 'navigator', 'location', 'postMessage', 'close',
+  'createImageBitmap',
+  'addEventListener', 'removeEventListener', 'dispatchEvent',
+  'onmessage', 'onmessageerror',
 ];
 
+const DEAD = { value: undefined, writable: false, configurable: false, enumerable: false };
+
 function strip(): void {
-  const scope = self as unknown as Record<string, unknown>;
-  for (const name of STRIPPED) {
-    try {
-      Object.defineProperty(scope, name, { value: undefined, configurable: false, writable: false });
-    } catch {
+  const owner = (level: object, name: string) => Object.prototype.hasOwnProperty.call(level, name);
+
+  for (let level: object | null = self; level; level = Object.getPrototypeOf(level) as object | null) {
+    for (const name of STRIPPED) {
+      if (!owner(level, name)) continue;
+      try {
+        Object.defineProperty(level, name, DEAD);
+      } catch {
+        try {
+          delete (level as Record<string, unknown>)[name];
+        } catch {
+        }
+      }
     }
   }
 }

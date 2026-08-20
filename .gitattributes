@@ -1,5 +1,6 @@
 docs/** linguist-documentation=false
 src/tests/** linguist-vendored=true
+src/bench/** linguist-vendored=true
 *.dsmx linguist-language=ASL
 packaging/** linguist-generated=true
 cli/** linguist-generated=true

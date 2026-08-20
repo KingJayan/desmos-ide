@@ -259,6 +259,28 @@ html, body {
 }
 #graph-container { width: 100%; height: 100%; }
 
+#graph-island.is-stale #graph-container {
+  opacity: 0.45;
+  filter: saturate(0.4);
+}
+
+#graph-stale {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--subtext1);
+  background: var(--island-header);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
+
 #ai-panel {
   width: 340px;
   min-width: 260px;

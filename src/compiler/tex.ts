@@ -195,6 +195,7 @@ class TexGen {
           case '/': return r === 0 ? null : l / r;
           case '^': return Math.pow(l, r);
         }
+        return null;
       }
       case 'Call': {
         const fn = JS_FNS[expr.fn];

@@ -80,7 +80,7 @@ export async function listPlugins(): Promise<InstalledPlugin[]> {
     .sort((a, b) => a.manifest.name.localeCompare(b.manifest.name));
 }
 
-export async function setPluginEnabled(id: string, enabled: boolean): Promise<PluginResult<{}>> {
+export async function setPluginEnabled(id: string, enabled: boolean): Promise<PluginResult<object>> {
   const state = await readState();
   state[id] = enabled;
   try {
@@ -91,7 +91,7 @@ export async function setPluginEnabled(id: string, enabled: boolean): Promise<Pl
   }
 }
 
-export async function uninstallPlugin(id: string): Promise<PluginResult<{}>> {
+export async function uninstallPlugin(id: string): Promise<PluginResult<object>> {
   const manifest = await readPlugin(id, true);
   if (!manifest) return { ok: false, message: `'${id}' is not installed` };
   try {

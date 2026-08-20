@@ -1,6 +1,6 @@
 // recursive-descent parser
 
-import { Token, TT } from './lexer';
+import { Token, TT, posOf } from './lexer';
 import * as T from './types';
 
 export class ParseError extends Error {
@@ -8,7 +8,7 @@ export class ParseError extends Error {
     msg: string,
     public readonly tok: Token,
   ) {
-    super(`[${tok.line}:${tok.col}] Parse error: ${msg} (got '${tok.value}')`);
+    super(`[${tok.pos?.line ?? tok.line}:${tok.col}] Parse error: ${msg} (got '${tok.value}')`);
     this.name = 'ParseError';
   }
 }
@@ -55,7 +55,7 @@ class Parser {
   }
 
   private curPos(): T.Pos {
-    return { line: this.peek().line, col: this.peek().col };
+    return posOf(this.peek());
   }
 
   parseProgram(): T.Program {
@@ -70,7 +70,7 @@ class Parser {
         if (e instanceof ParseError) {
           this.collectedErrors.push({
             error: e.message,
-            line: e.tok.line,
+            line: e.tok.pos?.line ?? e.tok.line,
             col: e.tok.col,
             tokenLen: e.tok.value.length > 0 ? e.tok.value.length : undefined,
             phase: 1,
@@ -744,7 +744,7 @@ class Parser {
 
   private parsePrimary(): T.Expr {
     const t = this.peek();
-    const pos: T.Pos = { line: t.line, col: t.col };
+    const pos: T.Pos = posOf(t);
 
     if (t.type === 'str') {
       this.advance();

@@ -4,7 +4,7 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
   getWorker() { return new EditorWorker(); },
 };
 
-import * as monaco from 'monaco-editor';
+import * as monaco from './monaco';
 import {
   createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
   Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode, Zap,
@@ -15,16 +15,18 @@ import { builtinSignature } from '../src/compiler/builtins';
 import { formatDsl } from '../src/compiler/format';
 import { findRenameEdits, isValidIdent } from '../src/compiler/rename';
 import CompileWorker from './compile.worker?worker';
+import type { ListDelta } from './compile.worker';
 import { compileToTex } from '../src/index';
 import { shareUrl } from '../src/share';
 import type { CompileResult, SymbolInfo, ExprSource, OptimizeNote } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
+import { Layout } from './layout';
 import { EnhancedPane } from './enhanced';
 import { Transport } from './transport';
 import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings } from './settings';
-import type { ColorTheme, EditorSettings, UiScale } from './settings';
+import type { ColorTheme, UiScale } from './settings';
 import { compileStatus, errorsByPhase } from './compile-status';
 import { CommandPalette } from './command-palette';
 import type { PaletteCommand } from './command-palette';
@@ -69,6 +71,13 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const editorContainer = $('editor-container');
 const graphContainer = $('graph-container');
+const graphIsland = $('graph-island');
+const graphStale = $('graph-stale');
+
+function markGraphStale(stale: boolean): void {
+  graphIsland.classList.toggle('is-stale', stale);
+  graphStale.classList.toggle('hidden', !stale);
+}
 const dslPane = $('dsl-pane');
 const enhancedPane = $('enhanced-pane');
 const btnDsl = $<HTMLButtonElement>('btn-dsl');
@@ -512,7 +521,10 @@ graph.onExpressionEdited(exprs => {
   }
 });
 
-editor.onDidChangeCursorPosition(e => graphLink.onCursorMoved(e.position.lineNumber));
+editor.onDidChangeCursorPosition(e => {
+  graphLink.onCursorMoved(e.position.lineNumber);
+  statusPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+});
 
 function applyTheme(theme: ColorTheme): void {
   document.documentElement.setAttribute('data-color-theme', theme);
@@ -596,9 +608,59 @@ const MAX_WORKER_RESTARTS = 3;
 type CompileWorkerResponse = {
   id: number;
   result: CompileResult;
+  delta?: ListDelta;
+  compileMs: number;
+  cached: boolean;
 };
 
+const workerExprs = new Map<string, DesmosExpr>();
+let workerOrder: string[] = [];
+
+function applyListDelta(delta: ListDelta): DesmosExpr[] {
+  for (const expr of delta.changed) workerExprs.set(expr.id, expr);
+  if (delta.order) {
+    workerOrder = delta.order;
+    const keep = new Set(delta.order);
+    for (const id of workerExprs.keys()) if (!keep.has(id)) workerExprs.delete(id);
+  }
+  const list: DesmosExpr[] = [];
+  for (const id of workerOrder) {
+    const expr = workerExprs.get(id);
+    if (expr) list.push(expr);
+  }
+  return list;
+}
+
+const DEBOUNCE_MIN = 16;
+const DEBOUNCE_MAX = 250;
+const DEBOUNCE_FACTOR = 2;
+let compileDebounce = 120;
+let compileStartedAt = 0;
+
+let lastOverheadMs = 0;
+
+function noteCompileTiming(compileMs: number, cached: boolean): void {
+  if (cached) return;
+  const roundTrip = performance.now() - compileStartedAt;
+  lastOverheadMs = Math.max(0, roundTrip - compileMs);
+  compileDebounce = Math.min(DEBOUNCE_MAX, Math.max(DEBOUNCE_MIN, Math.round(roundTrip * DEBOUNCE_FACTOR)));
+  if (localStorage.getItem('dsmx:perf')) {
+    console.warn(
+      `[compile] round-trip ${roundTrip.toFixed(1)}ms = pipeline ${compileMs.toFixed(1)}ms + overhead ${lastOverheadMs.toFixed(1)}ms → debounce ${compileDebounce}ms`,
+    );
+  }
+}
+
+const lastRendered = new Map<string, string>();
+
+function unchanged(panel: string, key: string): boolean {
+  if (lastRendered.get(panel) === key) return true;
+  lastRendered.set(panel, key);
+  return false;
+}
+
 function renderOutline(symbols: SymbolInfo[]): void {
+  if (unchanged('outline', symbols.map(s => `${s.kind} ${s.name} ${s.line}:${s.col}`).join('\n'))) return;
   outlineList.innerHTML = '';
   if (symbols.length === 0) {
     outlineEmpty.classList.remove('outline-empty--hidden');
@@ -662,6 +724,7 @@ const optimizerPanel = new OptimizerPanel({
 });
 
 function renderOptimizations(notes: OptimizeNote[]): void {
+  if (unchanged('optimizer', notes.map(n => `${n.kind} ${n.line}:${n.col} ${n.before}>${n.after}`).join('\n'))) return;
   optimizerPanel.render(notes);
   optimizerHints.set(groupByLine(notes)
     .filter(g => g.line <= model.getLineCount())
@@ -674,32 +737,47 @@ function renderOptimizations(notes: OptimizeNote[]): void {
     })));
 }
 
-window.addEventListener('beforeunload', () => {
-  sliderManager.dispose();
-  aiSidebar?.dispose();
-});
+
+function setMarkers(owner: string, markers: monaco.editor.IMarkerData[]): void {
+  const key = markers.map(m => `${m.startLineNumber}:${m.startColumn}:${m.severity}:${m.message}`).join('\n');
+  if (unchanged(`markers:${owner}`, key)) return;
+  monaco.editor.setModelMarkers(model, owner, markers);
+}
+
+let sliderVersion = -1;
+
+/** the sliders come from the text, not the compile, so only a real edit can move them */
+function updateSliders(): void {
+  const version = model.getVersionId();
+  if (version === sliderVersion) return;
+  sliderVersion = version;
+  sliderManager.update(model.getValue());
+}
 
 function handleCompileResult(result: CompileResult): void {
   lastCompileResult = result;
   if (result.success) {
-    monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', []);
-    monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', []);
-    monaco.editor.setModelMarkers(model, 'desmos-dsl', result.warnings);
+    setMarkers('desmos-dsl-syntax', []);
+    setMarkers('desmos-dsl-semantic', []);
+    setMarkers('desmos-dsl', result.warnings);
     graph.update(result.state.expressions.list);
     sourceMap = result.sourceMap;
     if (mode === 'split' || mode === 'enhanced') syncEnhanced();
-    sliderManager.update(editor.getValue());
+    updateSliders();
     renderOutline(result.symbols);
     renderOptimizations(result.optimizations);
     transport.setClock(result.clock);
+    markGraphStale(false);
   } else {
     const { syntax, semantic } = errorsByPhase(result.errors, errorToMarker);
-    monaco.editor.setModelMarkers(model, 'desmos-dsl-syntax', syntax);
-    monaco.editor.setModelMarkers(model, 'desmos-dsl-semantic', semantic);
+    setMarkers('desmos-dsl-syntax', syntax);
+    setMarkers('desmos-dsl-semantic', semantic);
 
     renderOptimizations([]);
+    updateSliders();
+    markGraphStale(true);
   }
-  monaco.editor.setModelMarkers(model, 'desmos-dsl-plugin', macroErrors.map(e => ({
+  setMarkers('desmos-dsl-plugin', macroErrors.map(e => ({
     startLineNumber: e.line, startColumn: e.col,
     endLineNumber: e.line,   endColumn: model.getLineMaxColumn(Math.min(e.line, model.getLineCount())),
     message: e.message,
@@ -825,8 +903,10 @@ let activeWorker: Worker | null = null;
 function spawnWorker(): Worker {
   const w = new CompileWorker();
   w.addEventListener('message', (event: MessageEvent<CompileWorkerResponse>) => {
-    const { id, result } = event.data;
+    const { id, result, delta, compileMs, cached } = event.data;
     if (id !== compileRequestId) return;
+    if (delta && result.success) result.state.expressions.list = applyListDelta(delta);
+    noteCompileTiming(compileMs, cached);
     handleCompileResult(result);
   });
   w.addEventListener('error', (e: ErrorEvent) => {
@@ -836,7 +916,7 @@ function spawnWorker(): Worker {
       setStatus(`⚠ Compiler restarting (${workerRestarts}/${MAX_WORKER_RESTARTS})…`, 'info');
       w.terminate();
       activeWorker = spawnWorker();
-      runCompile();
+      void runCompile();
     } else {
       setStatus('✗ Compiler failed — reload to recover', 'error');
     }
@@ -855,10 +935,15 @@ let macroErrors: MacroError[] = [];
 async function runCompile(): Promise<void> {
   if (!activeWorker) return;
   const src = editor.getValue();
+  compileStartedAt = performance.now();
   compileRequestId += 1;
   const id = compileRequestId;
 
-  const expanded = await pluginHost.expand(src);
+  // expansion is a worker round trip of its own, and a file with no invocation in it
+  // has nothing to expand
+  const expanded = src.includes('@')
+    ? await pluginHost.expand(src)
+    : { src, errors: [] as MacroError[], lineMap: undefined };
   if (id !== compileRequestId || !activeWorker) return;
 
   macroErrors = expanded.errors;
@@ -873,7 +958,7 @@ async function runCompile(): Promise<void> {
 
 editor.onDidChangeModelContent(() => {
   if (compileTimer !== null) clearTimeout(compileTimer);
-  compileTimer = setTimeout(runCompile, 280);
+  compileTimer = setTimeout(runCompile, compileDebounce);
   refreshSavedState();
   schedulePersist();
 });
@@ -924,7 +1009,7 @@ const toasts = new Toasts();
 // named here before it ever reaches this map
 const appCommands: Record<string, () => void | Promise<void>> = {
   format: () => runEditorAction('editor.action.formatDocument'),
-  compile: () => { runCompile(); },
+  compile: () => { void runCompile(); },
   save: () => cmdSave(),
   'export.png': () => cmdExportImage('png'),
   'export.svg': () => cmdExportImage('svg'),
@@ -1168,7 +1253,7 @@ pluginTabClose.addEventListener('click', e => { e.stopPropagation(); closePlugin
 void pluginHost.refresh().then(() => runCompile());
 void refreshRegistry();
 
-runCompile();
+void runCompile();
 
 //mode switching
 let mode: Mode = 'dsl';
@@ -1259,10 +1344,6 @@ function refreshSaveFact(unsaved: boolean): void {
     : 'Autosave is off — ⌘S to write the file. Turn it on in Settings';
 }
 
-editor.onDidChangeCursorPosition(e => {
-  statusPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
-});
-
 function startWatching(path: string): void {
   if (watchedPath && watchedPath !== path) {
     void window.electronAPI?.unwatchFile(watchedPath);
@@ -1284,7 +1365,7 @@ window.electronAPI?.onFileChanged((changedPath, content) => {
   editor.setValue(content);
   markSaved(content);
   setStatus('↻ Reloaded from disk', 'info');
-  runCompile();
+  void runCompile();
 });
 
 async function enhancedDirtyGuard(): Promise<boolean> {
@@ -1302,7 +1383,7 @@ async function cmdNew(): Promise<void> {
   void setFilename(null);
   setStatus('New file', 'info');
   applyMode('dsl');
-  runCompile();
+  void runCompile();
 }
 
 async function cmdOpen(): Promise<void> {
@@ -1318,7 +1399,7 @@ async function cmdOpen(): Promise<void> {
   void setFilename(result.path);
   startWatching(result.path);
   applyMode(mode === 'enhanced' ? 'dsl' : mode);
-  runCompile();
+  void runCompile();
   persistSession();
 }
 
@@ -1490,7 +1571,7 @@ async function openPath(path: string, at?: { line: number; col: number }): Promi
     editor.revealLineInCenter(at.line);
   }
   editor.focus();
-  runCompile();
+  void runCompile();
   return true;
 }
 
@@ -1618,72 +1699,25 @@ window.addEventListener('focus', () => {
   void gitPanel.refreshIfStale();
 });
 
-//divider drag
-let dragging = false;
-
-dividerEl.addEventListener('mousedown', e => {
-  dragging = true;
-  dividerEl.classList.add('dragging');
-  e.preventDefault();
-});
-
-document.addEventListener('mousemove', e => {
-  if (dragging) {
-    const rect = leftPanel.getBoundingClientRect();
-    const room = workspace.getBoundingClientRect().right - rect.left;
-    const w = Math.max(280, Math.min(e.clientX - rect.left, room - 204));
-    leftPanel.style.width = `${w}px`;
-    editor.layout();
-  }
-  if (toolLeftDragging) {
-    const rect = toolLeft.getBoundingClientRect();
-    toolLeft.style.width = `${Math.max(180, Math.min(e.clientX - rect.left, 520))}px`;
-    editor.layout();
-  }
-  if (bottomDragging) {
-    const rect = centerCol.getBoundingClientRect();
-    const h = Math.max(90, Math.min(rect.bottom - e.clientY, rect.height - 140));
-    toolBottom.style.height = `${h}px`;
-    editor.layout();
-  }
-  if (paneDragging) {
-    const rect = leftPanel.getBoundingClientRect();
-    const h = Math.max(80, Math.min(e.clientY - rect.top, rect.height - 84));
-    dslPane.style.flex = 'none';
-    dslPane.style.height = `${h}px`;
-    editor.layout();
-  }
-});
-
-let paneDragging = false;
-let toolLeftDragging = false;
-let bottomDragging = false;
-
-paneDivider.addEventListener('mousedown', e => {
-  paneDragging = true;
-  paneDivider.classList.add('dragging');
-  e.preventDefault();
-});
-
-toolLeftDivider.addEventListener('mousedown', e => {
-  toolLeftDragging = true;
-  toolLeftDivider.classList.add('dragging');
-  e.preventDefault();
-});
-
-bottomDivider.addEventListener('mousedown', e => {
-  bottomDragging = true;
-  bottomDivider.classList.add('dragging');
-  e.preventDefault();
-});
-
-document.addEventListener('mouseup', () => {
-  if (dragging) { dragging = false; dividerEl.classList.remove('dragging'); }
-  if (aiDragging) { aiDragging = false; aiDivider.classList.remove('dragging'); }
-  if (paneDragging) { paneDragging = false; paneDivider.classList.remove('dragging'); }
-  if (toolLeftDragging) { toolLeftDragging = false; toolLeftDivider.classList.remove('dragging'); }
-  if (bottomDragging) { bottomDragging = false; bottomDivider.classList.remove('dragging'); }
-});
+const layout = new Layout(
+  {
+    editor: dividerEl,
+    pane: paneDivider,
+    toolLeft: toolLeftDivider,
+    bottom: bottomDivider,
+    ai: aiDivider,
+  },
+  {
+    editorIsland: leftPanel,
+    workspace,
+    centerCol,
+    dslPane,
+    toolLeft,
+    toolBottom,
+    aiPanel,
+  },
+  () => editor.layout(),
+);
 
 // sidebar
 type SidebarView = 'git' | 'ai' | 'outline' | 'plugins' | null;
@@ -1921,6 +1955,7 @@ interface Problem {
 }
 
 function renderProblems(problems: Problem[]): void {
+  if (unchanged('problems', problems.map(p => `${p.severity} ${p.line}:${p.col} ${p.message}`).join('\n'))) return;
   problemsList.replaceChildren();
   problemsEmpty.classList.toggle('hidden', problems.length > 0);
 
@@ -2016,22 +2051,6 @@ async function refreshTimeline(): Promise<void> {
     timelineList.appendChild(li);
   }
 }
-
-// divider drag
-let aiDragging = false;
-
-aiDivider.addEventListener('mousedown', e => {
-  aiDragging = true;
-  aiDivider.classList.add('dragging');
-  e.preventDefault();
-});
-
-document.addEventListener('mousemove', e => {
-  if (!aiDragging) return;
-  const rect = workspace.getBoundingClientRect();
-  const w = Math.max(260, Math.min(rect.right - e.clientX, 500));
-  aiPanel.style.width = `${w}px`;
-});
 
 // settings
 let settingsPanel: SettingsPanel | null = null;
@@ -2218,7 +2237,7 @@ const baseCommands: PaletteCommand[] = [
     id: 'compile.run',
     label: 'recompile',
     description: 'Manually trigger a DSL recompile',
-    action: () => { runCompile(); setStatus('Recompiling…', 'info'); },
+    action: () => { void runCompile(); setStatus('Recompiling…', 'info'); },
   },
   {
     id: 'editor.rename',
@@ -2332,7 +2351,7 @@ async function restoreSession(): Promise<void> {
   } finally {
     restoring = false;
   }
-  runCompile();
+  void runCompile();
 }
 
 void restoreSession();
@@ -2345,4 +2364,7 @@ window.addEventListener('beforeunload', () => {
   if (persistTimer !== null) clearTimeout(persistTimer);
   persistSession();
   searchPanel.dispose();
+  sliderManager.dispose();
+  aiSidebar?.dispose();
+  layout.dispose();
 });

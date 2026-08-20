@@ -7,6 +7,7 @@ import { fetchRegistry, installPlugin, listPlugins, pluginIcon, pluginReadme, se
 import {
   deletePluginSecret, getPluginSecret, pluginState, setSyncKeys, storePluginSecret, updatePluginState,
 } from './plugin-storage';
+import { allowRoot, loadAllowed } from './paths';
 import { searchFolder, searchPaths } from './search';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import {
@@ -23,6 +24,8 @@ import {
 
 const DEV_SERVER_URL = 'http://localhost:5173';
 
+await loadAllowed();
+
 // git push/pull and provider calls far exceed the 1s rpc default
 const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
   maxRequestTime: 60_000,
@@ -33,7 +36,7 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       exportJson: ({ content }) => exportJson(content),
       exportTex: ({ content, defaultName }) => exportTex(content, defaultName),
       exportImage: ({ data, defaultName, format }) => exportImage(data, defaultName, format),
-      pickFolder: () => showFolderDialog(),
+      pickFolder: async () => allowRoot(await showFolderDialog()),
       watchFile: ({ path }) => {
         watchFile(path, (changedPath, content) =>
           rpc.send.fileChanged({ path: changedPath, content }));
@@ -119,7 +122,7 @@ async function resolveViewUrl(): Promise<string> {
       await fetch(DEV_SERVER_URL, { method: 'HEAD' });
       return DEV_SERVER_URL;
     } catch {
-      console.log('vite dev server not running, falling back to bundled view');
+      console.warn('vite dev server not running, falling back to bundled view');
     }
   }
   return 'views://mainview/index.html';

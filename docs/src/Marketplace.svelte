@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import Icon from '@iconify/svelte';
   import Nav from './Nav.svelte';
   import { iconIsImage, parseRegistry } from '../../src/plugin/manifest.ts';
@@ -9,14 +10,13 @@
   const REPO = 'https://github.com/KingJayan/dsmx-registry';
   const RAW = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main';
 
+  export let selected = null;
+
   let state = 'loading';
   let error = '';
   let plugins = [];
   let query = '';
-  let selected = null;
   let copied = '';
-  // the readme of the open plugin, rendered by the same code the app uses, so one
-  // readme reads the same in both places
   let readme = '';
   let readmeFor = '';
 
@@ -35,7 +35,6 @@
       const res = await fetch(fileUrl(entry, 'README.md'));
       if (!res.ok) return;
       const text = await res.text();
-      // a relative image in a readme is a file beside it in the registry
       if (readmeFor === entry.manifest.id) {
         readme = renderMarkdown(text, src => fileUrl(entry, src));
       }
@@ -44,16 +43,8 @@
     }
   }
 
-  // /marketplace/<id> opens straight on that plugin, so a link can point at one
-  function idFromPath() {
-    const m = /^\/marketplace\/([a-z0-9-]+)\/?$/.exec(window.location.pathname);
-    return m ? m[1] : null;
-  }
-
   function open(id) {
-    selected = id;
-    const path = id ? `/marketplace/${id}` : '/marketplace';
-    if (window.location.pathname !== path) window.history.pushState({}, '', path);
+    goto(id ? `/marketplace/${id}` : '/marketplace');
   }
 
   async function copy(text, tag) {
@@ -75,13 +66,11 @@
   }
 
   onMount(async () => {
-    window.addEventListener('popstate', () => (selected = idFromPath()));
     try {
       const res = await fetch(INDEX);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       plugins = parseRegistry(await res.json()).plugins;
       state = 'ready';
-      selected = idFromPath();
     } catch (err) {
       state = 'error';
       error = `the marketplace index did not load — ${err.message}`;
@@ -187,14 +176,15 @@
     <header class="head">
       <h1>marketplace</h1>
       <p>
-        Plugins add generators, DSL libraries and themes. They run on your machine only —
-        a share link carries the file, never the plugin.
+        plugins improve your experience through custom generators, DSL libraries, and themes.
       </p>
       <div class="search">
         <Icon icon="lucide:search" />
         <input bind:value={query} placeholder="search plugins" aria-label="search plugins" />
       </div>
     </header>
+
+      <p class="card-desc" style="margin-top: 1em;">{shown.length} matches</p>
 
     {#if state === 'loading'}
       <p class="notice">loading the index…</p>
@@ -234,12 +224,10 @@
     <section class="submit">
       <h2>publishing your own</h2>
       <p>
-        The registry is a repo. Add a folder under <code>plugins/</code>, add your entry to
-        <code>index.json</code> and open a pull request. Every plugin is read by hand before
-        it merges.
+        fork the repo linked below then follow the docs in the README.md.
       </p>
       <a class="btn" href={REPO} target="_blank" rel="noreferrer">
-        <Icon icon="simple-icons:github" />the registry repo
+        <Icon icon="simple-icons:github" />plugin registry
       </a>
     </section>
   {/if}
@@ -259,7 +247,7 @@
   }
 
   .head p {
-    max-width: 60ch;
+    max-width: 70ch;
     margin: 10px 0 0;
     color: var(--muted);
     line-height: 1.7;
@@ -269,7 +257,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    max-width: 380px;
+    max-width: 600px;
     margin-top: 22px;
     padding: 9px 13px;
     border: 1px solid var(--border);
@@ -545,7 +533,6 @@
   }
 
   .submit p { margin: 0 0 16px; color: var(--muted); line-height: 1.7; }
-  .submit code { font-size: 0.8rem; }
 
   @media (max-width: 640px) {
     .detail header { flex-direction: column; gap: 14px; }

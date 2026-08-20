@@ -208,3 +208,42 @@ describe('plugin storage refuses anything that is not its own', () => {
     assert.deepEqual((await pluginState('../escape', null)).global, {});
   });
 });
+
+describe('the main process only reads a path the user gave it', () => {
+  const load = () => import('../../bun/paths');
+
+  test('nothing is reachable before a dialog picks something', async () => {
+    const { allowed, allowedRoot } = await load();
+    assert.equal(allowed('/etc/passwd'), null);
+    assert.equal(allowedRoot('/'), null);
+  });
+
+  test('a picked file is reachable, and so is the folder it sits in', async () => {
+    const { allowFile, allowed } = await load();
+    allowFile('/Users/someone/graphs/one.dsmx');
+    assert.equal(allowed('/Users/someone/graphs/one.dsmx'), '/Users/someone/graphs/one.dsmx');
+    assert.equal(allowed('/Users/someone/graphs/two.dsmx'), '/Users/someone/graphs/two.dsmx');
+    assert.equal(allowed('/Users/someone/other.dsmx'), null);
+  });
+
+  test('a relative path is measured after it is resolved', async () => {
+    const { allowRoot, allowed } = await load();
+    allowRoot('/Users/someone/work');
+    assert.equal(allowed('/Users/someone/work/../../secret'), null);
+    assert.equal(allowed('/Users/someone/work/./deep/file.dsmx'), '/Users/someone/work/deep/file.dsmx');
+  });
+
+  test('a folder name that only starts the same is not inside it', async () => {
+    const { allowRoot, allowed } = await load();
+    allowRoot('/Users/someone/work');
+    assert.equal(allowed('/Users/someone/work-notes/file.dsmx'), null);
+  });
+
+  test('a path that is not a string reaches nothing', async () => {
+    const { allowed, allowFile } = await load();
+    for (const bad of [null, undefined, 42, '', {}]) {
+      assert.equal(allowed(bad), null);
+      assert.equal(allowFile(bad), null);
+    }
+  });
+});

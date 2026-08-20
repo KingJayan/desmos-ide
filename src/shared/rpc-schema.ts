@@ -135,7 +135,7 @@ export type DesmosIdeRPC = {
     };
   };
   webview: {
-    requests: {};
+    requests: Record<string, never>;
     messages: {
       aiChunk: { reqId: string; text: string };
       aiDone: { reqId: string };

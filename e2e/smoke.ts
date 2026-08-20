@@ -78,6 +78,27 @@ await page.addInitScript(() => {
       }
     });
 
+    const reachable = [];
+    try {
+      const global = Function('return this')();
+      for (const name of ['fetch', 'XMLHttpRequest', 'importScripts', 'indexedDB', 'caches',
+                          'navigator', 'location', 'createImageBitmap', 'addEventListener']) {
+        for (let level = global; level; level = Object.getPrototypeOf(level)) {
+          const held = Object.getOwnPropertyDescriptor(level, name);
+          if (!held) continue;
+          if (held.value === undefined && typeof held.get !== 'function') continue;
+          reachable.push(name);
+          break;
+        }
+      }
+    } catch (err) {
+      reachable.push('threw');
+    }
+
+    dsmx.window.registerStatusBarItem({
+      id: 'sealed',
+      text: reachable.length ? 'leaks ' + reachable.length : 'sealed',
+    });
     dsmx.window.registerStatusBarItem({ id: 'count', text: 'stars', command: 'insert' });
     dsmx.keybindings.register('Alt+K', 'insert');
     dsmx.menus.register('graph', 'insert', 'Insert stars');`,
@@ -271,6 +292,9 @@ check(
   'the plugin put an item in the status bar',
 );
 
+const sealed = (await page.locator('#status-plugins').textContent()) ?? '';
+check(sealed.includes('sealed'), `the sandbox keeps the network out of reach — ${sealed}`);
+
 stage = 'checking a plugin view event';
 await page.click('#editor-container .monaco-editor');
 await page.keyboard.press('Meta+A');
@@ -316,7 +340,7 @@ check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: 
 
 clearTimeout(watchdog);
 await browser.close();
-server.stop(true);
+await server.stop(true);
 
 if (problems.length) {
   console.error(`\n${problems.length} smoke check(s) failed`);

@@ -1,5 +1,6 @@
 import type { DesmosExpr } from '../src/compiler/codegen';
 import type { ColorTheme } from './settings';
+import { fingerprint } from './expr-fingerprint';
 
 type DesmosThemeSpec = {
   background: string;
@@ -30,15 +31,6 @@ const SETTLE_MS = 600;
 
 /** expressions written to desmos in one frame */
 const CHUNK = 60;
-
-function fingerprint(expr: DesmosExpr): string {
-  return JSON.stringify([
-    expr.type, expr.latex ?? '', expr.label ?? '', expr.color ?? '',
-    expr.title ?? '',
-    expr.slider ? [expr.slider.min ?? '', expr.slider.max ?? ''] : null,
-    expr.parametricDomain ? [expr.parametricDomain.min, expr.parametricDomain.max] : null,
-  ]);
-}
 
 export function scaledFill(fillOpacity: string | undefined, scale: number): string | undefined {
   if (fillOpacity === undefined || scale === 1) return fillOpacity;
@@ -186,15 +178,15 @@ export class DesmosGraph {
   private flushHandle: number | null = null;
 
   update(list: DesmosExpr[]): void {
-    const incoming = new Map(list.map(e => [e.id, e]));
-    this.drawn = incoming;
+    const incoming = this.drawn;
+    incoming.clear();
 
     for (const expr of list) {
+      incoming.set(expr.id, expr);
       if (this.snapshots.get(expr.id) !== fingerprint(expr)) this.queued.set(expr.id, expr);
     }
 
-    const gone = [...this.queued.keys()].filter(id => !incoming.has(id));
-    for (const id of gone) this.queued.delete(id);
+    for (const id of [...this.queued.keys()]) if (!incoming.has(id)) this.queued.delete(id);
 
     const toRemove: string[] = [];
     for (const id of this.snapshots.keys()) {

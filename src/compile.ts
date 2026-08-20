@@ -1,12 +1,12 @@
-// the compiler pipeline, with no editor imports, so the cli can load it alone
+// the compiler pipelin with no editor imports
 
 import { tokenize, LexError } from './compiler/lexer';
-import { parse, ParseError } from './compiler/parser';
-import { optimize, OptimizeNote } from './compiler/optimizer';
-import { codegenWithSourceMap, ClockInfo, DesmosState, DesmosExpr, ExprSource } from './compiler/codegen';
-import { analyze } from './compiler/analyze';
+import { parse, ParseError, type ParseErrorInfo } from './compiler/parser';
+import { optimize, collectAllRefs, OptimizeNote, type OptimizeCache, type RefsCache, type RefSet } from './compiler/optimizer';
+import { codegenWithSourceMap, ClockInfo, DesmosState, DesmosExpr, ExprSource, type CodegenCache } from './compiler/codegen';
+import { analyze, type AnalyzeCache } from './compiler/analyze';
 import { toTex, TexOptions, TexResult } from './compiler/tex';
-import type { Program, Statement, Expr } from './compiler/types';
+import type { Program, Statement } from './compiler/types';
 
 export type { TexOptions, TexResult, TexSkip, TexViewport } from './compiler/tex';
 
@@ -48,9 +48,20 @@ export interface CompileSuccess {
   uses: string[];
 }
 
+interface Handoff { ast?: Program }
+
+export interface ReuseCache {
+  analyze: AnalyzeCache;
+  refs: RefsCache;
+  optimize: OptimizeCache;
+  codegen: CodegenCache;
+}
+
 export interface CompileOptions {
   prelude?: string;
   available?: readonly string[];
+  front?: (src: string) => { ast: Program; parseErrors: ParseErrorInfo[] };
+  reuse?: ReuseCache;
 }
 
 export interface CompileError {
@@ -95,59 +106,19 @@ function stmtSymbol(stmt: Statement): SymbolInfo | null {
 }
 
 function extractSymbols(ast: Program): SymbolInfo[] {
-  return ast.body.flatMap(stmt => {
+  const out: SymbolInfo[] = [];
+  for (const stmt of ast.body) {
     const sym = stmtSymbol(stmt);
-    return sym ? [sym] : [];
-  });
+    if (sym) out.push(sym);
+  }
+  return out;
 }
 
 const RESERVED = new Set(['t', 'r', 'theta']);
 
-function collectRefs(expr: Expr, out: Set<string>): void {
-  switch (expr.type) {
-    case 'Ident': out.add(expr.name); break;
-    case 'BinOp': collectRefs(expr.left, out); collectRefs(expr.right, out); break;
-    case 'UnaryOp': collectRefs(expr.operand, out); break;
-    case 'CompareExpr': collectRefs(expr.left, out); collectRefs(expr.right, out); break;
-    case 'ConditionalExpr': collectRefs(expr.cond, out); collectRefs(expr.then, out); collectRefs(expr.else_, out); break;
-    case 'PiecewiseExpr': expr.branches.forEach(b => { if (b.cond) collectRefs(b.cond, out); collectRefs(b.body, out); }); break;
-    case 'Call': out.add(expr.fn); expr.args.forEach(a => collectRefs(a, out)); if (expr.kwargs) Object.values(expr.kwargs).forEach(v => collectRefs(v, out)); break;
-    case 'Tuple': collectRefs(expr.x, out); collectRefs(expr.y, out); break;
-    case 'ListRange': collectRefs(expr.start, out); collectRefs(expr.end, out); if (expr.step) collectRefs(expr.step, out); break;
-    case 'MapExpr': collectRefs(expr.range, out); collectRefs(expr.body, out); break;
-    case 'ForExpr': collectRefs(expr.start, out); collectRefs(expr.end, out); if (expr.step) collectRefs(expr.step, out); collectRefs(expr.body, out); break;
-  }
-}
-
-function allRefs(ast: Program): Set<string> {
-  const refs = new Set<string>();
-  for (const stmt of ast.body) {
-    switch (stmt.type) {
-      case 'VarDecl':     collectRefs(stmt.value, refs); if (stmt.domain) collectRefs(stmt.domain, refs); break;
-      case 'AliasDecl':   collectRefs(stmt.value, refs); break;
-      case 'FnDecl':      collectRefs(stmt.body, refs); break;
-      case 'DebugDecl':   collectRefs(stmt.expr, refs); break;
-      case 'ExprBlockDecl': stmt.bindings.forEach(b => collectRefs(b.value, refs)); collectRefs(stmt.result, refs); break;
-      case 'PointDecl':   collectRefs(stmt.x, refs); collectRefs(stmt.y, refs); break;
-      case 'CircleDecl':  collectRefs(stmt.cx, refs); collectRefs(stmt.cy, refs); collectRefs(stmt.r, refs); break;
-      case 'LineDecl':    [stmt.slope, stmt.intercept, stmt.lhs, stmt.rhs, stmt.expr].forEach(e => e && collectRefs(e, refs)); break;
-      case 'CurveDecl':   collectRefs(stmt.start, refs); collectRefs(stmt.end, refs); if (stmt.step) collectRefs(stmt.step, refs); collectRefs(stmt.body, refs); break;
-      case 'RegionDecl':  collectRefs(stmt.expr, refs); break;
-      case 'PolygonDecl': stmt.points.forEach(p => { collectRefs(p.x, refs); collectRefs(p.y, refs); }); break;
-      case 'SegmentDecl': collectRefs(stmt.p1.x, refs); collectRefs(stmt.p1.y, refs); collectRefs(stmt.p2.x, refs); collectRefs(stmt.p2.y, refs); break;
-      case 'TextDecl':    collectRefs(stmt.x, refs); collectRefs(stmt.y, refs); break;
-      case 'SpiralDecl':  collectRefs(stmt.turns, refs); collectRefs(stmt.spacing, refs); [stmt.cx, stmt.cy, stmt.rotate].forEach(e => e && collectRefs(e, refs)); break;
-      case 'WaveDecl':    [stmt.freq, stmt.amp, stmt.phase, stmt.cx, stmt.cy, stmt.xmin, stmt.xmax].forEach(e => e && collectRefs(e, refs)); break;
-      case 'GridDecl':    [stmt.cols, stmt.rows, stmt.xmin, stmt.xmax, stmt.ymin, stmt.ymax].forEach(e => e && collectRefs(e, refs)); break;
-    }
-  }
-  return refs;
-}
-
-function checkWarnings(ast: Program): WarningMarker[] {
+function checkWarnings(ast: Program, refs: RefSet): WarningMarker[] {
   const seen = new Map<string, number>();
   const markers: WarningMarker[] = [];
-  const refs = allRefs(ast);
 
   for (const stmt of ast.body) {
     const sym = stmtSymbol(stmt);
@@ -196,10 +167,16 @@ function mkError(raw: string, phase: 1 | 2, line?: number, col?: number, tokenLe
   return { error: raw, message, phase, line, col, endCol: (col != null && tokenLen) ? col + tokenLen : undefined, fix };
 }
 
-export function compile(src: string, opts: CompileOptions = {}): CompileResult {
+let preludeMemo: { src: string; parsed: ReturnType<typeof parse> } | null = null;
+
+function parsePrelude(src: string): ReturnType<typeof parse> {
+  if (preludeMemo?.src !== src) preludeMemo = { src, parsed: parse(tokenize(src)) };
+  return preludeMemo.parsed;
+}
+
+export function compile(src: string, opts: CompileOptions = {}, out?: Handoff): CompileResult {
   try {
-    const tokens = tokenize(src);
-    const { ast, parseErrors } = parse(tokens);
+    const { ast, parseErrors } = opts.front ? opts.front(src) : parse(tokenize(src));
 
     if (parseErrors.length > 0) {
       return {
@@ -227,10 +204,11 @@ export function compile(src: string, opts: CompileOptions = {}): CompileResult {
       }
     }
 
-    const userAst: Program = { type: 'Program', body: [...ast.body] };
+    const userAst = ast;
     const fromPlugin = new Set<string>();
+    let program: Program = ast;
     if (opts.prelude) {
-      const prelude = parse(tokenize(opts.prelude));
+      const prelude = parsePrelude(opts.prelude);
       const contributed = prelude.ast.body.filter(
         (s): s is Extract<Statement, { type: 'FnDecl' | 'AliasDecl' }> =>
           s.type === 'FnDecl' || s.type === 'AliasDecl',
@@ -244,11 +222,11 @@ export function compile(src: string, opts: CompileOptions = {}): CompileResult {
         for (const s of contributed) {
           if (!declared.has(s.name)) fromPlugin.add(s.name);
         }
-        ast.body.unshift(...contributed);
+        program = { type: 'Program', body: [...contributed, ...ast.body] };
       }
     }
 
-    const semanticErrors = analyze(ast);
+    const semanticErrors = analyze(program, opts.reuse?.analyze);
     if (semanticErrors.length > 0) {
       return {
         success: false,
@@ -257,15 +235,16 @@ export function compile(src: string, opts: CompileOptions = {}): CompileResult {
     }
 
     const optimizations: OptimizeNote[] = [];
-    const optimized = optimize(ast, optimizations);
-    const drawn: Program = {
-      type: 'Program',
-      body: optimized.body.filter(s => !('name' in s && fromPlugin.has(s.name))),
-    };
-    const { state, sourceMap, clock } = codegenWithSourceMap(drawn);
+    const usedRefs = collectAllRefs(program, opts.reuse?.refs);
+    const optimized = optimize(program, optimizations, usedRefs, opts.reuse?.optimize);
+    const drawn: Program = fromPlugin.size === 0
+      ? optimized
+      : { type: 'Program', body: optimized.body.filter(s => !('name' in s && fromPlugin.has(s.name))) };
+    const { state, sourceMap, clock } = codegenWithSourceMap(drawn, opts.reuse?.codegen);
     const symbols   = extractSymbols(userAst);
-    const warnings  = checkWarnings(userAst);
+    const warnings  = checkWarnings(userAst, usedRefs);
 
+    if (out) out.ast = optimized;
     return { success: true, state, warnings, symbols, sourceMap, clock, optimizations, uses };
   } catch (e) {
     if (e instanceof LexError)
@@ -284,9 +263,8 @@ export function compileToList(src: string): DesmosExpr[] | null {
 export type TexSuccess = { success: true } & TexResult;
 
 export function compileToTex(src: string, opts: TexOptions = {}): TexSuccess | CompileFailure {
-  const result = compile(src);
+  const handoff: Handoff = {};
+  const result = compile(src, {}, handoff);
   if (!result.success) return result;
-
-  const { ast } = parse(tokenize(src));
-  return { success: true, ...toTex(optimize(ast), opts) };
+  return { success: true, ...toTex(handoff.ast!, opts) };
 }

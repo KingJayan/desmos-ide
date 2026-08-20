@@ -191,6 +191,24 @@ function needsParens(childOp: string, parentOp: string, side: 'left' | 'right'):
   return false;
 }
 
+interface GenEntry {
+  camera: string;
+  ids: { base: string; pre: number }[];
+  exprs: DesmosExpr[];
+  sources: ExprSource[];
+  clock: ClockInfo | null;
+}
+
+export interface CodegenCache {
+  stmts: WeakMap<T.Statement, GenEntry>;
+  hits: number;
+  misses: number;
+}
+
+export function createCodegenCache(): CodegenCache {
+  return { stmts: new WeakMap(), hits: 0, misses: 0 };
+}
+
 export class Codegen {
   private list: DesmosExpr[] = [];
   private idCounts = new Map<string, number>();
@@ -198,6 +216,11 @@ export class Codegen {
   private currentPos: T.Pos | null = null;
   private clockInfo: ClockInfo | null = null;
   private cameraLatex = { azimuth: fmtNum(DEFAULT_CAMERA.azimuth), elevation: fmtNum(DEFAULT_CAMERA.elevation) };
+  private cameraKey = '';
+  private trace: GenEntry['ids'] | null = null;
+  private traceable = true;
+
+  constructor(private readonly cache?: CodegenCache) {}
 
   clock(): ClockInfo | null {
     return this.clockInfo;
@@ -215,7 +238,8 @@ export class Codegen {
         elevation: nameToLatex(`${cam.name}_el`),
       };
     }
-    for (const stmt of program.body) this.genStmt(stmt);
+    this.cameraKey = `${this.cameraLatex.azimuth}|${this.cameraLatex.elevation}`;
+    for (const stmt of program.body) this.runStmt(stmt);
     return {
       version: 9,
       graph: { viewport: { xmin: -10, ymin: -10, xmax: 10, ymax: 10 } },
@@ -223,24 +247,75 @@ export class Codegen {
     };
   }
 
+  private idsMatch(ids: GenEntry['ids']): boolean {
+    if (ids.length === 1) return (this.idCounts.get(ids[0].base) ?? 0) === ids[0].pre;
+
+    const local = new Map<string, number>();
+    for (const { base, pre } of ids) {
+      const seen = local.get(base) ?? 0;
+      if ((this.idCounts.get(base) ?? 0) + seen !== pre) return false;
+      local.set(base, seen + 1);
+    }
+    return true;
+  }
+
+  private runStmt(stmt: T.Statement): void {
+    const hit = this.cache?.stmts.get(stmt);
+    if (hit && hit.camera === this.cameraKey && this.idsMatch(hit.ids)) {
+      this.cache!.hits++;
+      for (const { base } of hit.ids) this.idCounts.set(base, (this.idCounts.get(base) ?? 0) + 1);
+      for (const e of hit.exprs) this.list.push(e);
+      for (const s of hit.sources) this.sources.push(s);
+      if (hit.clock) this.clockInfo = hit.clock;
+      return;
+    }
+
+    if (!this.cache) { this.genStmt(stmt); return; }
+    this.cache.misses++;
+
+    const trace: GenEntry['ids'] = [];
+    const fromExpr = this.list.length;
+    const fromSrc = this.sources.length;
+    const clockBefore = this.clockInfo;
+    this.trace = trace;
+    this.traceable = true;
+    this.genStmt(stmt);
+    const traceable = this.traceable;
+    this.trace = null;
+
+    if (traceable) {
+      this.cache.stmts.set(stmt, {
+        camera: this.cameraKey,
+        ids: trace,
+        exprs: this.list.slice(fromExpr),
+        sources: this.sources.slice(fromSrc),
+        clock: this.clockInfo === clockBefore ? null : this.clockInfo,
+      });
+    }
+  }
+
   // derived from a logical name
   private stableId(base: string): string {
     const n = (this.idCounts.get(base) ?? 0) + 1;
     this.idCounts.set(base, n);
+    if (this.trace) this.trace.push({ base, pre: n - 1 });
     return n === 1 ? base : `${base}_${n}`;
   }
 
   private emit(partial: Omit<DesmosExpr, 'id'>, idBase?: string): string {
+    if (!idBase) this.traceable = false;
     const id = idBase ? this.stableId(idBase) : this.stableId(`__anon_${this.list.length}`);
     this.list.push({ ...partial, id });
-    if (this.currentPos) {
-      this.sources.push({ id, line: this.currentPos.line, col: this.currentPos.col });
+    const pos = this.currentPos;
+    if (pos) {
+      this.sources.push(this.cache
+        ? { id, get line() { return pos.line; }, get col() { return pos.col; } }
+        : { id, line: pos.line, col: pos.col });
     }
     return id;
   }
 
   private genStmt(stmt: T.Statement): void {
-    // one statement can emit more than one expression; they all map back to it
     this.currentPos = stmt.pos;
     switch (stmt.type) {
       case 'VarDecl':     this.genVarDecl(stmt);     break;
@@ -260,7 +335,6 @@ export class Codegen {
       case 'TimeDecl':    this.genTimeDecl(stmt);    break;
       case 'CameraDecl':  this.genCameraDecl(stmt);  break;
       case 'FnDecl':      this.genFnDecl(stmt);      break;
-      // DebugDecl and ExprBlockDecl are stripped in optimizer; VarDecl handles ExprBlock lowered form
     }
   }
 
@@ -394,7 +468,7 @@ export class Codegen {
     if (stmt.form === 'slope-intercept') {
       const m = stmt.slope ? this.toLaTeX(stmt.slope) : '1';
       const b = stmt.intercept ? this.toLaTeX(stmt.intercept) : '0';
-      const mPart = m === '1' ? '' : m === '-1' ? '-' : /[+\-]/.test(m.slice(1)) ? `\\left(${m}\\right)` : m;
+      const mPart = m === '1' ? '' : m === '-1' ? '-' : /[-+]/.test(m.slice(1)) ? `\\left(${m}\\right)` : m;
       latex = b === '0' ? `y=${mPart}x` : `y=${mPart}x+${b}`;
     } else if (stmt.form === 'standard') {
       const lhs = stmt.lhs ? this.toLaTeX(stmt.lhs) : 'y';
@@ -751,8 +825,9 @@ export function codegen(program: T.Program): DesmosState {
 
 export function codegenWithSourceMap(
   program: T.Program,
+  cache?: CodegenCache,
 ): { state: DesmosState; sourceMap: ExprSource[]; clock: ClockInfo | null } {
-  const gen = new Codegen();
+  const gen = new Codegen(cache);
   const state = gen.generate(program);
   return { state, sourceMap: gen.sourceMap(), clock: gen.clock() };
 }
