@@ -106,7 +106,7 @@ $light-themes: 'dsmx-light', 'catppuccin-latte', 'github-light', 'vs-light';
 .hidden { display: none !important; }
 
 @mixin eyebrow {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.11em;
@@ -179,7 +179,6 @@ $light-themes: 'dsmx-light', 'catppuccin-latte', 'github-light', 'vs-light';
 
   --font-mono:    'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
   --font-ui:      'Inter', 'SF Pro Text', -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Space Grotesk', 'Inter', 'SF Pro Display', -apple-system, sans-serif;
 
   --fs-micro: 0.8rem;
   --fs-small: 0.9rem;

@@ -9,20 +9,40 @@
   flex-shrink: 0;
 }
 
-.ai-chat-select {
+.ai-chat-picker {
+  position: relative;
   flex: 1;
   min-width: 0;
-  background-color: var(--surface0);
+  display: flex;
+  align-items: center;
+  color: var(--overlay1);
+}
+.ai-chat-picker > svg {
+  position: absolute;
+  right: 7px;
+  pointer-events: none;
+}
+.ai-chat-picker:hover { color: var(--mauve); }
+.ai-chat-picker:hover .ai-chat-select { border-color: var(--mauve); }
+
+.ai-chat-select {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: var(--fs-small);
-  padding: 2px 22px 2px 6px;
+  font-size: var(--fs-micro);
+  padding: 2px 22px 2px 8px;
+  text-overflow: ellipsis;
   cursor: pointer;
   outline: none;
+  transition: border-color 0.12s;
 }
 .ai-chat-select:focus { border-color: var(--mauve); }
+.ai-chat-select option { background: var(--surface0); color: var(--text); }
 
 .ai-chat-select--pending {
   color: var(--overlay1);

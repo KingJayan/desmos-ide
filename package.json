@@ -10,6 +10,7 @@
     "build:native": "bun run scripts/build-native.ts",
     "build:grammar": "bun run scripts/build-grammar.ts",
     "build:cli": "bun run scripts/build-cli.ts",
+    "pack:vsix": "bun run scripts/pack-vsix.ts",
     "pack:cli": "bun run scripts/build-cli.ts && bun run scripts/pack-cli.ts",
     "formula": "bun run scripts/gen-formula.ts",
     "cask": "bun run scripts/gen-cask.ts",

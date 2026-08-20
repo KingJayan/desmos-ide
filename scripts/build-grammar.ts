@@ -4,11 +4,12 @@
 //
 //   bun run build:grammar
 
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { KEYWORDS } from '../src/compiler/lexer';
 import { BUILTIN_NAMES, STYLE_FNS } from '../src/compiler/builtins';
 import { languageConfig } from '../src/monaco/language';
+import { iconPng } from './vsix-icon';
 
 const ROOT = join(import.meta.dir, '..');
 const OUT_DIR = join(ROOT, 'editors', 'vscode');
@@ -108,11 +109,22 @@ const languageConfiguration = {
   },
 };
 
+const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8')) as { version: string };
+const REPO = 'https://github.com/KingJayan/desmos-ide';
+
 const manifest = {
   name: 'desmos-dsl',
   displayName: 'Desmos DSL',
-  description: 'Syntax highlighting for .dsmx files.',
-  version: '0.1.0',
+  description: 'Syntax highlighting for the dsmx language.',
+  version: pkg.version,
+  publisher: 'kingjayan',
+  license: 'Apache-2.0',
+  icon: 'icon.png',
+  galleryBanner: { color: '#11111b', theme: 'dark' },
+  homepage: `${REPO}#readme`,
+  repository: { type: 'git', url: `${REPO}.git`, directory: 'editors/vscode' },
+  bugs: { url: `${REPO}/issues` },
+  keywords: ['desmos', 'dsmx', 'graphing', 'math'],
   engines: { vscode: '^1.75.0' },
   categories: ['Programming Languages'],
   contributes: {
@@ -135,7 +147,32 @@ const HEADER = { _generated: 'by scripts/build-grammar.ts from the compiler tabl
 const write = async (path: string, value: object) =>
   writeFile(path, `${JSON.stringify({ ...HEADER, ...value }, null, 2)}\n`);
 
+const README = `# Desmos DSL
+
+Syntax highlighting and bracket behaviour for \`.dsmx\` files, the language the
+[desmos-ide](${REPO}) compiler reads.
+
+The grammar is generated from the compiler tables, so the keywords and builtins
+it colours are always the ones the compiler accepts.
+
+## What it gives you
+
+- syntax highlighting for keywords, builtins, calls, numbers, strings and comments
+- comment toggling, bracket matching, auto-closing pairs and folding markers
+
+For compilation, the graph preview and the optimizer, use the desmos-ide app or
+the \`dsmx\` command line tool.
+`;
+
+const VSCODE_IGNORE = `.vscode/**
+**/*.map
+`;
+
 await mkdir(join(OUT_DIR, 'syntaxes'), { recursive: true });
+await writeFile(join(OUT_DIR, 'README.md'), README);
+await writeFile(join(OUT_DIR, 'LICENSE'), await readFile(join(ROOT, 'LICENSE'), 'utf8'));
+await writeFile(join(OUT_DIR, '.vscodeignore'), VSCODE_IGNORE);
+await writeFile(join(OUT_DIR, 'icon.png'), iconPng());
 await write(join(OUT_DIR, 'syntaxes', 'desmos-dsl.tmLanguage.json'), grammar);
 await write(join(OUT_DIR, 'language-configuration.json'), languageConfiguration);
 await write(join(OUT_DIR, 'package.json'), manifest);

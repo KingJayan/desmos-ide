@@ -31,11 +31,8 @@ export interface LoadedPlugin {
 export type HostCall =
   | 'notify'
   | 'status'
-  | 'state.get'
   | 'state.update'
-  | 'state.keys'
   | 'state.sync'
-  | 'storage.path'
   | 'secrets.get'
   | 'secrets.store'
   | 'secrets.delete'

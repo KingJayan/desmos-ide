@@ -217,9 +217,9 @@ export class SettingsPanel {
             <div class="settings-row">
               <label class="settings-label" for="s-ui-scale">interface size</label>
               <select class="settings-select" id="s-ui-scale">
-                <option value="compact">Compact</option>
-                <option value="default">Default</option>
-                <option value="large">Large</option>
+                <option value="compact">compact</option>
+                <option value="default">default</option>
+                <option value="large">large</option>
               </select>
             </div>
             <div class="settings-row settings-hint-row">
@@ -289,9 +289,9 @@ export class SettingsPanel {
             <div class="settings-row">
               <label class="settings-label">line numbers</label>
               <select class="settings-select" id="s-line-numbers">
-                <option value="on">On</option>
-                <option value="relative">Relative</option>
-                <option value="off">Off</option>
+                <option value="on">on</option>
+                <option value="relative">relative</option>
+                <option value="off">off</option>
               </select>
             </div>
 

@@ -304,11 +304,6 @@ export class PluginHost {
         return (await window.electronAPI?.pluginSecretStore({ id: plugin, key: text(0), value: text(1) })) ?? false;
       case 'secrets.delete':
         return (await window.electronAPI?.pluginSecretDelete({ id: plugin, key: text(0) })) ?? false;
-
-      case 'state.get':
-      case 'state.keys':
-      case 'storage.path':
-        return null;
     }
   }
 

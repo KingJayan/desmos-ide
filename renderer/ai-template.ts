@@ -8,7 +8,10 @@ export interface TemplateState {
 export function sidebarMarkup({ sendContext, autoApprove }: TemplateState): string {
   return `
       <div class="ai-header">
-        <select class="ai-chat-select"></select>
+        <span class="ai-chat-picker">
+          <select class="ai-chat-select"></select>
+          ${iconSvg('chevron-down', { size: 12 })}
+        </span>
         <button class="ai-icon-btn" id="ai-new-btn" title="New Chat" aria-label="New Chat">${iconSvg('plus', { size: 14 })}</button>
         <button class="ai-icon-btn ai-icon-btn--danger" id="ai-del-btn" title="Delete/Clear Chat" aria-label="Delete or Clear Chat">${iconSvg('trash-2', { size: 14 })}</button>
       </div>
