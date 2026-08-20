@@ -1,6 +1,6 @@
 {
   "name": "desmos-ide",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "an IDE for Desmos with a custom DSL",
   "license": "Apache-2.0",
   "scripts": {
