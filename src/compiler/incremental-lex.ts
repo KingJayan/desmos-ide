@@ -3,7 +3,6 @@
 import { tokenize, type Token } from './lexer';
 import type { Pos } from './types';
 
-/** every position in a chunk reads its line through this, so moving a chunk is one write */
 interface Base { n: number }
 
 // refers to one statement worth of tokens
@@ -27,7 +26,6 @@ function livePos(base: Base, rel: number, col: number): Pos {
   return { col, get line() { return base.n + rel; } };
 }
 
-/** rewrites middle-relative lines to absolute and hands every token a chunk-tracking position */
 function bind(tokens: Token[], base: Base, offset: number): void {
   for (const t of tokens) {
     const abs = t.line + offset;

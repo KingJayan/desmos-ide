@@ -59,7 +59,7 @@
             <i data-lucide="puzzle" aria-hidden="true"></i>
           </button>
         </div>
-        <span class="rail-spacer"></span>
+        <span class="rail-rule"></span>
         <div class="rail-group">
           <button id="btn-tool-problems" class="rail-btn" title="problems  ⌘3" aria-label="problems">
             <i data-lucide="circle-alert" aria-hidden="true"></i>
@@ -72,6 +72,9 @@
             <i data-lucide="zap" aria-hidden="true"></i>
             <span id="optimizer-badge" class="rail-badge hidden">0</span>
           </button>
+        </div>
+        <span class="rail-spacer"></span>
+        <div class="rail-group">
           <button id="btn-sidebar-settings" class="rail-btn" title="settings  ⌘," aria-label="settings">
             <i data-lucide="settings" aria-hidden="true"></i>
           </button>
@@ -253,11 +256,11 @@
 
         <section id="tool-bottom" class="island hidden" aria-label="bottom tool window">
           <div class="tool-tabs" role="tablist">
-            <button id="btn-tab-problems" class="tool-tab tool-tab--active" role="tab" aria-selected="true">
+            <button id="btn-tab-problems" class="tool-tab tool-tab--active" role="tab" aria-controls="problems-body" aria-selected="true">
               problems <span id="problems-count" class="tool-tab-count hidden">0</span>
             </button>
-            <button id="btn-tab-timeline" class="tool-tab" role="tab" aria-selected="false">timeline</button>
-            <button id="btn-tab-optimizer" class="tool-tab" role="tab" aria-selected="false">
+            <button id="btn-tab-timeline" class="tool-tab" role="tab" aria-controls="timeline-body" aria-selected="false">timeline</button>
+            <button id="btn-tab-optimizer" class="tool-tab" role="tab" aria-controls="optimizer-body" aria-selected="false">
               optimizer <span id="optimizer-count" class="tool-tab-count hidden">0</span>
             </button>
             <span class="tool-tabs-spacer"></span>
@@ -265,15 +268,15 @@
               <i data-lucide="chevron-down" aria-hidden="true"></i>
             </button>
           </div>
-          <div id="problems-body" class="tool-body">
+          <div id="problems-body" class="tool-body" role="tabpanel" aria-labelledby="btn-tab-problems">
             <div id="problems-empty" class="tool-empty">no problems, the file compiles</div>
             <ul id="problems-list" class="problems-list"></ul>
           </div>
-          <div id="timeline-body" class="tool-body hidden">
+          <div id="timeline-body" class="tool-body hidden" role="tabpanel" aria-labelledby="btn-tab-timeline">
             <div id="timeline-empty" class="tool-empty">no history yet</div>
             <ul id="timeline-list" class="timeline-list"></ul>
           </div>
-          <div id="optimizer-body" class="tool-body hidden">
+          <div id="optimizer-body" class="tool-body hidden" role="tabpanel" aria-labelledby="btn-tab-optimizer">
             <div id="optimizer-empty" class="tool-empty">nothing to fold, the source is already direct</div>
             <ul id="optimizer-list" class="optimizer-list"></ul>
           </div>

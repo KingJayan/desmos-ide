@@ -1,8 +1,13 @@
-import { createIcons, ArrowDown, Plus } from 'lucide';
 import { iconSvg } from './icons';
 import { escapeHtml } from './escape';
-import { SecretStore } from './secret-store';
 import { lineDiff } from './diff';
+import { sidebarMarkup } from './ai-template';
+import { cleanTitle, parseResponse, renderMarkdown, truncateAtWord } from './ai-markdown';
+import {
+  PROVIDERS, PROVIDER_DEFAULTS, PROVIDER_MODELS, createSecretStore, modelHint,
+} from './ai-providers';
+import type { AIProvider, CopilotAuthState, ProviderConfig, ProviderConfigMap } from './ai-providers';
+import type { SecretStore } from './secret-store';
 import {
   MAX_CHATS, SLASH_COMMANDS,
   capChats, matchSlashCommands, pruneHistory, trimChatBytes, withContext,
@@ -10,8 +15,6 @@ import {
 import type { Chat, SlashCommand } from './chat-store';
 
 type ApplyAction = { type: 'insert' | 'replace'; code: string };
-
-type AIProvider = 'openai-compatible' | 'openrouter' | 'ollama' | 'github-copilot';
 
 const PROMPT_SUGGESTIONS = [
   'Explain what my file does',
@@ -22,176 +25,8 @@ const PROMPT_SUGGESTIONS = [
   'Complete the missing functionality',
 ];
 
-type ProviderConfig = {
-  model: string;
-  baseUrl: string;
-  apiKey: string;
-};
-
-type ProviderConfigMap = Record<AIProvider, ProviderConfig>;
-
-const PROVIDERS: Array<{ id: AIProvider; label: string }> = [
-  { id: 'openai-compatible', label: 'OpenAI-compatible' },
-  { id: 'openrouter', label: 'OpenRouter' },
-  { id: 'ollama', label: 'Ollama' },
-  { id: 'github-copilot', label: 'GitHub Copilot' },
-];
-
-const PROVIDER_DEFAULTS: ProviderConfigMap = {
-  'openai-compatible': {
-    model: 'gpt-5.3-mini',
-    baseUrl: 'https://api.openai.com/v1',
-    apiKey: '',
-  },
-  openrouter: {
-    model: 'openai/gpt-5.3-mini',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    apiKey: '',
-  },
-  ollama: {
-    model: 'llama3.3',
-    baseUrl: 'http://127.0.0.1:11434/v1',
-    apiKey: '',
-  },
-  'github-copilot': {
-    model: 'gpt-5.3',
-    baseUrl: 'https://api.githubcopilot.com',
-    apiKey: '',
-  },
-};
-
-const PROVIDER_MODELS: Record<AIProvider, string[]> = {
-  'openai-compatible': [
-    'gpt-5.3', 'gpt-5.3-mini',
-    'gpt-5.2', 'gpt-5.2-mini',
-    'gpt-5.1',
-    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-
-    'o3', 'o3-mini',
-    'o4', 'o4-mini',
-  ],
-
-  openrouter: [
-    'openai/gpt-5.3', 'openai/gpt-5.3-mini',
-    'openai/gpt-5.2', 'openai/gpt-5.2-mini',
-    'openai/gpt-4.1', 'openai/gpt-4.1-mini', 'openai/gpt-4.1-nano',
-    'openai/o3', 'openai/o3-mini',
-    'openai/o4', 'openai/o4-mini',
-
-    'anthropic/claude-opus-4.1',
-    'anthropic/claude-sonnet-4.5',
-    'anthropic/claude-haiku-4.5',
-
-    'google/gemini-2.5-pro',
-    'google/gemini-2.5-flash',
-    'google/gemini-2.0-flash',
-
-    'meta-llama/llama-4',
-    'meta-llama/llama-4-scout',
-    'meta-llama/llama-3.3-70b-instruct',
-
-    'mistralai/mistral-large',
-    'mistralai/mistral-small',
-    'mistralai/codestral',
-
-    'deepseek/deepseek-r1',
-    'deepseek/deepseek-v3',
-    'deepseek/deepseek-coder-v2',
-
-    'x-ai/grok-3',
-    'x-ai/grok-3-mini',
-
-    'cohere/command-r-plus',
-    'cohere/command-r',
-
-    'qwen/qwen-2.5-72b-instruct',
-    'qwen/qwen-2.5-coder-32b-instruct',
-
-    'microsoft/phi-4',
-    'microsoft/phi-4-mini',
-  ],
-
-  ollama: [
-    'llama3.3', 'llama3.2',
-
-    'mistral', 'mixtral', 'mistral-nemo',
-
-    'qwen2.5', 'qwen2.5-coder',
-
-    'phi4', 'phi4-mini',
-
-    'gemma3', 'gemma2',
-
-    'deepseek-r1', 'deepseek-v3', 'deepseek-coder-v2',
-
-    'codellama', 'codegemma', 'starcoder2',
-
-    'nomic-embed-text', 'mxbai-embed-large',
-  ],
-
-  'github-copilot': [
-    'gpt-4o', 'gpt-4o-mini',
-    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-    'o3-mini',
-    'claude-3.5-sonnet', 'claude-3.7-sonnet',
-    'gemini-2.0-flash',
-  ],
-};
-
 const SCROLL_AWAY_RATIO  = 0.25;
 const MAX_HISTORY        = 20;
-
-interface CopilotAuthState {
-  deviceCode: string;
-  userCode: string;
-  verificationUri: string;
-  pollTimer: ReturnType<typeof setInterval> | null;
-  interval: number;
-}
-
-/** the keys an older version wrote into localStorage in the clear */
-function legacyKeys(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem('ai-provider-configs');
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Partial<Record<AIProvider, { apiKey?: unknown }>>;
-    const out: Record<string, string> = {};
-    for (const p of PROVIDERS) {
-      const key = parsed[p.id]?.apiKey;
-      if (typeof key === 'string' && key) out[p.id] = key;
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-function createSecretStore(): SecretStore {
-  const api = () => window.electronAPI;
-  return new SecretStore(
-    {
-      available: () => api()?.secretsAvailable() ?? Promise.resolve(false),
-      get: account => api()?.secretGet(account) ?? Promise.resolve(null),
-      set: (account, value) => api()?.secretSet(account, value) ?? Promise.resolve(false),
-      remove: account => api()?.secretDelete(account) ?? Promise.resolve(false),
-      legacy: legacyKeys,
-      clearLegacy: () => {
-        // rewrite the stored configs with the keys taken out
-        try {
-          const raw = localStorage.getItem('ai-provider-configs');
-          if (!raw) return;
-          const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
-          for (const entry of Object.values(parsed)) {
-            if (entry && typeof entry === 'object') entry.apiKey = '';
-          }
-          localStorage.setItem('ai-provider-configs', JSON.stringify(parsed));
-        } catch {
-        }
-      },
-    },
-    PROVIDERS.map(p => p.id),
-  );
-}
 
 export class AISidebar {
   private chats: Chat[] = [];
@@ -362,87 +197,7 @@ export class AISidebar {
   }
 
   private render(): void {
-    this.el.innerHTML = `
-      <div class="ai-header">
-        <select class="ai-chat-select"></select>
-        <button class="ai-icon-btn" id="ai-new-btn" title="New Chat" aria-label="New Chat"><i data-lucide="plus" aria-hidden="true"></i></button>
-        <button class="ai-icon-btn ai-icon-btn--danger" id="ai-del-btn" title="Delete/Clear Chat" aria-label="Delete or Clear Chat"><i data-lucide="trash-2" aria-hidden="true"></i></button>
-      </div>
-      <div class="ai-messages"></div>
-      <div class="ai-status-strip">
-        <button class="ai-scroll-fab" type="button" title="Scroll to latest" aria-label="Scroll to latest" hidden>
-          <i data-lucide="arrow-down" aria-hidden="true"></i>
-          <span class="ai-scroll-fab-dot" hidden></span>
-        </button>
-        <div class="ai-status-left">
-          <button class="ai-provider-chip" id="ai-provider-chip" title="Change the AI provider and model"><span class="ai-status-provider-label"></span></button>
-          <button class="ai-status-model" title="Change model"></button>
-          <span class="ai-status-memory"></span>
-        </div>
-        <div class="ai-status-right">
-          <button class="ai-ctx-btn${this.sendContext ? ' ai-ctx-btn--on' : ''}" id="ai-ctx-btn" title="Send code context with each message. Toggle off to protect sensitive code.">
-            ${iconSvg('file-text', { size: 12, strokeWidth: 2.5 })}
-            <span>ctx</span>
-          </button>
-          <button class="ai-ctx-btn${this.autoApprove ? ' ai-ctx-btn--on' : ''}" id="ai-autoapprove-btn" title="${this.autoApprove ? 'Auto-approve ON — code applied without diff preview' : 'Auto-approve OFF — shows diff before applying'}">
-            ${iconSvg('check', { size: 12, strokeWidth: 2.5 })}
-            <span>auto</span>
-          </button>
-        </div>
-      </div>
-      <div class="ai-compose">
-        <div class="ai-autocomplete"></div>
-        <div class="ai-ctx-pill" hidden>
-          <span class="ai-ctx-pill-text"></span>
-          <button class="ai-ctx-pill-close" type="button" title="Disable context for this message">
-            ${iconSvg('x', { size: 12, strokeWidth: 2.5 })}
-          </button>
-        </div>
-        <div class="ai-compose-wrap">
-          <textarea class="ai-input" rows="1" placeholder="Ask about your DSL…"></textarea>
-          <div class="ai-compose-bar">
-            <button class="ai-send-btn" title="Send (Enter)">
-              ${iconSvg('send', { size: 14, strokeWidth: 2.5 })}
-            </button>
-          </div>
-        </div>
-        <div class="ai-config-popover" hidden>
-          <label class="ai-config-row">
-            <span>provider</span>
-            <select class="ai-config-input ai-config-provider"></select>
-          </label>
-          <div class="ai-config-copilot" hidden>
-            <div class="ai-copilot-row">
-              <span class="ai-copilot-status"></span>
-              <button class="ai-copilot-connect" type="button">Sign in</button>
-              <button class="ai-copilot-cancel" type="button" hidden>cancel</button>
-              <button class="ai-copilot-disconnect" type="button" hidden>disconnect</button>
-            </div>
-            <div class="ai-copilot-code-wrap" hidden>
-              <p class="ai-copilot-instructions">Open <a class="ai-copilot-link" href="#" id="ai-copilot-verif-link">github.com/login/device</a> and enter:</p>
-              <code class="ai-copilot-user-code"></code>
-            </div>
-          </div>
-          <div class="ai-config-standard">
-            <p class="ai-config-hint">The model and base url are filled in already. Paste a key to start, or pick Ollama to run a local model with no key at all.</p>
-            <label class="ai-config-row">
-              <span>model</span>
-              <select class="ai-config-input ai-config-model"></select>
-            </label>
-            <label class="ai-config-row">
-              <span>base url</span>
-              <input class="ai-config-input ai-config-baseurl" type="text" spellcheck="false" />
-            </label>
-            <label class="ai-config-row">
-              <span>api key</span>
-              <input class="ai-config-input ai-config-key" type="password" spellcheck="false" />
-            </label>
-            <p class="ai-config-hint ai-config-key-note"></p>
-          </div>
-          <button class="ai-config-save" type="button">save</button>
-        </div>
-      </div>
-    `;
+    this.el.innerHTML = sidebarMarkup({ sendContext: this.sendContext, autoApprove: this.autoApprove });
 
     this.messagesEl   = this.el.querySelector('.ai-messages')!;
     this.inputEl      = this.el.querySelector('.ai-input')!;
@@ -472,11 +227,6 @@ export class AISidebar {
     this.ctxPillEl = this.el.querySelector('.ai-ctx-pill')!;
     this.ctxPillCloseBtn = this.el.querySelector('.ai-ctx-pill-close')!;
     const ctxBtn      = this.el.querySelector('#ai-ctx-btn') as HTMLButtonElement;
-
-    createIcons({
-      icons: { ArrowDown, Plus },
-      attrs: { 'stroke-width': '2' },
-    });
 
     this.syncChatSelect();
     this.syncMemoryBadge();
@@ -1139,7 +889,8 @@ export class AISidebar {
       s.bubble?.classList.remove('ai-bubble--streaming');
       s.bubble?.querySelector('.ai-typing')?.remove();
       if (s.textEl) {
-        s.textEl.textContent = `Error: ${error}`;
+        const hint = modelHint(error, this.getProviderConfig().model);
+        s.textEl.textContent = hint ? `Error: ${error}\n\n${hint}` : `Error: ${error}`;
         s.textEl.classList.add('ai-error-text');
       }
       this.setLoading(false);
@@ -1485,107 +1236,5 @@ export class AISidebar {
 
     container.append(chipsEl, more);
   }
-}
-
-type Part = { type: 'text'; content: string } | { type: 'code'; content: string; lang: string };
-
-function parseResponse(text: string): Part[] {
-  const parts: Part[] = [];
-  const re = /```(\w+)?\n?([\s\S]*?)```/g;
-  let last = 0, m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const before = text.slice(last, m.index).trim();
-    if (before) parts.push({ type: 'text', content: before });
-    parts.push({ type: 'code', content: m[2].trim(), lang: m[1] || 'dsmx' });
-    last = m.index + m[0].length;
-  }
-  const after = text.slice(last).trim();
-  if (after) parts.push({ type: 'text', content: after });
-  return parts;
-}
-
-function renderMarkdown(text: string): HTMLElement {
-  const el = document.createElement('div');
-  const lines = text.split('\n');
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) { i++; continue; }
-
-    // horizontal rule
-    if (/^---+$/.test(trimmed)) {
-      const hr = document.createElement('div');
-      hr.className = 'ai-hr';
-      el.appendChild(hr);
-      i++;
-      continue;
-    }
-
-    // heading
-    const headingMatch = trimmed.match(/^##\s+(.+)$/);
-    if (headingMatch) {
-      const h = document.createElement('h3');
-      h.className = 'ai-heading';
-      h.textContent = headingMatch[1];
-      el.appendChild(h);
-      i++;
-      continue;
-    }
-
-    // bullet list or numbered list
-    if (/^[-*]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed)) {
-      const list = /^[-*]\s+/.test(trimmed)
-        ? document.createElement('ul')
-        : document.createElement('ol');
-      list.className = 'ai-list';
-      while (i < lines.length) {
-        const l = lines[i].trim();
-        if (!l) break;
-        const isBullet = /^[-*]\s+(.+)$/.test(l);
-        const isNum = /^\d+\.\s+(.+)$/.test(l);
-        if (!isBullet && !isNum) break;
-        const content = l.replace(/^(?:[-*]|\d+\.)\s+/, '');
-        const li = document.createElement('li');
-        li.className = 'ai-list-item';
-        li.innerHTML = formatInlineMarkdown(content);
-        list.appendChild(li);
-        i++;
-      }
-      el.appendChild(list);
-      continue;
-    }
-
-    // paragraph
-    const p = document.createElement('p');
-    p.innerHTML = formatInlineMarkdown(trimmed);
-    el.appendChild(p);
-    i++;
-  }
-
-  return el;
-}
-
-function formatInlineMarkdown(text: string): string {
-  let html = escapeHtml(text);
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>');
-  return html;
-}
-
-function cleanTitle(raw: string): string {
-  const words = raw.replace(/["'`]|[.\s]+$/g, '').replace(/\s+/g, ' ').trim().split(' ');
-  return words.length > 6 ? words.slice(0, 6).join(' ') : words.join(' ');
-}
-
-function truncateAtWord(raw: string, max = 40): string {
-  const text = raw.replace(/\s+/g, ' ').trim();
-  if (text.length <= max) return text;
-  const cut = text.slice(0, max);
-  const space = cut.lastIndexOf(' ');
-  return `${space > 12 ? cut.slice(0, space) : cut}…`;
 }
 

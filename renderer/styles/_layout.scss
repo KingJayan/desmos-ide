@@ -181,6 +181,12 @@ html, body {
 
 .rail-group { display: flex; flex-direction: column; gap: 2px; }
 .rail-spacer { flex: 1; }
+.rail-rule {
+  width: 18px;
+  height: 1px;
+  margin: 5px auto;
+  background: var(--border);
+}
 
 .rail-btn {
   --btn-hover-border: transparent;
@@ -215,6 +221,11 @@ html, body {
   font-weight: 700;
   line-height: 13px;
   text-align: center;
+}
+
+// the optimizer reports a saving, not a fault, so it must not wear the error colour
+#optimizer-badge {
+  background: var(--blue);
 }
 
 

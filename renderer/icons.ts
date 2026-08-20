@@ -1,15 +1,18 @@
 // one icon source for the whole UI
 
 import {
-  Check, ChevronRight, CircleX, Copy, ExternalLink, FileCode, FileText, FolderOpen, Info,
-  Pause, Play, Puzzle, RefreshCw, Search, Send, Square, SquarePen, Trash2, TriangleAlert, X,
+  ArrowDown, Check, ChevronRight, CircleX, Copy, ExternalLink, FileCode, FileText, FolderOpen,
+  Info, Pause, Play, Plus, Puzzle, RefreshCw, Search, Send, Square, SquarePen, Trash2,
+  TriangleAlert, X,
 } from 'lucide';
 import { escapeHtml } from './escape';
 
 type IconNode = [tag: string, attrs: Record<string, string | number>][];
 
 const ICONS = {
+  'arrow-down': ArrowDown as IconNode,
   check: Check as IconNode,
+  plus: Plus as IconNode,
   'chevron-right': ChevronRight as IconNode,
   'circle-x': CircleX as IconNode,
   copy: Copy as IconNode,

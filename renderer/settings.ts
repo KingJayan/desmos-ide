@@ -1,4 +1,5 @@
-import { createIcons, X } from 'lucide';
+
+import { iconSvg } from './icons';
 
 export type ColorTheme =
   | 'dsmx'
@@ -154,10 +155,6 @@ export class SettingsPanel {
     this.onChange = onChange;
     this.overlay = this.build();
     document.body.appendChild(this.overlay);
-    createIcons({
-      icons: { X },
-      attrs: { 'stroke-width': '2' },
-    });
   }
 
   /** themes a plugin defined, so an installed theme is one a user can pick */
@@ -193,7 +190,7 @@ export class SettingsPanel {
       <div class="settings-modal">
         <div class="settings-header">
           <span class="settings-title" id="settings-dialog-title">settings</span>
-          <button class="settings-close" aria-label="Close settings"><i data-lucide="x" aria-hidden="true"></i></button>
+          <button class="settings-close" aria-label="Close settings">${iconSvg('x', { size: 14 })}</button>
         </div>
         <div class="settings-body">
 

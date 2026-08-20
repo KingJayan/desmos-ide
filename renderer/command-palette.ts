@@ -16,6 +16,7 @@ export class CommandPalette {
   private filtered: PaletteCommand[] = [];
   private activeIdx = 0;
   private open = false;
+  private previousFocus: HTMLElement | null = null;
 
   constructor() {
     this.overlay = document.createElement('div');
@@ -24,6 +25,9 @@ export class CommandPalette {
 
     const modal = document.createElement('div');
     modal.className = 'cmd-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'command palette');
 
     const searchWrap = document.createElement('div');
     searchWrap.className = 'cmd-search-wrap';
@@ -73,6 +77,7 @@ export class CommandPalette {
 
   show(prefill = ''): void {
     this.open = true;
+    this.previousFocus = document.activeElement as HTMLElement | null;
     this.overlay.classList.add('cmd-overlay--visible');
     this.overlay.setAttribute('aria-hidden', 'false');
     this.input.value = prefill;
@@ -84,6 +89,8 @@ export class CommandPalette {
     this.open = false;
     this.overlay.classList.remove('cmd-overlay--visible');
     this.overlay.setAttribute('aria-hidden', 'true');
+    this.previousFocus?.focus();
+    this.previousFocus = null;
   }
 
   private filter(): void {
@@ -154,6 +161,8 @@ export class CommandPalette {
 
   private onKey(e: KeyboardEvent): void {
     if (e.key === 'Escape') { e.preventDefault(); this.close(); return; }
+    // the input is the only thing a user can focus here, so Tab has nowhere to go but out
+    if (e.key === 'Tab') { e.preventDefault(); return; }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       this.activeIdx = Math.min(this.activeIdx + 1, this.filtered.length - 1);
