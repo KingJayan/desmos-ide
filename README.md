@@ -70,14 +70,7 @@ bun pack:cli   # bundle + tarball the cli for a release
 
 ## troubleshooting
 
-| symptom | fix |
-|---|---|
-| window opens blank | run `bun run build:view` (serves built `dist/`) |
-| AI sidebar does nothing | open the provider popover and set a model + API key |
-| source control panel is empty | follows the open file; save the file inside a repo first |
-| `dsmx run` shows a pink bar about the API | it needs a network connection the first time; the browser caches it after |
-
-or [fill out an issue](https://github.com/KingJayan/desmos-ide/issues/new) to be addressed
+see [#9](https://github.com/KingJayan/desmos-ide/issues/9)
 
 ##
 <div align="center">
