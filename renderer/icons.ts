@@ -7,12 +7,64 @@ import {
 } from 'lucide';
 import { escapeHtml } from '../src/shared/escape';
 
-type IconNode = [tag: string, attrs: Record<string, string | number>][];
+type IconNode = [tag: string, attrs: Record<string, string | number>, children?: IconNode][];
 
 const DsmxMark: IconNode = [
-  ['path', { d: 'M2.5 12h19', opacity: '0.4' }],
-  ['path', { d: 'M12 2.5v19', opacity: '0.4' }],
-  ['path', { d: 'M3 6 Q12 17.5 21 6' }],
+  ['rect', {
+    width: '24',
+    height: '24',
+    rx: '5',
+    fill: '#202223',
+  }],
+
+  // graph grid
+  ['g', {
+    fill: 'none',
+    stroke: '#17191a',
+    'stroke-width': '0.65',
+  }, [
+    ['path', { d: 'M6 0v24' }],
+    ['path', { d: 'M12 0v24' }],
+    ['path', { d: 'M18 0v24' }],
+    ['path', { d: 'M0 6h24' }],
+    ['path', { d: 'M0 12h24' }],
+    ['path', { d: 'M0 18h24' }],
+  ]],
+
+  // secondary traces
+  ['g', {
+    fill: 'none',
+    stroke: '#4b5563',
+    'stroke-width': '0.7',
+    'stroke-linecap': 'round',
+  }, [
+    ['path', {
+      d: 'M1.5 8 C4 8 5.5 17 9 17 C12 17 13 7 16 7 C19 7 20 15.5 22.5 15.5',
+    }],
+    ['path', {
+      d: 'M1.5 9.2 C4 9.2 5.5 16 9 16 C12 16 13 8.2 16 8.2 C19 8.2 20 14.3 22.5 14.3',
+    }],
+    ['path', {
+      d: 'M1.5 10.4 C4 10.4 5.5 15 9 15 C12 15 13 9.4 16 9.4 C19 9.4 20 13.1 22.5 13.1',
+    }],
+  ]],
+
+  // primary trace
+  ['path', {
+    d: 'M1.5 5 C4.5 5 5.5 18.5 9 18.5 C12.5 18.5 13 5.5 16 5.5 C19 5.5 20 15.5 22.5 15.5',
+    fill: 'none',
+    stroke: '#2f80d0',
+    'stroke-width': '1.5',
+    'stroke-linecap': 'round',
+  }],
+
+  // subtle draggable point
+  ['circle', {
+    cx: '9',
+    cy: '18.5',
+    r: '1.15',
+    fill: '#2f80d0',
+  }],
 ];
 
 const ICONS = {

@@ -26,6 +26,7 @@
     "bump:patch": "bun pm version patch --no-git-tag-version",
     "bump:minor": "bun pm version minor --no-git-tag-version",
     "bump:major": "bun pm version major --no-git-tag-version",
+    "bump:hotfix": "bun pm version prepatch --no-git-tag-version --preid=hotfix",
     "bump:prepatch": "bun pm version prepatch --no-git-tag-version --preid=beta",
     "ready": "bun run bump:patch && bun run build",
     "release": "bash scripts/release.sh",
