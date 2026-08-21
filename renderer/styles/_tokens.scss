@@ -17,7 +17,7 @@ $palettes: (
     'blue': #0b7ec4, 'green': #12855f, 'yellow': #9a6a12,
     'red': #c8384a, 'mauve': #6d4ad1, 'peach': #b06a1c,
   ),
-  'desmos-dark': (
+  'catppuccin-mocha': (
     'base': #1e1e2e, 'mantle': #181825, 'crust': #11111b,
     'surface0': #313244, 'surface1': #45475a,
     'overlay0': #6c7086, 'overlay1': #7f849c, 'overlay2': #9399b2,
@@ -102,6 +102,15 @@ $light-themes: 'dsmx-light', 'catppuccin-latte', 'github-light', 'vs-light';
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 [hidden] { display: none !important; }
 .hidden { display: none !important; }
 

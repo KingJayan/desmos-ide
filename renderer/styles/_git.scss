@@ -24,6 +24,7 @@
   white-space: nowrap;
 }
 .status-fact.hidden { display: none; }
+.status-fact--warn { color: var(--yellow); }
 
 .git-pill {
   display: inline-flex;

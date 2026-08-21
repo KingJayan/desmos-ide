@@ -4,7 +4,7 @@ import { fingerprint } from './expr-fingerprint';
 
 function themeSettings(theme: ColorTheme): { backgroundColor: string; textColor: string } {
   const spec = themeSpec(theme);
-  return { backgroundColor: spec.background, textColor: spec.axis };
+  return { backgroundColor: spec.palette.base, textColor: spec.axis };
 }
 
 const SETTLE_MS = 600;

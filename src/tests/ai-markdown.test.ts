@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTitle, formatInlineMarkdown, parseResponse, truncateAtWord } from '../../renderer/ai-markdown';
+import { cleanTitle, parseResponse, truncateAtWord } from '../../renderer/ai-markdown';
 import { modelHint } from '../../renderer/ai-providers';
 
 describe('a reply is cut into text and code', () => {
@@ -30,26 +30,6 @@ describe('a reply is cut into text and code', () => {
 
   test('nothing at all gives no parts', () => {
     assert.deepEqual(parseResponse(''), []);
-  });
-});
-
-describe('inline marks are added after the text is escaped', () => {
-  test('a tag the model wrote stays text', () => {
-    const html = formatInlineMarkdown('<img src=x onerror=go>');
-    assert.equal(html.includes('<img'), false);
-    assert.ok(html.includes('&lt;img'));
-  });
-
-  test('bold, italic and code come through', () => {
-    assert.ok(formatInlineMarkdown('**a**').includes('<strong>a</strong>'));
-    assert.ok(formatInlineMarkdown('*a*').includes('<em>a</em>'));
-    assert.ok(formatInlineMarkdown('`a`').includes('<code class="ai-inline-code">a</code>'));
-  });
-
-  test('a tag inside a code span is still text', () => {
-    const html = formatInlineMarkdown('`<b>`');
-    assert.ok(html.includes('&lt;b&gt;'));
-    assert.equal(html.includes('<b>'), false);
   });
 });
 

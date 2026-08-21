@@ -128,7 +128,6 @@ await page.addInitScript(() => {
       global: {}, workspace: {}, storagePath: null, globalStoragePath: null,
     }),
     pluginStateUpdate: () => Promise.resolve(true),
-    pluginStateSync: () => Promise.resolve(true),
     pluginSecret: () => Promise.resolve(null),
     pluginSecretStore: () => Promise.resolve(true),
     pluginSecretDelete: () => Promise.resolve(true),

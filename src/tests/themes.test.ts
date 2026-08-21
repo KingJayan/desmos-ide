@@ -3,16 +3,21 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { THEMES, fillScale, isColorTheme, themeSpec } from '../../renderer/themes';
+import { THEMES, fillScale, isColorTheme, monacoTheme, themeSpec } from '../../renderer/themes';
 
 const tokens = readFileSync(fileURLToPath(new URL('../../renderer/styles/_tokens.scss', import.meta.url)), 'utf-8');
 
-function scssPalette(): Map<string, { base: string; light: boolean }> {
-  const out = new Map<string, { base: string; light: boolean }>();
+interface ScssTheme { light: boolean; roles: Record<string, string> }
+
+function scssPalette(): Map<string, ScssTheme> {
+  const out = new Map<string, ScssTheme>();
   const lightLine = /\$light-themes:([^;]+);/.exec(tokens)?.[1] ?? '';
   const light = new Set([...lightLine.matchAll(/'([^']+)'/g)].map(m => m[1]));
-  for (const m of tokens.matchAll(/'([a-z0-9-]+)':\s*\(\s*\n\s*'base':\s*(#[0-9a-f]{6})/gi)) {
-    out.set(m[1], { base: m[2].toLowerCase(), light: light.has(m[1]) });
+  const body = tokens.slice(tokens.indexOf('$palettes:'), tokens.indexOf('$default-theme'));
+  for (const m of body.matchAll(/'([a-z0-9-]+)':\s*\(([\s\S]*?)\n {2}\)/g)) {
+    const roles: Record<string, string> = {};
+    for (const r of m[2].matchAll(/'([a-z0-9]+)':\s*(#[0-9a-f]{6})/gi)) roles[r[1]] = r[2].toLowerCase();
+    out.set(m[1], { light: light.has(m[1]), roles });
   }
   return out;
 }
@@ -24,9 +29,19 @@ describe('the theme table', () => {
     assert.deepEqual([...palette.keys()].sort(), THEMES.map(t => t.id).sort());
   });
 
-  test('the graph background is the same colour as the editor', () => {
+  test('the table and the stylesheet hold the same colours', () => {
     for (const theme of THEMES) {
-      assert.equal(theme.background.toLowerCase(), palette.get(theme.id)?.base, theme.id);
+      assert.deepEqual({ ...theme.palette }, palette.get(theme.id)?.roles, theme.id);
+    }
+  });
+
+  test('the editor gets its colours from the same palette as the graph', () => {
+    for (const theme of THEMES) {
+      const editor = monacoTheme(theme.id);
+      assert.equal(editor.colors['editor.background'], theme.palette.base, theme.id);
+      assert.equal(editor.colors['editor.foreground'], theme.palette.text, theme.id);
+      assert.equal(editor.base, theme.light ? 'vs' : 'vs-dark', theme.id);
+      for (const rule of editor.rules) assert.match(rule.foreground, /^[0-9a-f]{6}$/, theme.id);
     }
   });
 

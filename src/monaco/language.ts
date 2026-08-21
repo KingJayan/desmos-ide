@@ -101,37 +101,6 @@ export const monarchTokens = {
 };
 
 
-export const themeRules = [
-  { token: 'keyword',               foreground: 'CBA6F7', fontStyle: 'bold'   }, // mauve
-  { token: 'function.builtin',      foreground: 'FAB387'                       }, // peach
-  { token: 'function.call',         foreground: '89B4FA'                       }, // blue — user fn calls
-  { token: 'identifier',            foreground: 'CDD6F4'                       }, // text
-  { token: 'number',                foreground: 'F38BA8'                       }, // red/rose — distinct from builtins
-  { token: 'operator',              foreground: '89DCEB'                       }, // sky
-  { token: 'operator.ellipsis',     foreground: 'A6E3A1', fontStyle: 'bold'   }, // green
-  { token: 'operator.arrow',        foreground: 'A6E3A1'                       }, // green
-  { token: 'string',                foreground: 'A6E3A1'                       }, // green
-  { token: 'string.quote',          foreground: 'A6E3A1'                       }, // green
-  { token: 'comment',               foreground: '6C7086', fontStyle: 'italic' }, // overlay0
-  { token: 'delimiter',             foreground: '9399B2'                       }, // overlay2
-  { token: 'delimiter.brace',       foreground: 'F5C2E7'                       }, // pink
-  { token: 'delimiter.bracket',     foreground: 'A6E3A1'                       }, // green
-  { token: 'delimiter.parenthesis', foreground: 'F9E2AF'                       }, // yellow
-];
-
-export const themeColors = {
-  'editor.background':                '#1E1E2E', // base
-  'editor.foreground':                '#CDD6F4', // text
-  'editorLineNumber.foreground':      '#6C7086', // overlay0
-  'editorLineNumber.activeForeground':'#BAC2DE', // subtext1
-  'editor.selectionBackground':       '#313244', // surface0
-  'editor.lineHighlightBackground':   '#181825', // mantle
-  'editorCursor.foreground':          '#F5C2E7', // pink
-  'editorBracketMatch.background':    '#45475A', // surface1
-  'editorBracketMatch.border':        '#89B4FA', // blue
-};
-
-
 export interface CompletionItem {
   label: string;
   kind: number; // monaco.languages.CompletionItemKind value
@@ -357,13 +326,6 @@ export function registerLanguage(monaco: {
   monaco.languages.register({ id: LANGUAGE_ID });
   monaco.languages.setLanguageConfiguration(LANGUAGE_ID, languageConfig);
   monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, monarchTokens);
-
-  monaco.editor.defineTheme('desmos-dark', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: themeRules,
-    colors: themeColors,
-  });
 
   const { Keyword, Snippet, Function } = monaco.languages.CompletionItemKind;
   const { InsertAsSnippet } = monaco.languages.CompletionItemInsertTextRule;

@@ -15,7 +15,6 @@ const MAX_STATE = 256 * 1024;
 
 interface GlobalFile {
   values: Record<string, unknown>;
-  sync: string[];
 }
 
 function safeId(id: string): string | null {
@@ -55,10 +54,8 @@ async function writeJson(path: string, value: unknown): Promise<boolean> {
 async function readGlobal(id: string): Promise<GlobalFile> {
   const raw = await readJson(join(pluginDir(id), 'global.json'));
   const values = raw?.['values'];
-  const sync = raw?.['sync'];
   return {
     values: values && typeof values === 'object' && !Array.isArray(values) ? (values as Record<string, unknown>) : {},
-    sync: Array.isArray(sync) ? sync.filter((k): k is string => typeof k === 'string') : [],
   };
 }
 
@@ -127,13 +124,6 @@ export async function updatePluginState(
   if (value === null) delete values[key];
   else values[key] = value;
   return writeJson(path, values);
-}
-
-export async function setSyncKeys(id: string, keys: string[]): Promise<boolean> {
-  if (!safeId(id)) return false;
-  const file = await readGlobal(id);
-  file.sync = keys.filter(k => KEY.test(k)).slice(0, 64);
-  return writeJson(join(pluginDir(id), 'global.json'), file);
 }
 
 function account(id: string, key: string): string {

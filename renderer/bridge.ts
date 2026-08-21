@@ -88,7 +88,6 @@ export const electronAPI = {
   pluginStateUpdate: (params: {
     id: string; scope: 'global' | 'workspace'; workspace: string | null; key: string; value: unknown;
   }) => rpc.request.pluginStateUpdate(params),
-  pluginStateSync: (params: { id: string; keys: string[] }) => rpc.request.pluginStateSync(params),
   pluginSecret: (params: { id: string; key: string }) => rpc.request.pluginSecret(params),
   pluginSecretStore: (params: { id: string; key: string; value: string }) => rpc.request.pluginSecretStore(params),
   pluginSecretDelete: (params: { id: string; key: string }) => rpc.request.pluginSecretDelete(params),

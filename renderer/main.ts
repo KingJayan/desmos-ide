@@ -16,6 +16,8 @@ import { formatDsl } from '../src/compiler/format';
 import { findRenameEdits, isValidIdent } from '../src/compiler/rename';
 import CompileWorker from './compile.worker?worker';
 import { CompilePipeline } from './compile-pipeline';
+import { GraphOnly } from './graph-only';
+import { THEMES, monacoTheme } from './themes';
 import { compileToTex } from '../src/index';
 import { shareUrl } from '../src/share';
 import type { CompileResult, SymbolInfo, ExprSource, OptimizeNote } from '../src/index';
@@ -169,233 +171,7 @@ const workspaceState = new WorkspaceState({ onRecents: () => syncRecent() });
 
 let autosaveOn = initSettings.autosave;
 
-monaco.editor.defineTheme('dsmx', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '5d6878' },
-    { token: 'keyword',   foreground: '8cd7ff' },
-    { token: 'string',    foreground: '7fe0b0' },
-    { token: 'number',    foreground: 'f0c58d' },
-    { token: 'type',      foreground: 'c3b0ff' },
-    { token: 'function',  foreground: 'a9c7ff' },
-    { token: 'variable',  foreground: 'edf2fa' },
-    { token: 'operator',  foreground: '9aa5b6' },
-  ],
-  colors: {
-    'editor.background':                '#0e1420',
-    'editor.foreground':                '#edf2fa',
-    'editorLineNumber.foreground':      '#2c3745',
-    'editorLineNumber.activeForeground':'#9aa5b6',
-    'editor.selectionBackground':       '#1e3244',
-    'editor.lineHighlightBackground':   '#141b28',
-    'editorCursor.foreground':          '#8cd7ff',
-    'editorIndentGuide.background1':    '#1b2431',
-    'editorIndentGuide.activeBackground1': '#2c3745',
-    'editorWhitespace.foreground':      '#1b2431',
-    'editorBracketMatch.background':    '#1e3244',
-    'editorBracketMatch.border':        '#8cd7ff',
-  },
-});
-
-monaco.editor.defineTheme('dsmx-light', {
-  base: 'vs',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '8b95a5' },
-    { token: 'keyword',   foreground: '0b7ec4' },
-    { token: 'string',    foreground: '12855f' },
-    { token: 'number',    foreground: 'b06a1c' },
-    { token: 'type',      foreground: '6d4ad1' },
-    { token: 'function',  foreground: '1c62a8' },
-    { token: 'variable',  foreground: '141a24' },
-    { token: 'operator',  foreground: '55606f' },
-  ],
-  colors: {
-    'editor.background':                '#ffffff',
-    'editor.foreground':                '#141a24',
-    'editorLineNumber.foreground':      '#cbd2de',
-    'editorLineNumber.activeForeground':'#55606f',
-    'editor.selectionBackground':       '#cfe6f6',
-    'editor.lineHighlightBackground':   '#f4f6fa',
-    'editorCursor.foreground':          '#0b7ec4',
-    'editorIndentGuide.background1':    '#e8ecf3',
-    'editorWhitespace.foreground':      '#e8ecf3',
-  },
-});
-
-monaco.editor.defineTheme('desmos-dark', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '6c7086', fontStyle: 'italic' },
-    { token: 'keyword',   foreground: 'cba6f7' },
-    { token: 'string',    foreground: 'a6e3a1' },
-    { token: 'number',    foreground: 'fab387' },
-    { token: 'type',      foreground: 'f38ba8' },
-    { token: 'function',  foreground: '89b4fa' },
-    { token: 'variable',  foreground: 'cdd6f4' },
-    { token: 'operator',  foreground: '89dceb' },
-  ],
-  colors: {
-    'editor.background':                '#1e1e2e',
-    'editor.foreground':                '#cdd6f4',
-    'editorLineNumber.foreground':      '#45475a',
-    'editorLineNumber.activeForeground':'#bac2de',
-    'editor.selectionBackground':       '#45475a',
-    'editor.lineHighlightBackground':   '#313244',
-    'editorCursor.foreground':          '#b4befe',
-    'editorIndentGuide.background1':    '#313244',
-    'editorWhitespace.foreground':      '#313244',
-  },
-});
-
-monaco.editor.defineTheme('catppuccin-latte', {
-  base: 'vs',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '9ca0b0', fontStyle: 'italic' },
-    { token: 'keyword',   foreground: '8839ef' },
-    { token: 'string',    foreground: '40a02b' },
-    { token: 'number',    foreground: 'fe640b' },
-    { token: 'type',      foreground: 'd20f39' },
-    { token: 'function',  foreground: '1e66f5' },
-    { token: 'variable',  foreground: '4c4f69' },
-    { token: 'operator',  foreground: '179299' },
-  ],
-  colors: {
-    'editor.background':                '#eff1f5',
-    'editor.foreground':                '#4c4f69',
-    'editorLineNumber.foreground':      '#bcc0cc',
-    'editorLineNumber.activeForeground':'#5c5f77',
-    'editor.selectionBackground':       '#acb0be',
-    'editor.lineHighlightBackground':   '#e6e9ef',
-    'editorCursor.foreground':          '#7287fd',
-    'editorIndentGuide.background1':    '#ccd0da',
-    'editorWhitespace.foreground':      '#ccd0da',
-  },
-});
-
-monaco.editor.defineTheme('catppuccin-frappe', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '737994', fontStyle: 'italic' },
-    { token: 'keyword',   foreground: 'ca9ee6' },
-    { token: 'string',    foreground: 'a6d189' },
-    { token: 'number',    foreground: 'ef9f76' },
-    { token: 'type',      foreground: 'e78284' },
-    { token: 'function',  foreground: '8caaee' },
-    { token: 'variable',  foreground: 'c6d0f5' },
-    { token: 'operator',  foreground: '81c8be' },
-  ],
-  colors: {
-    'editor.background':                '#303446',
-    'editor.foreground':                '#c6d0f5',
-    'editorLineNumber.foreground':      '#51576d',
-    'editorLineNumber.activeForeground':'#b5bfe2',
-    'editor.selectionBackground':       '#51576d',
-    'editor.lineHighlightBackground':   '#414559',
-    'editorCursor.foreground':          '#babbf1',
-    'editorIndentGuide.background1':    '#414559',
-    'editorWhitespace.foreground':      '#414559',
-  },
-});
-
-monaco.editor.defineTheme('catppuccin-macchiato', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '6e738d', fontStyle: 'italic' },
-    { token: 'keyword',   foreground: 'c6a0f6' },
-    { token: 'string',    foreground: 'a6da95' },
-    { token: 'number',    foreground: 'f5a97f' },
-    { token: 'type',      foreground: 'ed8796' },
-    { token: 'function',  foreground: '8aadf4' },
-    { token: 'variable',  foreground: 'cad3f5' },
-    { token: 'operator',  foreground: '8bd5ca' },
-  ],
-  colors: {
-    'editor.background':                '#24273a',
-    'editor.foreground':                '#cad3f5',
-    'editorLineNumber.foreground':      '#494d64',
-    'editorLineNumber.activeForeground':'#b8c0e0',
-    'editor.selectionBackground':       '#494d64',
-    'editor.lineHighlightBackground':   '#363a4f',
-    'editorCursor.foreground':          '#b7bdf8',
-    'editorIndentGuide.background1':    '#363a4f',
-    'editorWhitespace.foreground':      '#363a4f',
-  },
-});
-
-monaco.editor.defineTheme('github-dark', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '8b949e', fontStyle: 'italic' },
-    { token: 'keyword',   foreground: 'ff7b72' },
-    { token: 'string',    foreground: 'a5d6ff' },
-    { token: 'number',    foreground: '79c0ff' },
-    { token: 'type',      foreground: 'ffa657' },
-    { token: 'function',  foreground: 'd2a8ff' },
-    { token: 'variable',  foreground: 'e6edf3' },
-    { token: 'operator',  foreground: 'ff7b72' },
-  ],
-  colors: {
-    'editor.background':           '#0d1117',
-    'editor.foreground':           '#e6edf3',
-    'editorLineNumber.foreground': '#6e7681',
-    'editor.selectionBackground':  '#264f78',
-    'editor.lineHighlightBackground': '#161b22',
-    'editorCursor.foreground':     '#58a6ff',
-  },
-});
-
-monaco.editor.defineTheme('github-light', {
-  base: 'vs',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '6e7781', fontStyle: 'italic' },
-    { token: 'keyword',   foreground: 'cf222e' },
-    { token: 'string',    foreground: '0a3069' },
-    { token: 'number',    foreground: '0550ae' },
-    { token: 'type',      foreground: 'e36209' },
-    { token: 'function',  foreground: '8250df' },
-    { token: 'variable',  foreground: '24292f' },
-    { token: 'operator',  foreground: 'cf222e' },
-  ],
-  colors: {
-    'editor.background':           '#ffffff',
-    'editor.foreground':           '#24292f',
-    'editorLineNumber.foreground': '#8c959f',
-    'editor.selectionBackground':  '#add6ff',
-    'editor.lineHighlightBackground': '#f6f8fa',
-    'editorCursor.foreground':     '#0969da',
-  },
-});
-
-monaco.editor.defineTheme('monokai', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'comment',   foreground: '88846f', fontStyle: 'italic' },
-    { token: 'keyword',   foreground: 'f92672' },
-    { token: 'string',    foreground: 'e6db74' },
-    { token: 'number',    foreground: 'ae81ff' },
-    { token: 'type',      foreground: '66d9e8' },
-    { token: 'function',  foreground: 'a6e22e' },
-    { token: 'variable',  foreground: 'f8f8f2' },
-    { token: 'operator',  foreground: 'f92672' },
-  ],
-  colors: {
-    'editor.background':           '#272822',
-    'editor.foreground':           '#f8f8f2',
-    'editorLineNumber.foreground': '#90908a',
-    'editor.selectionBackground':  '#49483e',
-    'editor.lineHighlightBackground': '#3e3d32',
-    'editorCursor.foreground':     '#f8f8f0',
-  },
-});
+for (const theme of THEMES) monaco.editor.defineTheme(theme.id, monacoTheme(theme.id));
 
 document.documentElement.setAttribute('data-color-theme', initSettings.colorTheme);
 
@@ -476,6 +252,18 @@ function freshName(taken: Set<string>): string {
   }
 }
 
+const statusGraphOnly = $('status-graph-only');
+const graphOnly = new GraphOnly();
+
+// an expression with no DSL form is not in the saved file, so it is counted where the user can see it
+function noteGraphOnly(refused: string[], seen: (string | undefined)[] = []): void {
+  graphOnly.record(refused, seen);
+  statusGraphOnly.textContent = graphOnly.label();
+  statusGraphOnly.title = graphOnly.title();
+  statusGraphOnly.classList.toggle('hidden', graphOnly.count === 0);
+  setEnhancedDirty(graphOnly.count > 0);
+}
+
 function writeBackToDsl(exprs: DesmosExpr[], removedIds: string[] = []): string[] {
   const edits: monaco.editor.IIdentifiedSingleEditOperation[] = [];
   const refused: string[] = [];
@@ -520,10 +308,8 @@ function writeBackToDsl(exprs: DesmosExpr[], removedIds: string[] = []): string[
 }
 
 graph.onExpressionEdited(exprs => {
-  const refused = writeBackToDsl(exprs.filter(e => sourceMap.some(s => s.id === e.id)));
-  if (refused.length) {
-    setStatus(`Cannot write back as DSL: ${refused.join(', ')}`, 'error');
-  }
+  const refused = writeBackToDsl(exprs);
+  noteGraphOnly(refused, exprs.map(e => e.id));
 });
 
 editor.onDidChangeCursorPosition(e => {
@@ -575,11 +361,8 @@ async function ensureEnhancedPane(): Promise<EnhancedPane> {
       enhancedSeen = list.map(e => ({ ...e }));
 
       const refused = writeBackToDsl(changed, removed);
-      if (refused.length) {
-        graph.update(list);
-        setStatus(`Kept on the graph only: ${refused.join(', ')}`, 'info');
-      }
-      setEnhancedDirty(refused.length > 0);
+      if (refused.length) graph.update(list);
+      noteGraphOnly(refused, [...changed.map(e => e.id), ...removed]);
     },
   );
   return enhanced;
@@ -600,7 +383,8 @@ btnExportJson.addEventListener('click', async () => {
   if (!result) return;
   if (result.ok) {
     enhanced.clearDirty();
-    setEnhancedDirty(false);
+    graphOnly.clear();
+    noteGraphOnly([]);
     setStatus('Exported', 'success');
   } else if (!result.canceled) {
     setStatus(result.message, 'error');

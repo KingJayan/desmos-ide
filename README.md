@@ -47,7 +47,13 @@ macOS and Linux, req `node`, loads desmos api over network on the first time
 ```bash
 brew install --cask KingJayan/dsmx/dsmx-app
 ```
-app isn't signed with apple dev id, so if you download it through releases page, allow in Settings -> Security -> Gatekeeper, or:
+the cask installs it ready to run — it clears the quarantine flag for you.
+
+the app carries an ad-hoc signature, not an apple developer id one, because i don't have one. so if you download the `.app` from the releases page instead, macOS blocks it on first launch. the source is all here and the release is built by the CI workflow in this repo. to open it, either:
+
+* open **System Settings → Privacy & Security**, and press **Open Anyway** under the blocked app, or
+* remove the quarantine flag yourself:
+
 ```bash
 xattr -dr com.apple.quarantine /Applications/desmos-ide.app
 ```

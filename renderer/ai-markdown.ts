@@ -1,5 +1,3 @@
-import { escapeHtml } from '../src/shared/escape';
-
 export type Part = { type: 'text'; content: string } | { type: 'code'; content: string; lang: string };
 
 export function parseResponse(text: string): Part[] {
@@ -15,14 +13,6 @@ export function parseResponse(text: string): Part[] {
   const after = text.slice(last).trim();
   if (after) parts.push({ type: 'text', content: after });
   return parts;
-}
-
-export function formatInlineMarkdown(text: string): string {
-  let html = escapeHtml(text);
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>');
-  return html;
 }
 
 export function cleanTitle(raw: string): string {

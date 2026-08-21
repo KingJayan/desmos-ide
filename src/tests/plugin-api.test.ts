@@ -187,10 +187,9 @@ describe('a readme is escaped before it is marked up', () => {
 
 describe('plugin storage refuses anything that is not its own', () => {
   test('a bad id writes nothing and says so', async () => {
-    const { updatePluginState, getPluginSecret, setSyncKeys } = await import('../../bun/plugin-storage');
+    const { updatePluginState, getPluginSecret } = await import('../../bun/plugin-storage');
     for (const id of ['../escape', 'Upper', 'a', 'has space', 'a/b']) {
       assert.equal(await updatePluginState(id, 'global', null, 'k', 1), false, id);
-      assert.equal(await setSyncKeys(id, ['k']), false, id);
       assert.equal(await getPluginSecret(id, 'k'), null, id);
     }
   });

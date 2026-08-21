@@ -68,7 +68,6 @@ interface Registered {
   menus: unknown[];
   global: Record<string, unknown>;
   workspace: Record<string, unknown>;
-  sync: string[];
   storagePath: string | null;
   globalStoragePath: string | null;
 }
@@ -138,15 +137,6 @@ function memento(plugin: string, reg: Registered, scope: 'global' | 'workspace')
       else store()[key] = clean;
       await hostCall(plugin, 'state.update', [scope, key, clean ?? null]);
     },
-    ...(scope === 'global'
-      ? {
-        setKeysForSync: (keys: unknown): void => {
-          if (!Array.isArray(keys)) throw new Error('setKeysForSync takes an array of keys');
-          reg.sync = keys.filter((k): k is string => typeof k === 'string');
-          void hostCall(plugin, 'state.sync', [reg.sync]);
-        },
-      }
-      : {}),
   };
 }
 
@@ -262,7 +252,7 @@ type LoadRequest = Extract<SandboxRequest, { type: 'load' }>['plugins'][number];
 function blank(): Registered {
   return {
     macros: new Map(), commands: new Map(), views: new Map(), status: new Map(),
-    keys: new Map(), menus: [], global: {}, workspace: {}, sync: [],
+    keys: new Map(), menus: [], global: {}, workspace: {},
     storagePath: null, globalStoragePath: null,
   };
 }

@@ -51,7 +51,7 @@ const DEFAULTS: EditorSettings = {
 };
 
 const STORAGE_KEY = 'desmos-ide-settings';
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 3;
 
 const VALID_LINE_NUMBERS = new Set(['on','off','relative']);
 const VALID_WORD_WRAP = new Set(['on','off']);
@@ -79,7 +79,12 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
     if (raw.fontFamily && !raw.codeFontFamily) { raw.codeFontFamily = raw.fontFamily; delete raw.fontFamily; }
     if (raw.colorTheme && !raw.editorTheme) raw.editorTheme = raw.colorTheme;
     if (raw.editorTheme && !raw.colorTheme) raw.colorTheme = raw.editorTheme;
-    if (raw.colorTheme === 'dark') raw.colorTheme = 'desmos-dark';
+    if (raw.colorTheme === 'dark') raw.colorTheme = 'catppuccin-mocha';
+  }
+  if (v < 3) {
+    for (const key of ['colorTheme', 'editorTheme']) {
+      if (raw[key] === 'desmos-dark') raw[key] = 'catppuccin-mocha';
+    }
   }
   raw.__v = SETTINGS_VERSION;
   return raw;

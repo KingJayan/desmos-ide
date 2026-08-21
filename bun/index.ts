@@ -5,7 +5,7 @@ import { exportImage, exportJson, exportTex, openFile, openJsonFile, readFileAt,
 import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
 import { fetchRegistry, installPlugin, listPlugins, pluginIcon, pluginReadme, setPluginEnabled, uninstallPlugin } from './plugins';
 import {
-  deletePluginSecret, getPluginSecret, pluginState, setSyncKeys, storePluginSecret, updatePluginState,
+  deletePluginSecret, getPluginSecret, pluginState, storePluginSecret, updatePluginState,
 } from './plugin-storage';
 import { allowRoot, loadAllowed } from './paths';
 import { ensureConfig, readConfig, watchConfig, writeConfig } from './config';
@@ -87,7 +87,6 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       pluginState: ({ id, workspace }) => pluginState(id, workspace),
       pluginStateUpdate: ({ id, scope, workspace, key, value }) =>
         updatePluginState(id, scope, workspace, key, value),
-      pluginStateSync: ({ id, keys }) => setSyncKeys(id, keys),
       pluginSecret: ({ id, key }) => getPluginSecret(id, key),
       pluginSecretStore: ({ id, key, value }) => storePluginSecret(id, key, value),
       pluginSecretDelete: ({ id, key }) => deletePluginSecret(id, key),

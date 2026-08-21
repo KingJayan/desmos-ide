@@ -292,12 +292,6 @@ export class PluginHost {
           value: args[2] ?? null,
         }) ?? null;
 
-      case 'state.sync':
-        return window.electronAPI?.pluginStateSync({
-          id: plugin,
-          keys: Array.isArray(args[0]) ? (args[0] as unknown[]).filter((k): k is string => typeof k === 'string') : [],
-        }) ?? null;
-
       case 'secrets.get':
         return (await window.electronAPI?.pluginSecret({ id: plugin, key: text(0) })) ?? null;
       case 'secrets.store':

@@ -32,7 +32,6 @@ export type HostCall =
   | 'notify'
   | 'status'
   | 'state.update'
-  | 'state.sync'
   | 'secrets.get'
   | 'secrets.store'
   | 'secrets.delete'

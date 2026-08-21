@@ -37,7 +37,7 @@
         <div class="mode-toggle" role="group" aria-label="view mode">
           <button id="btn-dsl" class="mode-btn active" title="Write the DSL. This is the file that gets saved.">dsl</button>
           <button id="btn-split" class="mode-btn" title="DSL editor and the expression list side by side">split</button>
-          <button id="btn-enhanced" class="mode-btn" title="Edit the expressions the way Desmos does. Edits are written back into the DSL file.">enhanced</button>
+          <button id="btn-enhanced" class="mode-btn" title="Edit the expressions the way Desmos does. Edits are written back into the DSL file when they have a DSL form.">enhanced</button>
         </div>
         <div class="tb-actions">
           <button id="btn-new"  class="tb-icon" title="new file  ⌘N" aria-label="new file"><i data-lucide="file-plus" aria-hidden="true"></i></button>
@@ -226,7 +226,7 @@
                   <span>Some of these edits are on the graph only &mdash; export them to keep them</span>
                   <button id="btn-export-json" class="unsaved-export-btn">export json</button>
                 </div>
-                <div id="enhanced-hint">Edit the expressions the way Desmos does. Every edit is written back into the DSL file.</div>
+                <div id="enhanced-hint">Edit the expressions the way Desmos does. Each edit is written back into the DSL file, unless it has no DSL form &mdash; then it stays on the graph and is counted in the status bar.</div>
                 <div id="expr-list"></div>
                 <div id="expr-actions">
                   <button id="btn-add-expr" class="action-btn">+ add expression</button>
@@ -298,6 +298,7 @@
       <span id="status-facts">
         <span id="status-branch" class="status-fact hidden"></span>
         <span id="status-save" class="status-fact"></span>
+        <span id="status-graph-only" class="status-fact status-fact--warn hidden"></span>
         <span id="status-lang" class="status-fact">dsmx</span>
         <span id="status-plugins" class="status-plugins"></span>
         <span id="status-pos" class="status-fact">Ln 1, Col 1</span>

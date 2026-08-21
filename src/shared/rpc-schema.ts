@@ -123,7 +123,6 @@ export type DesmosIdeRPC = {
         params: { id: string; scope: 'global' | 'workspace'; workspace: string | null; key: string; value: unknown };
         response: boolean;
       };
-      pluginStateSync: { params: { id: string; keys: string[] }; response: boolean };
       pluginSecret: { params: { id: string; key: string }; response: string | null };
       pluginSecretStore: { params: { id: string; key: string; value: string }; response: boolean };
       pluginSecretDelete: { params: { id: string; key: string }; response: boolean };
