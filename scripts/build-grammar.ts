@@ -139,6 +139,12 @@ const manifest = {
       path: './syntaxes/desmos-dsl.tmLanguage.json',
     }],
   },
+  scripts: {
+    "bump:patch": "bun pm version patch --no-git-tag-version",
+    "bump:minor": "bun pm version minor --no-git-tag-version",
+    "bump:major": "bun pm version major --no-git-tag-version",
+    "bump:hotfix": "bun pm version prepatch --no-git-tag-version --preid=hotfix"
+  }
 };
 
 const HEADER = { _generated: 'by scripts/build-grammar.ts from the compiler tables — do not edit' };

@@ -3,10 +3,16 @@
   "name": "desmos-dsl",
   "displayName": "Desmos DSL",
   "description": "Syntax highlighting for the dsmx language.",
-  "version": "1.5.4-hotfix.1",
+  "version": "1.5.5",
   "publisher": "kingjayan",
   "license": "Apache-2.0",
   "icon": "icon.png",
+  "scripts": {
+    "bump:patch": "bun pm version patch --no-git-tag-version",
+    "bump:minor": "bun pm version minor --no-git-tag-version",
+    "bump:major": "bun pm version major --no-git-tag-version",
+    "bump:hotfix": "bun pm version prepatch --no-git-tag-version --preid=hotfix"
+  },
   "galleryBanner": {
     "color": "#11111b",
     "theme": "dark"
