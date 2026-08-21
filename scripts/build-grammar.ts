@@ -9,7 +9,6 @@ import { join } from 'path';
 import { KEYWORDS } from '../src/compiler/lexer';
 import { BUILTIN_NAMES, STYLE_FNS } from '../src/compiler/builtins';
 import { languageConfig } from '../src/monaco/language';
-import { iconPng } from './vsix-icon';
 
 const ROOT = join(import.meta.dir, '..');
 const OUT_DIR = join(ROOT, 'editors', 'vscode');
@@ -171,7 +170,6 @@ await mkdir(join(OUT_DIR, 'syntaxes'), { recursive: true });
 await writeFile(join(OUT_DIR, 'README.md'), README);
 await writeFile(join(OUT_DIR, 'LICENSE'), await readFile(join(ROOT, 'LICENSE'), 'utf8'));
 await writeFile(join(OUT_DIR, '.vscodeignore'), VSCODE_IGNORE);
-await writeFile(join(OUT_DIR, 'icon.png'), iconPng());
 await write(join(OUT_DIR, 'syntaxes', 'desmos-dsl.tmLanguage.json'), grammar);
 await write(join(OUT_DIR, 'language-configuration.json'), languageConfiguration);
 await write(join(OUT_DIR, 'package.json'), manifest);
