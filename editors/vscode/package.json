@@ -3,7 +3,7 @@
   "name": "desmos-dsl",
   "displayName": "Desmos DSL",
   "description": "Syntax highlighting for the dsmx language.",
-  "version": "1.5.3",
+  "version": "1.5.4-hotfix.1",
   "publisher": "kingjayan",
   "license": "Apache-2.0",
   "icon": "icon.png",
