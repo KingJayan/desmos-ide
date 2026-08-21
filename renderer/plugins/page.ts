@@ -1,7 +1,7 @@
 import { iconEl } from '../icons';
 import { mergeViews } from './actions';
 import type { PluginActions } from './actions';
-import { renderMarkdown } from '../../src/plugin/markdown';
+import { markdownToHtml } from '../markdown';
 import { pluginIcon } from './icon';
 import type { InstalledPlugin } from '../../src/plugin/manifest';
 
@@ -130,7 +130,7 @@ export class PluginPage {
 
     const text = local?.readme ?? this.readmes.get(id) ?? null;
     if (text) {
-      readme.innerHTML = renderMarkdown(text);
+      readme.innerHTML = markdownToHtml(text);
     } else if (this.readmes.has(id)) {
       readme.innerHTML = '<p>This plugin ships no readme.</p>';
     } else {
@@ -151,7 +151,7 @@ export class PluginPage {
     const rows: [string, string][] = [];
     if (manifest.lib) rows.push(['dsl', 'Adds functions you can call from any file']);
     if (manifest.main) rows.push(['code', 'Runs sandboxed javascript for generators and commands']);
-    if (manifest.theme) rows.push(['theme', 'Adds an editor colour theme']);
+    if (manifest.theme) rows.push(['theme', 'Adds an editor color theme']);
     if (local?.enabled === false) rows.push(['off', 'Installed, but not enabled']);
     if (rows.length === 0) return null;
 

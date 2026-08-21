@@ -1,35 +1,13 @@
 import type { DesmosExpr } from '../src/compiler/codegen';
-import type { ColorTheme } from './settings';
+import { fillScale as themeFillScale, themeSpec, type ColorTheme } from './themes';
 import { fingerprint } from './expr-fingerprint';
 
-type DesmosThemeSpec = {
-  background: string;
-  text: string;
-  fillScale: number;
-};
-
-const DESMOS_THEMES: Record<ColorTheme, DesmosThemeSpec> = {
-  dsmx: { background: '#0e1420', text: '#5d6878', fillScale: 1 },
-  'dsmx-light': { background: '#ffffff', text: '#8b95a5', fillScale: 0.55 },
-  'desmos-dark': { background: '#24273a', text: '#7f849c', fillScale: 1 },
-  'catppuccin-latte': { background: '#eff1f5', text: '#9ca0b0', fillScale: 0.55 },
-  'catppuccin-frappe': { background: '#303446', text: '#737994', fillScale: 1 },
-  'catppuccin-macchiato': { background: '#24273a', text: '#8087a2', fillScale: 1 },
-  'github-dark': { background: '#0d1117', text: '#8b949e', fillScale: 1 },
-  'github-light': { background: '#ffffff', text: '#8c959f', fillScale: 0.55 },
-  monokai: { background: '#272822', text: '#90908a', fillScale: 1 },
-  'vs-dark': { background: '#1e1e1e', text: '#9da0a6', fillScale: 1 },
-  'vs-light': { background: '#ffffff', text: '#949494', fillScale: 0.55 },
-};
-
 function themeSettings(theme: ColorTheme): { backgroundColor: string; textColor: string } {
-  const spec = DESMOS_THEMES[theme];
-  return { backgroundColor: spec.background, textColor: spec.text };
+  const spec = themeSpec(theme);
+  return { backgroundColor: spec.background, textColor: spec.axis };
 }
 
 const SETTLE_MS = 600;
-
-/** expressions written to desmos in one frame */
 const CHUNK = 60;
 
 export function scaledFill(fillOpacity: string | undefined, scale: number): string | undefined {
@@ -139,12 +117,11 @@ export class DesmosGraph {
   }
 
   setTheme(theme: ColorTheme): void {
-    const before = DESMOS_THEMES[this.theme].fillScale;
+    const before = themeFillScale(this.theme);
     this.theme = theme;
     this.calc.updateSettings(themeSettings(theme));
 
-    if (DESMOS_THEMES[theme].fillScale === before) return;
-    this.settleUntil = Date.now() + SETTLE_MS;
+    if (themeFillScale(theme) === before) return;
     for (const expr of this.drawn.values()) {
       if (expr.fillOpacity !== undefined) this.setOne(expr);
     }
@@ -156,23 +133,43 @@ export class DesmosGraph {
     };
     if (typeof calc.observeEvent !== 'function') return;
 
-    calc.observeEvent('change', () => {
-      const settling = this.settleUntil > Date.now();
-      const edited: DesmosExpr[] = [];
+    this.editedCb = cb;
+    calc.observeEvent('change', () => this.reconcile());
+  }
 
-      for (const expr of this.currentList()) {
-        const print = fingerprint(expr);
-        if (this.observed.get(expr.id) !== print) {
-          this.observed.set(expr.id, print);
-          if (!settling) edited.push(expr);
-        }
+  private reconcile(): void {
+    const cb = this.editedCb;
+    if (!cb) return;
+
+    const wait = this.settleUntil - Date.now();
+    if (wait > 0) {
+      if (this.recheck === null) {
+        this.recheck = setTimeout(() => { this.recheck = null; this.reconcile(); }, wait + 16);
       }
-      if (edited.length) cb(edited);
-    });
+      return;
+    }
+
+    const edited: DesmosExpr[] = [];
+    for (const expr of this.currentList()) {
+      const print = fingerprint(expr);
+      if (this.observed.get(expr.id) === print) continue;
+      this.observed.set(expr.id, print);
+      if (!this.written.has(expr.id)) edited.push(expr);
+    }
+    this.written.clear();
+    if (edited.length) cb(edited);
+  }
+
+  private hold(ids: Iterable<string>): void {
+    this.settleUntil = Date.now() + SETTLE_MS;
+    for (const id of ids) this.written.add(id);
   }
 
   private settleUntil = 0;
   private observed = new Map<string, string>();
+  private written = new Set<string>();
+  private recheck: ReturnType<typeof setTimeout> | null = null;
+  private editedCb: ((exprs: DesmosExpr[]) => void) | null = null;
 
   private queued = new Map<string, DesmosExpr>();
   private flushHandle: number | null = null;
@@ -195,7 +192,7 @@ export class DesmosGraph {
     for (const id of toRemove) this.snapshots.delete(id);
 
     if (toRemove.length === 0 && this.queued.size === 0) return;
-    this.settleUntil = Date.now() + SETTLE_MS;
+    this.hold(toRemove);
     for (const id of toRemove) {
       this.calc.removeExpression({ id });
       this.observed.delete(id);
@@ -218,8 +215,8 @@ export class DesmosGraph {
     const batch = [...this.queued.values()].slice(0, CHUNK);
     if (batch.length === 0) return;
 
-    this.settleUntil = Date.now() + SETTLE_MS;
-    const scale = DESMOS_THEMES[this.theme].fillScale;
+    this.hold(batch.map(e => e.id));
+    const scale = themeFillScale(this.theme);
     this.calc.setExpressions(batch.map(e => toSetExpression(e, scale)));
     for (const expr of batch) {
       this.queued.delete(expr.id);
@@ -229,7 +226,8 @@ export class DesmosGraph {
   }
 
   private setOne(expr: DesmosExpr): void {
-    this.calc.setExpression(toSetExpression(expr, DESMOS_THEMES[this.theme].fillScale));
+    this.hold([expr.id]);
+    this.calc.setExpression(toSetExpression(expr, themeFillScale(this.theme)));
   }
 
   currentList(): DesmosExpr[] {
@@ -261,17 +259,17 @@ export class DesmosGraph {
   private selfSelected: string | null = null;
 
   setClockPlaying(id: string, playing: boolean): void {
-    this.settleUntil = Date.now() + SETTLE_MS;
+    this.hold([id]);
     this.calc.setExpression({ id, playing });
   }
 
   setClockPeriod(id: string, period: number): void {
-    this.settleUntil = Date.now() + SETTLE_MS;
+    this.hold([id]);
     this.calc.setExpression({ id, animationPeriod: period });
   }
 
   setClockValue(id: string, name: string, value: number): void {
-    this.settleUntil = Date.now() + SETTLE_MS;
+    this.hold([id]);
     this.calc.setExpression({ id, latex: `${name}=${value}`, playing: false });
   }
 

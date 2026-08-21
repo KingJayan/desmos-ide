@@ -2,7 +2,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyContributions, parseContributions, parseKey, resolveKeys } from '../plugin/contributions';
-import { renderMarkdown } from '../plugin/markdown';
+import { markdownToHtml } from '../shared/markdown';
 import { iconIsImage, imageType, parseManifest, pluginFiles } from '../plugin/manifest';
 
 const GOOD = {
@@ -153,34 +153,34 @@ describe('two plugins can want one combo', () => {
 
 describe('a readme is escaped before it is marked up', () => {
   test('a tag an author wrote is text, not a tag', () => {
-    const html = renderMarkdown('<script>alert(1)</script>');
+    const html = markdownToHtml('<script>alert(1)</script>');
     assert.equal(html.includes('<script'), false);
     assert.ok(html.includes('&lt;script'));
   });
 
   test('the marks it knows come through', () => {
-    assert.ok(renderMarkdown('# Title').includes('<h2>Title</h2>'));
-    assert.ok(renderMarkdown('- one\n- two').includes('<ul><li>one</li><li>two</li></ul>'));
-    assert.ok(renderMarkdown('1. one\n2. two').includes('<ol>'));
-    assert.ok(renderMarkdown('> quoted').includes('<blockquote>'));
-    assert.ok(renderMarkdown('---').includes('<hr />'));
-    assert.ok(renderMarkdown('`code`').includes('<code>code</code>'));
+    assert.ok(markdownToHtml('# Title').includes('<h2>Title</h2>'));
+    assert.ok(markdownToHtml('- one\n- two').includes('<ul><li>one</li><li>two</li></ul>'));
+    assert.ok(markdownToHtml('1. one\n2. two').includes('<ol>'));
+    assert.ok(markdownToHtml('> quoted').includes('<blockquote>'));
+    assert.ok(markdownToHtml('---').includes('<hr />'));
+    assert.ok(markdownToHtml('`code`').includes('<code>code</code>'));
   });
 
   test('a link has to be https, and anything else stays as text', () => {
-    assert.ok(renderMarkdown('[x](https://a.dev)').includes('href="https://a.dev"'));
-    const bad = renderMarkdown('[x](javascript:alert(1))');
+    assert.ok(markdownToHtml('[x](https://a.dev)').includes('href="https://a.dev"'));
+    const bad = markdownToHtml('[x](javascript:alert(1))');
     assert.equal(bad.includes('href'), false);
   });
 
   test('a relative image is only shown when the caller can place it', () => {
-    assert.equal(renderMarkdown('![shot](shot.png)').includes('<img'), false);
-    const placed = renderMarkdown('![shot](shot.png)', src => `https://cdn.dev/${src}`);
+    assert.equal(markdownToHtml('![shot](shot.png)').includes('<img'), false);
+    const placed = markdownToHtml('![shot](shot.png)', { resolveImage: src => `https://cdn.dev/${src}` });
     assert.ok(placed.includes('src="https://cdn.dev/shot.png"'));
   });
 
   test('a fence keeps its contents whole', () => {
-    const html = renderMarkdown('```\n# not a heading\n```');
+    const html = markdownToHtml('```\n# not a heading\n```');
     assert.ok(html.includes('<pre><code># not a heading</code></pre>'));
   });
 });
@@ -218,11 +218,11 @@ describe('the main process only reads a path the user gave it', () => {
     assert.equal(allowedRoot('/'), null);
   });
 
-  test('a picked file is reachable, and so is the folder it sits in', async () => {
+  test('a picked file is reachable, but the folder it sits in is not', async () => {
     const { allowFile, allowed } = await load();
     allowFile('/Users/someone/graphs/one.dsmx');
     assert.equal(allowed('/Users/someone/graphs/one.dsmx'), '/Users/someone/graphs/one.dsmx');
-    assert.equal(allowed('/Users/someone/graphs/two.dsmx'), '/Users/someone/graphs/two.dsmx');
+    assert.equal(allowed('/Users/someone/graphs/two.dsmx'), null);
     assert.equal(allowed('/Users/someone/other.dsmx'), null);
   });
 

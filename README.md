@@ -4,6 +4,10 @@
 </div>
 
 <p align="center">
+  <img src="./docs/static/favicon-scalable.svg" height="128">
+</p>
+
+<p align="center">
   <img src="https://skillicons.dev/icons?i=ts,bun" height="36">
 </p>
 
@@ -68,9 +72,7 @@ bun dsmx       # the cli, straight from source
 bun pack:cli   # bundle + tarball the cli for a release
 ```
 
-## troubleshooting
-
-see [#9](https://github.com/KingJayan/desmos-ide/issues/9)
+## troubleshooting/bugs [see here](https://github.com/KingJayan/desmos-ide/issues/9)
 
 ##
 <div align="center">

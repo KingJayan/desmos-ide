@@ -5,7 +5,7 @@ import {
   Info, Pause, Play, Plus, Puzzle, RefreshCw, Search, Send, Square, SquarePen, Trash2,
   TriangleAlert, X,
 } from 'lucide';
-import { escapeHtml } from './escape';
+import { escapeHtml } from '../src/shared/escape';
 
 type IconNode = [tag: string, attrs: Record<string, string | number>][];
 

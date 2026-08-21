@@ -1,19 +1,12 @@
 
 import { iconSvg } from './icons';
 
-export type ColorTheme =
-  | 'dsmx'
-  | 'dsmx-light'
-  | 'desmos-dark'
-  | 'catppuccin-latte'
-  | 'catppuccin-frappe'
-  | 'catppuccin-macchiato'
-  | 'github-dark'
-  | 'github-light'
-  | 'monokai'
-  | 'vs-dark'
-  | 'vs-light';
-export type EditorTheme = 'dsmx' | 'dsmx-light' | 'desmos-dark' | 'catppuccin-latte' | 'catppuccin-frappe' | 'catppuccin-macchiato' | 'github-dark' | 'github-light' | 'monokai' | 'vs-dark' | 'vs-light';
+import { THEMES, isColorTheme, type ColorTheme } from './themes';
+
+export type { ColorTheme };
+export type EditorTheme = ColorTheme;
+
+const THEME_OPTIONS = THEMES.map(t => `<option value="${t.id}">${t.label}</option>`).join('\n                ');
 
 export interface EditorSettings {
   colorTheme:  ColorTheme;
@@ -60,11 +53,6 @@ const DEFAULTS: EditorSettings = {
 const STORAGE_KEY = 'desmos-ide-settings';
 const SETTINGS_VERSION = 2;
 
-const VALID_COLOR_THEMES = new Set<ColorTheme>([
-  'dsmx','dsmx-light',
-  'desmos-dark','catppuccin-latte','catppuccin-frappe','catppuccin-macchiato',
-  'github-dark','github-light','monokai','vs-dark','vs-light',
-]);
 const VALID_LINE_NUMBERS = new Set(['on','off','relative']);
 const VALID_WORD_WRAP = new Set(['on','off']);
 const VALID_FONTS_CODE = new Set([
@@ -99,10 +87,10 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
 
 function validate(raw: Record<string, unknown>): EditorSettings {
   const d = DEFAULTS;
-  const colorTheme = VALID_COLOR_THEMES.has(raw.colorTheme as ColorTheme)
-    ? (raw.colorTheme as ColorTheme) : d.colorTheme;
-  const editorTheme = VALID_COLOR_THEMES.has(raw.editorTheme as EditorTheme)
-    ? (raw.editorTheme as EditorTheme) : d.editorTheme;
+  const colorTheme = isColorTheme(raw.colorTheme)
+    ? raw.colorTheme : d.colorTheme;
+  const editorTheme = isColorTheme(raw.editorTheme)
+    ? raw.editorTheme : d.editorTheme;
   const rawSize = Number(raw.fontSize);
   const fontSize = Number.isFinite(rawSize) ? Math.min(20, Math.max(12, Math.round(rawSize))) : d.fontSize;
   const codeFontFamily = VALID_FONTS_CODE.has(raw.codeFontFamily as string)
@@ -224,17 +212,7 @@ export class SettingsPanel {
             <div class="settings-row">
               <label class="settings-label">color theme</label>
               <select class="settings-select" id="s-color-theme">
-                <option value="dsmx">dsmx Dark</option>
-                <option value="dsmx-light">dsmx Light</option>
-                <option value="desmos-dark">Catppuccin Mocha</option>
-                <option value="catppuccin-latte">Catppuccin Latte</option>
-                <option value="catppuccin-frappe">Catppuccin Frappé</option>
-                <option value="catppuccin-macchiato">Catppuccin Macchiato</option>
-                <option value="github-dark">GitHub Dark</option>
-                <option value="github-light">GitHub Light</option>
-                <option value="monokai">Monokai</option>
-                <option value="vs-dark">VS Dark</option>
-                <option value="vs-light">VS Light</option>
+                ${THEME_OPTIONS}
               </select>
             </div>
 
@@ -260,17 +238,7 @@ export class SettingsPanel {
             <div class="settings-row">
               <label class="settings-label">syntax theme</label>
               <select class="settings-select" id="s-editor-theme">
-                <option value="dsmx">dsmx Dark</option>
-                <option value="dsmx-light">dsmx Light</option>
-                <option value="desmos-dark">Catppuccin Mocha</option>
-                <option value="catppuccin-latte">Catppuccin Latte</option>
-                <option value="catppuccin-frappe">Catppuccin Frappé</option>
-                <option value="catppuccin-macchiato">Catppuccin Macchiato</option>
-                <option value="github-dark">GitHub Dark</option>
-                <option value="github-light">GitHub Light</option>
-                <option value="monokai">Monokai</option>
-                <option value="vs-dark">VS Dark</option>
-                <option value="vs-light">VS Light</option>
+                ${THEME_OPTIONS}
               </select>
             </div>
 

@@ -80,7 +80,7 @@ await page.addInitScript(() => {
 
     const reachable = [];
     try {
-      const global = Function('return this')();
+      const global = globalThis;
       for (const name of ['fetch', 'XMLHttpRequest', 'importScripts', 'indexedDB', 'caches',
                           'navigator', 'location', 'createImageBitmap', 'addEventListener']) {
         for (let level = global; level; level = Object.getPrototypeOf(level)) {
@@ -95,9 +95,13 @@ await page.addInitScript(() => {
       reachable.push('threw');
     }
 
+    let builds = false;
+    try { Function('return 1')(); builds = true; } catch (err) { builds = false; }
+    try { (function () {}).constructor('return 1')(); builds = true; } catch (err) { }
+
     dsmx.window.registerStatusBarItem({
       id: 'sealed',
-      text: reachable.length ? 'leaks ' + reachable.length : 'sealed',
+      text: reachable.length ? 'leaks ' + reachable.length : (builds ? 'builds code' : 'sealed'),
     });
     dsmx.window.registerStatusBarItem({ id: 'count', text: 'stars', command: 'insert' });
     dsmx.keybindings.register('Alt+K', 'insert');

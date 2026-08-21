@@ -1,4 +1,4 @@
-// spirograph — a small wheel rolling inside a big one, with a pen off its centre.
+// spirograph — a small wheel rolling inside a big one, with a pen off its center.
 // ring is the fixed circle, wheel the rolling one, pen how far the tip sits from its hub.
 
 ring = slider(5, 2, 8, step=1)

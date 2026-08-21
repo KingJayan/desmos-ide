@@ -455,7 +455,7 @@ class TexGen {
     const cy = this.pgf(stmt.cy);
     const r = this.pgf(stmt.r);
     if (cx === null || cy === null || r === null) {
-      this.skip(stmt.name, 'the centre or the radius has no pgfmath form');
+      this.skip(stmt.name, 'the center or the radius has no pgfmath form');
       return;
     }
     const color = this.color(stmt.style?.color, COLORS.circle);
@@ -626,7 +626,7 @@ class TexGen {
     const cy = stmt.cy ? this.pgf(stmt.cy) : '0';
     const rotate = stmt.rotate ? this.pgf(stmt.rotate) : '0';
     if (cx === null || cy === null || rotate === null) {
-      this.skip(stmt.name, 'the centre or the rotation has no pgfmath form');
+      this.skip(stmt.name, 'the center or the rotation has no pgfmath form');
       return;
     }
     const color = this.color(stmt.style?.gradient?.from ?? stmt.style?.color, COLORS.spiral);
@@ -649,7 +649,7 @@ class TexGen {
     const cx = stmt.cx ? this.pgf(stmt.cx) : '0';
     const cy = stmt.cy ? this.pgf(stmt.cy) : '0';
     if (phase === null || cx === null || cy === null) {
-      this.skip(stmt.name, 'the phase or the centre has no pgfmath form');
+      this.skip(stmt.name, 'the phase or the center has no pgfmath form');
       return;
     }
     const xmin = this.evalConst(stmt.xmin) ?? -10;

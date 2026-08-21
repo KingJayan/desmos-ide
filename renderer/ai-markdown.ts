@@ -1,4 +1,4 @@
-import { escapeHtml } from './escape';
+import { escapeHtml } from '../src/shared/escape';
 
 export type Part = { type: 'text'; content: string } | { type: 'code'; content: string; lang: string };
 
@@ -23,66 +23,6 @@ export function formatInlineMarkdown(text: string): string {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   html = html.replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>');
   return html;
-}
-
-export function renderMarkdown(text: string): HTMLElement {
-  const el = document.createElement('div');
-  const lines = text.split('\n');
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) { i++; continue; }
-
-    if (/^---+$/.test(trimmed)) {
-      const hr = document.createElement('div');
-      hr.className = 'ai-hr';
-      el.appendChild(hr);
-      i++;
-      continue;
-    }
-
-    const headingMatch = trimmed.match(/^##\s+(.+)$/);
-    if (headingMatch) {
-      const h = document.createElement('h3');
-      h.className = 'ai-heading';
-      h.textContent = headingMatch[1];
-      el.appendChild(h);
-      i++;
-      continue;
-    }
-
-    if (/^[-*]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed)) {
-      const list = /^[-*]\s+/.test(trimmed)
-        ? document.createElement('ul')
-        : document.createElement('ol');
-      list.className = 'ai-list';
-      while (i < lines.length) {
-        const l = lines[i].trim();
-        if (!l) break;
-        const isBullet = /^[-*]\s+(.+)$/.test(l);
-        const isNum = /^\d+\.\s+(.+)$/.test(l);
-        if (!isBullet && !isNum) break;
-        const content = l.replace(/^(?:[-*]|\d+\.)\s+/, '');
-        const li = document.createElement('li');
-        li.className = 'ai-list-item';
-        li.innerHTML = formatInlineMarkdown(content);
-        list.appendChild(li);
-        i++;
-      }
-      el.appendChild(list);
-      continue;
-    }
-
-    const p = document.createElement('p');
-    p.innerHTML = formatInlineMarkdown(trimmed);
-    el.appendChild(p);
-    i++;
-  }
-
-  return el;
 }
 
 export function cleanTitle(raw: string): string {

@@ -54,7 +54,7 @@ describe('the manifest is the gate', () => {
     assert.equal(parseManifest({ ...GOOD, homepage: 'https://x.dev' })?.homepage, 'https://x.dev');
   });
 
-  test('a theme keeps only colours that are colours', () => {
+  test('a theme keeps only colors that are colors', () => {
     const m = parseManifest({
       ...GOOD,
       theme: { dark: true, editor: { 'editor.background': '#101010', bad: 'red' }, tokens: {} },

@@ -3,7 +3,10 @@ import type {
   ViewEvent,
 } from './protocol';
 
+import { dynamicImportIn } from './guard';
+
 const post = self.postMessage.bind(self);
+const RealFunction = Function;
 
 const STRIPPED = [
   'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts',
@@ -30,6 +33,24 @@ function strip(): void {
         } catch {
         }
       }
+    }
+  }
+}
+
+// refusing import() at load is only worth anything while a plugin cannot build a new
+// function around it, so every runtime compiler goes with it
+function sealCodeBuilding(): void {
+  const blocked = (): never => { throw new Error('a plugin cannot build code at runtime'); };
+  try {
+    Object.defineProperty(Function.prototype, 'constructor', {
+      value: blocked, writable: false, configurable: false, enumerable: false,
+    });
+  } catch {
+  }
+  for (const name of ['eval', 'Function']) {
+    try {
+      Object.defineProperty(self, name, DEAD);
+    } catch {
     }
   }
 }
@@ -259,7 +280,10 @@ function load(plugins: LoadRequest[]): void {
 
     let error: string | null = null;
     try {
-      const factory = new Function('dsmx', `'use strict';\n${entry.main}\n`);
+      if (dynamicImportIn(entry.main)) {
+        throw new Error('a plugin cannot import code at runtime');
+      }
+      const factory = new RealFunction('dsmx', `'use strict';\n${entry.main}\n`);
       factory(api(entry.id, reg));
       loaded.set(entry.id, reg);
     } catch (err) {
@@ -356,3 +380,4 @@ self.addEventListener('message', (event: MessageEvent<SandboxRequest>) => {
 });
 
 strip();
+sealCodeBuilding();

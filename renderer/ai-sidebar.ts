@@ -1,8 +1,9 @@
 import { iconSvg } from './icons';
-import { escapeHtml } from './escape';
+import { escapeHtml } from '../src/shared/escape';
 import { lineDiff } from './diff';
 import { sidebarMarkup } from './ai-template';
-import { cleanTitle, parseResponse, renderMarkdown, truncateAtWord } from './ai-markdown';
+import { cleanTitle, parseResponse, truncateAtWord } from './ai-markdown';
+import { AI_MARKDOWN_CLASSES, renderMarkdown } from './markdown';
 import {
   PROVIDERS, PROVIDER_DEFAULTS, PROVIDER_MODELS, createSecretStore, modelHint,
 } from './ai-providers';
@@ -965,7 +966,7 @@ export class AISidebar {
     bubble.innerHTML = '';
     for (const part of parseResponse(full)) {
       if (part.type === 'text') {
-        bubble.appendChild(renderMarkdown(part.content));
+        bubble.appendChild(renderMarkdown(part.content, { classes: AI_MARKDOWN_CLASSES }));
       } else {
         bubble.appendChild(this.buildCodeBlock(part.content, part.lang));
       }

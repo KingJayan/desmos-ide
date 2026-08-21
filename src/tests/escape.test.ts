@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { escapeHtml } from '../../renderer/escape';
+import { escapeHtml } from '../shared/escape';
 
 describe('escaping for markup', () => {
   test('escapes the angle brackets and the ampersand', () => {

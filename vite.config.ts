@@ -10,6 +10,14 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: { index: resolve(__dirname, 'renderer/index.html') },
+      output: {
+        // the editor and the math renderer are the two big libraries, and neither
+        // changes when app code does, so they get their own files
+        manualChunks: {
+          monaco: ['monaco-editor'],
+          katex: ['katex'],
+        },
+      },
     },
   },
   resolve: {

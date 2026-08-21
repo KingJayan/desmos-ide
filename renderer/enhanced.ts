@@ -164,7 +164,7 @@ export class EnhancedPane {
     row.className = 'expr-row';
     row.dataset.id = expr.id;
 
-    // a real button, so the colour is reachable by tab and carries its own focus ring
+    // a real button, so the color is reachable by tab and carries its own focus ring
     const dot = document.createElement('button');
     dot.type = 'button';
     dot.className = 'expr-color-dot';

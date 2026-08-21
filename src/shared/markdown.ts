@@ -1,16 +1,36 @@
-import { escapeHtml } from '../shared/escape';
+import { escapeHtml } from './escape';
 
 export type ResolveImage = (src: string) => string | null;
+
+export interface MarkdownClasses {
+  heading?: string;
+  list?: string;
+  listItem?: string;
+  rule?: string;
+  inlineCode?: string;
+}
+
+export interface MarkdownOptions {
+  resolveImage?: ResolveImage;
+  classes?: MarkdownClasses;
+}
+
+const NONE: MarkdownClasses = {};
+
+function attr(name: string | undefined): string {
+  return name ? ` class="${name}"` : '';
+}
 
 function safeUrl(href: string): string | null {
   return /^https:\/\//.test(href) ? href : null;
 }
 
-function inline(text: string, resolve?: ResolveImage): string {
+function inline(text: string, opts: MarkdownOptions): string {
+  const classes = opts.classes ?? NONE;
   return escapeHtml(text)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/`([^`]+)`/g, `<code${attr(classes.inlineCode)}>$1</code>`)
     .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt: string, src: string) => {
-      const url = safeUrl(src) ?? resolve?.(src) ?? null;
+      const url = safeUrl(src) ?? opts.resolveImage?.(src) ?? null;
       return url ? `<img src="${url}" alt="${alt}" loading="lazy" />` : alt;
     })
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -21,7 +41,8 @@ function inline(text: string, resolve?: ResolveImage): string {
     });
 }
 
-export function renderMarkdown(src: string, resolve?: ResolveImage): string {
+export function markdownToHtml(src: string, opts: MarkdownOptions = {}): string {
+  const classes = opts.classes ?? NONE;
   const out: string[] = [];
   const lines = src.split('\n');
   let list: { ordered: boolean; items: string[] } | null = null;
@@ -31,12 +52,13 @@ export function renderMarkdown(src: string, resolve?: ResolveImage): string {
   const closeList = () => {
     if (!list) return;
     const tag = list.ordered ? 'ol' : 'ul';
-    out.push(`<${tag}>${list.items.map(li => `<li>${inline(li, resolve)}</li>`).join('')}</${tag}>`);
+    const items = list.items.map(li => `<li${attr(classes.listItem)}>${inline(li, opts)}</li>`).join('');
+    out.push(`<${tag}${attr(classes.list)}>${items}</${tag}>`);
     list = null;
   };
   const closeQuote = () => {
     if (!quote) return;
-    out.push(`<blockquote>${quote.map(q => `<p>${inline(q, resolve)}</p>`).join('')}</blockquote>`);
+    out.push(`<blockquote>${quote.map(q => `<p>${inline(q, opts)}</p>`).join('')}</blockquote>`);
     quote = null;
   };
   const closeBlocks = () => { closeList(); closeQuote(); };
@@ -49,13 +71,13 @@ export function renderMarkdown(src: string, resolve?: ResolveImage): string {
     }
     if (fence) { fence.push(line); continue; }
 
-    if (/^\s*(?:---+|\*\*\*+)\s*$/.test(line)) { closeBlocks(); out.push('<hr />'); continue; }
+    if (/^\s*(?:---+|\*\*\*+)\s*$/.test(line)) { closeBlocks(); out.push(`<hr${attr(classes.rule)} />`); continue; }
 
     const heading = /^(#{1,4})\s+(.*)$/.exec(line);
     if (heading) {
       closeBlocks();
       const level = Math.min(heading[1].length + 1, 5);
-      out.push(`<h${level}>${inline(heading[2], resolve)}</h${level}>`);
+      out.push(`<h${level}${attr(classes.heading)}>${inline(heading[2], opts)}</h${level}>`);
       continue;
     }
 
@@ -78,10 +100,11 @@ export function renderMarkdown(src: string, resolve?: ResolveImage): string {
 
     if (line.trim() === '') { closeBlocks(); continue; }
     closeBlocks();
-    out.push(`<p>${inline(line, resolve)}</p>`);
+    out.push(`<p>${inline(line, opts)}</p>`);
   }
 
   closeBlocks();
   if (fence) out.push(`<pre><code>${escapeHtml(fence.join('\n'))}</code></pre>`);
   return out.join('');
 }
+

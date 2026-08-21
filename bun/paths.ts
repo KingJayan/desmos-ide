@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
+import { realpathSync } from 'fs';
 import { homedir } from 'os';
-import { dirname, join, resolve, sep } from 'path';
+import { basename, dirname, join, resolve, sep } from 'path';
 
 const STORE = process.env.DSMX_HOME || join(homedir(), '.dsmx');
 const LIST = join(STORE, 'allowed.json');
@@ -12,9 +13,21 @@ const roots = new Set<string>();
 let loaded = false;
 let writing: Promise<void> | null = null;
 
+// fs follows symlinks, so a path is only comparable to a root after the links are resolved.
+// a file that does not exist yet still has its parents resolved, which is what a save needs.
+function real(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+  }
+  const parent = dirname(path);
+  return parent === path ? path : join(real(parent), basename(path));
+}
+
 function clean(path: unknown): string | null {
   if (typeof path !== 'string' || !path) return null;
-  const full = resolve(path);
+  if (path.includes('\0')) return null;
+  const full = real(resolve(path));
   return full.includes('\0') ? null : full;
 }
 
@@ -56,15 +69,14 @@ export async function loadAllowed(): Promise<void> {
   }
 }
 
-// a dialog is the only thing that widens the list: the user picked this path themselves
+// a dialog is the only thing that widens the list: the user picked this path themselves.
+// one picked file grants that file, never its folder.
 export function allowFile(path: unknown): string | null {
   const full = clean(path);
   if (!full) return null;
   files.delete(full);
   files.add(full);
-  roots.add(dirname(full));
   trim(files, MAX_FILES);
-  trim(roots, MAX_ROOTS);
   void persist();
   return full;
 }

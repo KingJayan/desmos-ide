@@ -57,13 +57,13 @@ describe('document shape', () => {
   });
 });
 
-describe('colours', () => {
-  test('a named colour becomes a definecolor', () => {
+describe('colors', () => {
+  test('a named color becomes a definecolor', () => {
     const out = tex('point p (1, 2) as { color red }');
     assert.match(out, /\\definecolor\{dslc1\}\{HTML\}\{C74440\}/);
   });
 
-  test('one definition per distinct colour', () => {
+  test('one definition per distinct color', () => {
     const out = tex('point a (0,0) as { color red }\npoint b (1,1) as { color red }');
     assert.equal(out.split('\\definecolor').length - 1, 1);
   });

@@ -27,6 +27,9 @@ jobs:
       - name: types
         run: bun run check
 
+      - name: lint
+        run: bun run lint
+
       - name: tests
         run: bun test src/tests/
 

@@ -15,20 +15,20 @@ import { builtinSignature } from '../src/compiler/builtins';
 import { formatDsl } from '../src/compiler/format';
 import { findRenameEdits, isValidIdent } from '../src/compiler/rename';
 import CompileWorker from './compile.worker?worker';
-import type { ListDelta } from './compile.worker';
+import { CompilePipeline } from './compile-pipeline';
 import { compileToTex } from '../src/index';
 import { shareUrl } from '../src/share';
 import type { CompileResult, SymbolInfo, ExprSource, OptimizeNote } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
 import { Layout } from './layout';
-import { EnhancedPane } from './enhanced';
+import type { EnhancedPane } from './enhanced';
 import { Transport } from './transport';
-import { AISidebar } from './ai-sidebar';
 import { SettingsPanel, loadSettings, settingsFromJson, settingsToJson } from './settings';
 import type { ColorTheme, EditorSettings, UiScale } from './settings';
+import type { AISidebar } from './ai-sidebar';
+import type { ConfigEditor } from './config-editor';
 import { Keymap, chordOf, keybindsToJson, parseKeybinds, DEFAULT_KEYBINDS } from './keybinds';
-import { ConfigEditor } from './config-editor';
 import { Onboarding } from './onboarding';
 import { compileStatus, errorsByPhase } from './compile-status';
 import { CommandPalette } from './command-palette';
@@ -41,11 +41,10 @@ import { OptimizerPanel, groupByLine, lineHint } from './optimizer-panel';
 import { typingElsewhere } from './keys';
 import { decompile } from '../src/compiler/decompile';
 import type { Mode } from './session';
+import { WorkspaceState, baseNameOf } from './workspace-state';
 import type { ConfigFile } from '../src/shared/rpc-schema';
 import exampleSrc from '../example/rose.dsmx?raw';
-import {
-  loadRecent, loadSession, pushRecent, recentLabel, removeRecent, saveRecent, saveSession,
-} from './session';
+import { loadSession, recentLabel } from './session';
 import { registerColorProvider } from './color-provider';
 import { iconEl } from './icons';
 import { PluginHost } from './plugins/host';
@@ -57,7 +56,6 @@ import { Toasts } from './toast';
 import { PluginPanel } from './plugins/panel';
 import { PluginPage } from './plugins/page';
 import type { PluginActions } from './plugins/actions';
-import type { MacroError } from '../src/plugin/macro';
 import type { RegistryEntry } from '../src/plugin/manifest';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
@@ -167,6 +165,8 @@ text lbl = "hello, desmos" at (0, 1.5)
 `;
 
 const initSettings = loadSettings();
+const workspaceState = new WorkspaceState({ onRecents: () => syncRecent() });
+
 let autosaveOn = initSettings.autosave;
 
 monaco.editor.defineTheme('dsmx', {
@@ -561,7 +561,10 @@ function setEnhancedDirty(dirty: boolean): void {
 let enhancedSeen: DesmosExpr[] = [];
 const same = (a: DesmosExpr, b: DesmosExpr): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-function ensureEnhancedPane(): EnhancedPane {
+// the expression list draws latex with katex, which no other view needs
+async function ensureEnhancedPane(): Promise<EnhancedPane> {
+  if (enhanced) return enhanced;
+  const { EnhancedPane } = await import('./enhanced');
   if (enhanced) return enhanced;
   enhanced = new EnhancedPane(
     document.getElementById('expr-list')!,
@@ -583,10 +586,11 @@ function ensureEnhancedPane(): EnhancedPane {
 }
 
 function syncEnhanced(): void {
-  const pane = ensureEnhancedPane();
-  if (pane.isEditing) return;
-  pane.syncFromGraph(graph.currentList());
-  enhancedSeen = pane.getList();
+  void ensureEnhancedPane().then(pane => {
+    if (pane.isEditing) return;
+    pane.syncFromGraph(graph.currentList());
+    enhancedSeen = pane.getList();
+  });
 }
 
 btnExportJson.addEventListener('click', async () => {
@@ -605,57 +609,6 @@ btnExportJson.addEventListener('click', async () => {
 
 //compilation pipeline
 const model = editor.getModel()!;
-let compileTimer: ReturnType<typeof setTimeout> | null = null;
-let compileRequestId = 0;
-let workerRestarts = 0;
-const MAX_WORKER_RESTARTS = 3;
-
-type CompileWorkerResponse = {
-  id: number;
-  result: CompileResult;
-  delta?: ListDelta;
-  compileMs: number;
-  cached: boolean;
-};
-
-const workerExprs = new Map<string, DesmosExpr>();
-let workerOrder: string[] = [];
-
-function applyListDelta(delta: ListDelta): DesmosExpr[] {
-  for (const expr of delta.changed) workerExprs.set(expr.id, expr);
-  if (delta.order) {
-    workerOrder = delta.order;
-    const keep = new Set(delta.order);
-    for (const id of workerExprs.keys()) if (!keep.has(id)) workerExprs.delete(id);
-  }
-  const list: DesmosExpr[] = [];
-  for (const id of workerOrder) {
-    const expr = workerExprs.get(id);
-    if (expr) list.push(expr);
-  }
-  return list;
-}
-
-const DEBOUNCE_MIN = 16;
-const DEBOUNCE_MAX = 250;
-const DEBOUNCE_FACTOR = 2;
-let compileDebounce = 120;
-let compileStartedAt = 0;
-
-let lastOverheadMs = 0;
-
-function noteCompileTiming(compileMs: number, cached: boolean): void {
-  if (cached) return;
-  const roundTrip = performance.now() - compileStartedAt;
-  lastOverheadMs = Math.max(0, roundTrip - compileMs);
-  compileDebounce = Math.min(DEBOUNCE_MAX, Math.max(DEBOUNCE_MIN, Math.round(roundTrip * DEBOUNCE_FACTOR)));
-  if (localStorage.getItem('dsmx:perf')) {
-    console.warn(
-      `[compile] round-trip ${roundTrip.toFixed(1)}ms = pipeline ${compileMs.toFixed(1)}ms + overhead ${lastOverheadMs.toFixed(1)}ms → debounce ${compileDebounce}ms`,
-    );
-  }
-}
-
 const lastRendered = new Map<string, string>();
 
 function unchanged(panel: string, key: string): boolean {
@@ -766,7 +719,7 @@ function handleCompileResult(result: CompileResult): void {
     setMarkers('desmos-dsl', result.warnings);
     graph.update(result.state.expressions.list);
     sourceMap = result.sourceMap;
-    if (mode === 'split' || mode === 'enhanced') syncEnhanced();
+    if (workspaceState.mode === 'split' || workspaceState.mode === 'enhanced') syncEnhanced();
     updateSliders();
     renderOutline(result.symbols);
     renderOptimizations(result.optimizations);
@@ -781,7 +734,7 @@ function handleCompileResult(result: CompileResult): void {
     updateSliders();
     markGraphStale(true);
   }
-  setMarkers('desmos-dsl-plugin', macroErrors.map(e => ({
+  setMarkers('desmos-dsl-plugin', pipeline.macroErrors.map(e => ({
     startLineNumber: e.line, startColumn: e.col,
     endLineNumber: e.line,   endColumn: model.getLineMaxColumn(Math.min(e.line, model.getLineCount())),
     message: e.message,
@@ -789,7 +742,7 @@ function handleCompileResult(result: CompileResult): void {
   })));
 
   renderProblems([
-    ...macroErrors.map(e => ({ severity: 'error' as const, message: e.message, line: e.line, col: e.col })),
+    ...pipeline.macroErrors.map(e => ({ severity: 'error' as const, message: e.message, line: e.line, col: e.col })),
     ...(result.success
       ? result.warnings.map(w => ({
           severity: 'warning' as const,
@@ -902,72 +855,30 @@ monaco.languages.registerRenameProvider(LANGUAGE_ID, {
   },
 });
 
-let activeWorker: Worker | null = null;
+const pipeline = new CompilePipeline({
+  spawn: () => new CompileWorker(),
+  source: () => editor.getValue(),
+  expand: src => pluginHost.expand(src),
+  prelude: () => pluginHost.prelude(),
+  available: () => pluginHost.ids(),
+  onResult: result => handleCompileResult(result),
+  onStatus: (message, kind) => setStatus(message, kind),
+  log: line => { if (localStorage.getItem('dsmx:perf')) console.warn(line); },
+});
+pipeline.start();
 
-function spawnWorker(): Worker {
-  const w = new CompileWorker();
-  w.addEventListener('message', (event: MessageEvent<CompileWorkerResponse>) => {
-    const { id, result, delta, compileMs, cached } = event.data;
-    if (id !== compileRequestId) return;
-    if (delta && result.success) result.state.expressions.list = applyListDelta(delta);
-    noteCompileTiming(compileMs, cached);
-    handleCompileResult(result);
-  });
-  w.addEventListener('error', (e: ErrorEvent) => {
-    console.error('[compile-worker] error:', e.message);
-    if (workerRestarts < MAX_WORKER_RESTARTS) {
-      workerRestarts++;
-      setStatus(`⚠ Compiler restarting (${workerRestarts}/${MAX_WORKER_RESTARTS})…`, 'info');
-      w.terminate();
-      activeWorker = spawnWorker();
-      void runCompile();
-    } else {
-      setStatus('✗ Compiler failed — reload to recover', 'error');
-    }
-  });
-  w.addEventListener('messageerror', () => {
-    console.error('[compile-worker] message decode error');
-    setStatus('✗ Compiler message error', 'error');
-  });
-  return w;
-}
-
-activeWorker = spawnWorker();
-
-let macroErrors: MacroError[] = [];
-
-async function runCompile(): Promise<void> {
-  if (!activeWorker) return;
-  const src = editor.getValue();
-  compileStartedAt = performance.now();
-  compileRequestId += 1;
-  const id = compileRequestId;
-
-  const expanded = src.includes('@')
-    ? await pluginHost.expand(src)
-    : { src, errors: [] as MacroError[], lineMap: undefined };
-  if (id !== compileRequestId || !activeWorker) return;
-
-  macroErrors = expanded.errors;
-  activeWorker.postMessage({
-    id,
-    src: expanded.src,
-    lineMap: expanded.lineMap,
-    prelude: pluginHost.prelude(),
-    available: pluginHost.ids(),
-  });
+function runCompile(): Promise<void> {
+  return pipeline.run();
 }
 
 editor.onDidChangeModelContent(() => {
-  if (compileTimer !== null) clearTimeout(compileTimer);
-  compileTimer = setTimeout(runCompile, compileDebounce);
+  pipeline.schedule();
   refreshSavedState();
   schedulePersist();
 });
 
 window.addEventListener('unload', () => {
-  activeWorker?.terminate();
-  activeWorker = null;
+  pipeline.dispose();
   pluginHost.dispose();
   stopWatching();
   enhanced?.dispose();
@@ -1034,7 +945,7 @@ const pluginServices: HostServices = {
   editorReplace: text => replaceSelection(text),
   editorSetText: text => { editor.setValue(text); editor.focus(); },
 
-  workspace: () => folderOf(currentPath),
+  workspace: () => workspaceState.folder(),
   runApp: async command => { await appCommands[command]?.(); },
 };
 
@@ -1219,7 +1130,7 @@ function setActiveTab(tab: 'file' | 'plugin'): void {
   pluginPageEl.classList.toggle('hidden', onFile);
 
   if (onFile) {
-    applyMode(mode);
+    applyMode(workspaceState.mode);
     return;
   }
   dslPane.classList.add('hidden');
@@ -1252,10 +1163,8 @@ void refreshRegistry();
 void runCompile();
 
 //mode switching
-let mode: Mode = 'dsl';
-
 function applyMode(m: Mode): void {
-  mode = m;
+  workspaceState.setMode(m);
   btnDsl.classList.toggle('active', m === 'dsl');
   btnSplit.classList.toggle('active', m === 'split');
   btnEnhanced.classList.toggle('active', m === 'enhanced');
@@ -1290,19 +1199,9 @@ btnSplit.addEventListener('click', () => showMode('split'));
 btnEnhanced.addEventListener('click', () => showMode('enhanced'));
 
 //file ops
-let currentPath: string | null = null;
-let watchedPath: string | null = null;
-
-function folderOf(p: string | null): string | null {
-  return p ? p.replace(/[\\/][^\\/]*$/, '') : null;
-}
-
 function setFilename(p: string | null): Promise<unknown> {
-  const moved = folderOf(p) !== folderOf(currentPath);
-  currentPath = p;
-  if (moved) void pluginHost.reloadWorkspace();
-  if (p) rememberRecent(p);
-  const name = p ? p.split(/[\\/]/).pop()! : 'untitled.dsmx';
+  if (workspaceState.setPath(p)) void pluginHost.reloadWorkspace();
+  const name = workspaceState.name();
   filenameEl.textContent = name;
   tabLabel.textContent = name;
   renderBreadcrumbs(p);
@@ -1310,18 +1209,16 @@ function setFilename(p: string | null): Promise<unknown> {
   return Promise.resolve(window.electronAPI?.setGitContext(p)).then(() => gitPanel.refreshAll());
 }
 
-let savedSource: string | null = null;
-
 function markSaved(content: string): void {
-  savedSource = content;
+  workspaceState.markSaved(content);
   refreshSavedState();
 }
 
 function refreshSavedState(): void {
-  const unsaved = savedSource === null || editor.getValue() !== savedSource;
+  const unsaved = workspaceState.isUnsaved(editor.getValue());
   savedDotEl.classList.toggle('hidden', !unsaved);
   tabDot.classList.toggle('hidden', !unsaved);
-  savedDotEl.title = currentPath
+  savedDotEl.title = workspaceState.path
     ? 'Unsaved changes — ⌘S to write them to the file'
     : 'This buffer has no file yet — ⌘S to choose one';
   filenameEl.classList.toggle('filename--unsaved', unsaved);
@@ -1329,7 +1226,7 @@ function refreshSavedState(): void {
 }
 
 function refreshSaveFact(unsaved: boolean): void {
-  const on = autosaveOn && !!currentPath;
+  const on = autosaveOn && !!workspaceState.path;
   statusSave.textContent = on
     ? (unsaved ? 'autosave: saving…' : 'autosave: on')
     : (unsaved ? 'unsaved' : 'saved');
@@ -1339,22 +1236,18 @@ function refreshSaveFact(unsaved: boolean): void {
 }
 
 function startWatching(path: string): void {
-  if (watchedPath && watchedPath !== path) {
-    void window.electronAPI?.unwatchFile(watchedPath);
-  }
-  watchedPath = path;
+  const drop = workspaceState.watch(path);
+  if (drop) void window.electronAPI?.unwatchFile(drop);
   void window.electronAPI?.watchFile(path);
 }
 
 function stopWatching(): void {
-  if (watchedPath) {
-    void window.electronAPI?.unwatchFile(watchedPath);
-    watchedPath = null;
-  }
+  const drop = workspaceState.unwatch();
+  if (drop) void window.electronAPI?.unwatchFile(drop);
 }
 
 window.electronAPI?.onFileChanged((changedPath, content) => {
-  if (changedPath !== currentPath) return;
+  if (changedPath !== workspaceState.path) return;
   if (content === editor.getValue()) return;
   editor.setValue(content);
   markSaved(content);
@@ -1363,7 +1256,7 @@ window.electronAPI?.onFileChanged((changedPath, content) => {
 });
 
 async function enhancedDirtyGuard(): Promise<boolean> {
-  if (mode === 'enhanced' && enhanced?.isDirty) {
+  if (workspaceState.mode === 'enhanced' && enhanced?.isDirty) {
     return nativeConfirm('Discard the Enhanced edits? They are not in the DSL file.');
   }
   return true;
@@ -1373,7 +1266,7 @@ async function cmdNew(): Promise<void> {
   if (!(await enhancedDirtyGuard())) return;
   stopWatching();
   editor.setValue(DEFAULT_SRC);
-  savedSource = null;
+  workspaceState.forgetSaved();
   void setFilename(null);
   setStatus('New file', 'info');
   applyMode('dsl');
@@ -1392,7 +1285,7 @@ async function cmdOpen(): Promise<void> {
   markSaved(result.content);
   void setFilename(result.path);
   startWatching(result.path);
-  applyMode(mode === 'enhanced' ? 'dsl' : mode);
+  applyMode(workspaceState.mode === 'enhanced' ? 'dsl' : workspaceState.mode);
   void runCompile();
   persistSession();
 }
@@ -1400,7 +1293,7 @@ async function cmdOpen(): Promise<void> {
 async function cmdSave(saveAs = false): Promise<void> {
   if (formatOnSave) await formatDocument();
   const sent = editor.getValue();
-  const result = await window.electronAPI?.saveFile(saveAs ? null : currentPath, sent);
+  const result = await window.electronAPI?.saveFile(saveAs ? null : workspaceState.path, sent);
   if (!result) return;
   if (result.ok) {
     markSaved(sent);
@@ -1417,7 +1310,7 @@ async function cmdSave(saveAs = false): Promise<void> {
 async function cmdExportTex(): Promise<void> {
   const name = baseName();
   const result = compileToTex(editor.getValue(), {
-    title: currentPath?.replace(/^.*\//, '') ?? 'an unsaved file',
+    title: baseNameOf(workspaceState.path) ?? 'an unsaved file',
     viewport: graph.viewport() ?? undefined,
   });
 
@@ -1441,7 +1334,7 @@ async function cmdExportTex(): Promise<void> {
 }
 
 function baseName(): string {
-  return currentPath?.replace(/^.*\//, '').replace(/\.dsmx$/, '') ?? 'desmos-graph';
+  return baseNameOf(workspaceState.path)?.replace(/\.dsmx$/, '') ?? 'desmos-graph';
 }
 
 async function cmdExportImage(format: 'png' | 'svg'): Promise<void> {
@@ -1490,53 +1383,37 @@ btnSave.addEventListener('click', () => cmdSave());
 
 //persistence
 const AUTOSAVE_DELAY = 1200;
-let recentFiles = loadRecent();
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
-let autosaving = false;
-let restoring = false;
-
-function rememberRecent(path: string): void {
-  recentFiles = pushRecent(recentFiles, path);
-  saveRecent(recentFiles);
-  syncRecent();
-}
 
 function forgetRecent(path: string): void {
-  recentFiles = removeRecent(recentFiles, path);
-  saveRecent(recentFiles);
-  syncRecent();
+  workspaceState.forget(path);
 }
 
 function persistSession(): void {
   const pos = editor.getPosition();
-  saveSession({
-    path: currentPath,
-    source: editor.getValue(),
-    mode,
-    line: pos?.lineNumber ?? 1,
-    col: pos?.column ?? 1,
-  });
+  workspaceState.persist(editor.getValue(), pos?.lineNumber ?? 1, pos?.column ?? 1);
 }
 
 async function autosave(): Promise<void> {
-  if (!autosaveOn || !currentPath || autosaving) return;
-  autosaving = true;
+  const path = workspaceState.path;
+  if (!autosaveOn || !path || workspaceState.autosaving) return;
+  workspaceState.autosaving = true;
   try {
     const sent = editor.getValue();
-    const result = await window.electronAPI?.saveFile(currentPath, sent);
+    const result = await window.electronAPI?.saveFile(path, sent);
     if (result?.ok) {
       markSaved(sent);
-      noteSave(`${currentPath.split(/[\\/]/).pop()} (autosave)`);
+      noteSave(`${baseNameOf(path)} (autosave)`);
       setStatus('Autosaved', 'info');
     }
     else if (result && !result.canceled) setStatus(result.message, 'error');
   } finally {
-    autosaving = false;
+    workspaceState.autosaving = false;
   }
 }
 
 function schedulePersist(): void {
-  if (restoring) return;
+  if (workspaceState.restoring) return;
   if (persistTimer !== null) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     persistTimer = null;
@@ -1559,7 +1436,7 @@ async function openPath(path: string, at?: { line: number; col: number }): Promi
   markSaved(result.content);
   void setFilename(result.path);
   startWatching(result.path);
-  if (mode === 'enhanced') applyMode('dsl');
+  if (workspaceState.mode === 'enhanced') applyMode('dsl');
   if (at) {
     editor.setPosition({ lineNumber: at.line, column: at.col });
     editor.revealLineInCenter(at.line);
@@ -1657,7 +1534,10 @@ let sidebarView: SidebarView = null;
 let aiSidebar: AISidebar | null = null;
 let aiSelectionListener: { dispose(): void } | null = null;
 
-function ensureAiSidebar(): AISidebar {
+// the chat panel is a large part of the bundle and most sessions never open it
+async function ensureAiSidebar(): Promise<AISidebar> {
+  if (aiSidebar) return aiSidebar;
+  const { AISidebar } = await import('./ai-sidebar');
   if (aiSidebar) return aiSidebar;
   aiSidebar = new AISidebar(
     aiContainer,
@@ -1716,7 +1596,7 @@ function setSidebarView(next: SidebarView): void {
   btnSidebarAi.classList.toggle('active', aiOpen);
 
   if (next === 'ai') {
-    ensureAiSidebar();
+    void ensureAiSidebar();
   } else if (aiSelectionListener) {
     aiSelectionListener.dispose();
     aiSelectionListener = null;
@@ -1734,7 +1614,7 @@ function setSidebarView(next: SidebarView): void {
 
 function openAiWith(prompt: string): void {
   if (sidebarView !== 'ai') setSidebarView('ai');
-  ensureAiSidebar().sendMessage(prompt);
+  void ensureAiSidebar().then(sidebar => sidebar.sendMessage(prompt));
 }
 
 // "Fix error" code lens on error lines
@@ -2006,7 +1886,7 @@ function ensureSettingsPanel(): SettingsPanel {
       minimap:     { enabled: s.minimap },
       wordWrap:    s.wordWrap,
     });
-  }, file => void configEditor.open(file));
+  }, file => void openConfigFile(file));
   settingsPanel.setExtraThemes(pluginThemes);
   return settingsPanel;
 }
@@ -2020,8 +1900,8 @@ const NO_BRIDGE = Promise.resolve({
 });
 
 const searchPanel = new SearchPanel({
-  paths: () => recentFiles.map(f => f.path),
-  folder: () => (currentPath ? currentPath.replace(/\/[^/]*$/, '') || '/' : null),
+  paths: () => workspaceState.recents.map(f => f.path),
+  folder: () => workspaceState.folder() || (workspaceState.path ? '/' : null),
   search: (paths, query, useRegex) =>
     window.electronAPI?.searchFiles(paths, query, useRegex) ?? NO_BRIDGE,
   searchFolder: (root, query, useRegex) =>
@@ -2219,13 +2099,13 @@ const baseCommands: PaletteCommand[] = [
     id: 'preferences.settings-json',
     label: 'preferences: open settings.json',
     description: 'Edit every setting as text — this file is what the app reads',
-    action: () => configEditor.open('settings'),
+    action: () => void openConfigFile('settings'),
   },
   {
     id: 'preferences.keybinds-json',
     label: 'preferences: open keybinds.json',
     description: 'Bind your own keys to any command in this palette',
-    action: () => configEditor.open('keybinds'),
+    action: () => void openConfigFile('keybinds'),
   },
   {
     id: 'preferences.reset-keybinds',
@@ -2256,17 +2136,28 @@ const baseCommands: PaletteCommand[] = [
 const keymap = new Keymap();
 const commandIndex = new Map<string, PaletteCommand>();
 
-const configEditor = new ConfigEditor({
-  read: file => window.electronAPI?.configRead(file) ?? Promise.resolve(null),
-  write: async (file, content) => {
-    const ok = (await window.electronAPI?.configWrite(file, content)) ?? false;
-    if (ok) applyConfig(file, content);
-    return ok;
-  },
-  theme: () => settingsNow().editorTheme,
-  fontSize: () => settingsNow().fontSize,
-  fontFamily: () => settingsNow().codeFontFamily,
-});
+let configEditor: ConfigEditor | null = null;
+
+// the json editor carries its own monaco grammar, so it is fetched the first time it opens
+async function ensureConfigEditor(): Promise<ConfigEditor> {
+  const { ConfigEditor: Editor } = await import('./config-editor');
+  configEditor ??= new Editor({
+    read: file => window.electronAPI?.configRead(file) ?? Promise.resolve(null),
+    write: async (file, content) => {
+      const ok = (await window.electronAPI?.configWrite(file, content)) ?? false;
+      if (ok) applyConfig(file, content);
+      return ok;
+    },
+    theme: () => settingsNow().editorTheme,
+    fontSize: () => settingsNow().fontSize,
+    fontFamily: () => settingsNow().codeFontFamily,
+  });
+  return configEditor;
+}
+
+async function openConfigFile(file: ConfigFile): Promise<void> {
+  void (await ensureConfigEditor()).open(file);
+}
 
 const onboarding = new Onboarding({
   steps: [
@@ -2357,7 +2248,7 @@ async function cmdImportSettings(): Promise<void> {
 
 function syncRecent(): void {
   refreshPaletteCommands();
-  void window.electronAPI?.setRecentFiles(recentFiles.map(f => f.path));
+  void window.electronAPI?.setRecentFiles(workspaceState.recents.map(f => f.path));
 }
 
 function insertAtCursor(text: string): void {
@@ -2385,7 +2276,7 @@ async function runPluginCommand(plugin: string, command: string): Promise<void> 
 }
 
 function refreshPaletteCommands(): void {
-  const paths = recentFiles.map(f => f.path);
+  const paths = workspaceState.recents.map(f => f.path);
   const commands: PaletteCommand[] = [
     ...baseCommands,
     ...pluginHost.commands().map(c => ({
@@ -2394,7 +2285,7 @@ function refreshPaletteCommands(): void {
       description: c.description ?? `from the ${c.plugin} plugin`,
       action: () => runPluginCommand(c.plugin, c.id),
     })),
-    ...recentFiles.map(f => {
+    ...workspaceState.recents.map(f => {
       const { name, hint } = recentLabel(f.path, paths);
       return {
         id: `file.recent:${f.path}`,
@@ -2423,7 +2314,7 @@ async function restoreSession(): Promise<void> {
     return;
   }
 
-  restoring = true;
+  workspaceState.restoring = true;
   try {
     if (saved.path) {
       const result = await window.electronAPI?.readFileAt(saved.path);
@@ -2445,7 +2336,7 @@ async function restoreSession(): Promise<void> {
     editor.setPosition({ lineNumber: saved.line, column: saved.col });
     editor.revealLineInCenter(saved.line);
   } finally {
-    restoring = false;
+    workspaceState.restoring = false;
   }
   void runCompile();
 }
@@ -2458,7 +2349,7 @@ editor.focus();
 
 window.electronAPI?.onConfigChanged((file, content) => {
   applyConfig(file, content);
-  configEditor.reload(file, content);
+  configEditor?.reload(file, content);
 });
 
 void loadConfigFiles().then(() => {
@@ -2471,7 +2362,7 @@ window.addEventListener('beforeunload', () => {
   searchPanel.dispose();
   sliderManager.dispose();
   aiSidebar?.dispose();
-  configEditor.dispose();
+  configEditor?.dispose();
   onboarding.dispose();
   layout.dispose();
 });

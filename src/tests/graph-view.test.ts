@@ -7,7 +7,7 @@ const square = { pxW: 800, pxH: 800, perPxX: 0.025, perPxY: 0.025 };
 const math = { left: -10, right: 10, bottom: -10, top: 10 };
 
 describe('the graph keeps its picture when a sidebar opens', () => {
-  test('a narrower graph keeps the scale and the centre', () => {
+  test('a narrower graph keeps the scale and the center', () => {
     const held = heldBounds(square, { ...square, pxW: 400 }, math)!;
     assert.equal(held.right - held.left, 10);
     assert.equal(held.top - held.bottom, 20);
@@ -15,7 +15,7 @@ describe('the graph keeps its picture when a sidebar opens', () => {
     assert.equal((held.top + held.bottom) / 2, 0);
   });
 
-  test('the centre moves with the graph, not to the origin', () => {
+  test('the center moves with the graph, not to the origin', () => {
     const held = heldBounds(square, { ...square, pxW: 400 }, {
       left: 30, right: 50, bottom: 100, top: 120,
     })!;

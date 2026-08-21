@@ -223,7 +223,7 @@ html, body {
   text-align: center;
 }
 
-// the optimizer reports a saving, not a fault, so it must not wear the error colour
+// the optimizer reports a saving, not a fault, so it must not wear the error color
 #optimizer-badge {
   background: var(--blue);
 }

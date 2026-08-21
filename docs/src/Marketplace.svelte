@@ -4,7 +4,7 @@
   import Icon from '@iconify/svelte';
   import Nav from './Nav.svelte';
   import { iconIsImage, parseRegistry } from '../../src/plugin/manifest.ts';
-  import { renderMarkdown } from '../../src/plugin/markdown.ts';
+  import { markdownToHtml } from '../../src/shared/markdown.ts';
 
   const INDEX = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main/index.json';
   const REPO = 'https://github.com/KingJayan/dsmx-registry';
@@ -36,7 +36,7 @@
       if (!res.ok) return;
       const text = await res.text();
       if (readmeFor === entry.manifest.id) {
-        readme = renderMarkdown(text, src => fileUrl(entry, src));
+        readme = markdownToHtml(text, { resolveImage: src => fileUrl(entry, src) });
       }
     } catch {
       readme = '';
@@ -158,7 +158,7 @@
             <li><span class="tag tag-code">code</span>generators and commands, run in a sandbox with no network and no DOM</li>
           {/if}
           {#if current.manifest.theme}
-            <li><span class="tag tag-theme">theme</span>an editor colour theme</li>
+            <li><span class="tag tag-theme">theme</span>an editor color theme</li>
           {/if}
         </ul>
       </section>
@@ -166,7 +166,7 @@
       {#if readme}
         <section class="readme">
           <h2>readme</h2>
-          <!-- rendered by src/plugin/markdown.ts, which escapes first and only then
+          <!-- rendered by src/shared/markdown.ts, which escapes first and only then
                puts back the few marks it knows -->
           {@html readme}
         </section>

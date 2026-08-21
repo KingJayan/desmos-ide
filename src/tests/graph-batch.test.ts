@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DesmosExpr } from '../compiler/codegen';
 
@@ -10,6 +10,11 @@ type Write = { kind: 'set'; ids: string[] } | { kind: 'remove'; id: string };
 const writes: Write[] = [];
 let frames: (() => void)[] = [];
 
+let graphList: DesmosExpr[] = [];
+let onChange: (() => void) | null = null;
+const realNow = Date.now;
+let clock = realNow();
+
 const calc = {
   setExpression() {},
   setExpressions(list: Record<string, unknown>[]) {
@@ -17,7 +22,8 @@ const calc = {
   },
   removeExpression({ id }: { id: string }) { writes.push({ kind: 'remove', id }); },
   updateSettings() {},
-  getExpressions() { return []; },
+  getExpressions() { return graphList; },
+  observeEvent(name: string, handler: () => void) { if (name === 'change') onChange = handler; },
   destroy() {},
 };
 
@@ -25,6 +31,8 @@ const g = globalThis as unknown as Record<string, unknown>;
 g['Desmos'] = { GraphingCalculator: () => calc };
 g['requestAnimationFrame'] = (cb: () => void) => { frames.push(cb); return frames.length; };
 g['cancelAnimationFrame'] = () => {};
+
+Date.now = () => clock;
 
 const { DesmosGraph } = await import('../../renderer/desmos');
 
@@ -99,5 +107,53 @@ describe('the graph batches big updates', () => {
     writes.length = 0;
     graph.update(exprs(2));
     assert.deepEqual(writes, [{ kind: 'remove', id: 'e2' }]);
+  });
+});
+
+describe('the graph reports edits made on the graph', () => {
+  beforeEach(() => {
+    writes.length = 0;
+    frames = [];
+    graphList = [];
+    onChange = null;
+    clock = realNow();
+  });
+
+  after(() => { Date.now = realNow; });
+
+  test('an edit made while the app is writing is still reported', () => {
+    const graph = new DesmosGraph({} as HTMLElement);
+    const seen: string[][] = [];
+    graph.onExpressionEdited(list => seen.push(list.map(e => e.id)));
+
+    graph.update(exprs(2));
+    graphList = exprs(2);
+    clock += 700;
+    onChange?.();
+    seen.length = 0;
+
+    // the app writes e0 while the user drags e1
+    graph.update([{ type: 'expression', id: 'e0', latex: 'y=7x' }, ...exprs(1, 1)]);
+    graphList = [{ type: 'expression', id: 'e0', latex: 'y=7x' }, { type: 'expression', id: 'e1', latex: 'y=99x' }];
+    onChange?.();
+    assert.deepEqual(seen, []);
+
+    clock += 700;
+    onChange?.();
+    assert.deepEqual(seen, [['e1']]);
+  });
+
+  test('a write of the app is not reported back as an edit', () => {
+    const graph = new DesmosGraph({} as HTMLElement);
+    const seen: string[][] = [];
+    graph.onExpressionEdited(list => seen.push(list.map(e => e.id)));
+
+    graph.update(exprs(2));
+    // desmos rewrites the latex it was given
+    graphList = exprs(2).map(e => ({ ...e, latex: `${e.latex} ` }));
+    onChange?.();
+    clock += 700;
+    onChange?.();
+    assert.deepEqual(seen, []);
   });
 });
