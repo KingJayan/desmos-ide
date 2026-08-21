@@ -29,6 +29,7 @@ export interface EditorSettings {
   uiScale: UiScale;
   gitAutofetch: boolean;
   gitAutofetchPeriod: number;
+  tourDone: boolean;
 }
 
 export type UiScale = 'compact' | 'default' | 'large';
@@ -53,6 +54,7 @@ const DEFAULTS: EditorSettings = {
   // off by default: a fetch reaches the network, and that is the user's call to make
   gitAutofetch: false,
   gitAutofetchPeriod: 180,
+  tourDone: false,
 };
 
 const STORAGE_KEY = 'desmos-ide-settings';
@@ -119,12 +121,15 @@ function validate(raw: Record<string, unknown>): EditorSettings {
   const gitAutofetch = typeof raw.gitAutofetch === 'boolean' ? raw.gitAutofetch : d.gitAutofetch;
   const gitAutofetchPeriod = (GIT_AUTOFETCH_PERIODS as readonly number[]).includes(Number(raw.gitAutofetchPeriod))
     ? Number(raw.gitAutofetchPeriod) : d.gitAutofetchPeriod;
+  const tourDone = typeof raw.tourDone === 'boolean' ? raw.tourDone : d.tourDone;
   return {
     colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily,
     minimap, lineNumbers, wordWrap, formatOnSave, autosave, uiScale, gitAutofetch, gitAutofetchPeriod,
+    tourDone,
   };
 }
 
+/** settings.json storage */
 export function loadSettings(): EditorSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -137,8 +142,25 @@ export function loadSettings(): EditorSettings {
   }
 }
 
+export function settingsFromJson(text: string): EditorSettings | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    return validate(migrate(parsed as Record<string, unknown>));
+  } catch {
+    return null;
+  }
+}
+
+export function settingsToJson(s: EditorSettings): string {
+  const ordered: Record<string, unknown> = {};
+  for (const key of Object.keys(DEFAULTS).sort()) ordered[key] = s[key as keyof EditorSettings];
+  return JSON.stringify(ordered, null, 2) + '\n';
+}
+
 function saveSettings(s: EditorSettings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  void window.electronAPI?.configWrite('settings', settingsToJson(s));
 }
 
 export interface ExtraTheme { id: string; label: string }
@@ -149,15 +171,17 @@ export class SettingsPanel {
   private settings: EditorSettings;
   private onChange: (s: EditorSettings) => void;
   private previousFocus: HTMLElement | null = null;
+  private syncControls: () => void = () => {};
+  private openJson?: (file: 'settings' | 'keybinds') => void;
 
-  constructor(onChange: (s: EditorSettings) => void) {
+  constructor(onChange: (s: EditorSettings) => void, openJson?: (file: 'settings' | 'keybinds') => void) {
     this.settings = loadSettings();
     this.onChange = onChange;
+    this.openJson = openJson;
     this.overlay = this.build();
     document.body.appendChild(this.overlay);
   }
 
-  /** themes a plugin defined, so an installed theme is one a user can pick */
   setExtraThemes(themes: ExtraTheme[]): void {
     this.extraThemes = themes;
     const select = this.overlay.querySelector('#s-editor-theme') as HTMLSelectElement | null;
@@ -356,6 +380,13 @@ export class SettingsPanel {
             </div>
           </div>
         </div>
+        <div class="settings-footer">
+          <span class="settings-hint">Every setting is text in settings.json.</span>
+          <span class="settings-footer-links">
+            <button class="settings-link" id="s-open-settings-json" type="button">settings.json</button>
+            <button class="settings-link" id="s-open-keybinds-json" type="button">keybinds.json</button>
+          </span>
+        </div>
       </div>
     `;
 
@@ -374,22 +405,25 @@ export class SettingsPanel {
     const autofetchEl   = overlay.querySelector('#s-git-autofetch') as HTMLInputElement;
     const autofetchPeriodEl = overlay.querySelector('#s-git-autofetch-period') as HTMLSelectElement;
 
-    const s = this.settings;
-    colorThemeEl.value  = s.colorTheme;
-    editorThemeEl.value = s.editorTheme;
-    fontSizeEl.value    = String(s.fontSize);
-    fontSizeValEl.textContent = `${s.fontSize}px`;
-    uiFontFamilyEl.value   = s.uiFontFamily;
-    codeFontFamilyEl.value = s.codeFontFamily;
-    lineNumEl.value     = s.lineNumbers;
-    minimapEl.checked   = s.minimap;
-    wordWrapEl.checked  = s.wordWrap === 'on';
-    formatSaveEl.checked = s.formatOnSave;
-    autosaveEl.checked   = s.autosave;
-    uiScaleEl.value      = s.uiScale;
-    autofetchEl.checked  = s.gitAutofetch;
-    autofetchPeriodEl.value = String(s.gitAutofetchPeriod);
-    autofetchPeriodEl.disabled = !s.gitAutofetch;
+    this.syncControls = () => {
+      const s = this.settings;
+      colorThemeEl.value  = s.colorTheme;
+      editorThemeEl.value = s.editorTheme;
+      fontSizeEl.value    = String(s.fontSize);
+      fontSizeValEl.textContent = `${s.fontSize}px`;
+      uiFontFamilyEl.value   = s.uiFontFamily;
+      codeFontFamilyEl.value = s.codeFontFamily;
+      lineNumEl.value     = s.lineNumbers;
+      minimapEl.checked   = s.minimap;
+      wordWrapEl.checked  = s.wordWrap === 'on';
+      formatSaveEl.checked = s.formatOnSave;
+      autosaveEl.checked   = s.autosave;
+      uiScaleEl.value      = s.uiScale;
+      autofetchEl.checked  = s.gitAutofetch;
+      autofetchPeriodEl.value = String(s.gitAutofetchPeriod);
+      autofetchPeriodEl.disabled = !s.gitAutofetch;
+    };
+    this.syncControls();
 
     const emit = () => { saveSettings(this.settings); this.onChange({ ...this.settings }); };
 
@@ -449,6 +483,15 @@ export class SettingsPanel {
       emit();
     });
 
+    overlay.querySelector('#s-open-settings-json')!.addEventListener('click', () => {
+      this.hide();
+      this.openJson?.('settings');
+    });
+    overlay.querySelector('#s-open-keybinds-json')!.addEventListener('click', () => {
+      this.hide();
+      this.openJson?.('keybinds');
+    });
+
     overlay.querySelector('.settings-close')!.addEventListener('click', () => this.hide());
     overlay.addEventListener('click', e => { if (e.target === overlay) this.hide(); });
     overlay.addEventListener('keydown', e => {
@@ -492,4 +535,19 @@ export class SettingsPanel {
 
   toggle(): void { if (this.overlay.classList.contains('hidden')) this.show(); else this.hide(); }
   current(): EditorSettings { return { ...this.settings }; }
+
+  adopt(next: EditorSettings): void {
+    this.settings = next;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    this.syncControls();
+    this.setExtraThemes(this.extraThemes);
+    this.onChange({ ...this.settings });
+  }
+
+  patch(part: Partial<EditorSettings>): void {
+    this.settings = { ...this.settings, ...part };
+    saveSettings(this.settings);
+    this.syncControls();
+    this.onChange({ ...this.settings });
+  }
 }

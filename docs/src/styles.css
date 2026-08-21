@@ -407,12 +407,24 @@ main {
 }
 
 .topbar-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-right: 6px;
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text) !important;
+}
+
+.topbar-logo {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .landing {

@@ -50,6 +50,18 @@ export async function openFile(): Promise<FileResult<{ path: string; content: st
   }
 }
 
+export async function openJsonFile(): Promise<FileResult<{ path: string; content: string }>> {
+  const picked = await showOpenDialog({ extensions: ['json'] });
+  if (!picked) return CANCELED;
+  const path = allowFile(picked);
+  if (!path) return NOT_ALLOWED;
+  try {
+    return { ok: true, path, content: await withRetry(() => readFile(path, 'utf-8')) };
+  } catch (err) {
+    return fileError(err);
+  }
+}
+
 export async function readFileAt(raw: string): Promise<FileResult<{ path: string; content: string }>> {
   if (typeof raw !== 'string' || !raw) {
     return { ok: false, errorCode: 'BAD_PAYLOAD', message: 'Path must be a string.' };
@@ -97,8 +109,8 @@ async function exportAs(
   }
 }
 
-export function exportJson(content: string): Promise<FileResult<{ path: string }>> {
-  return exportAs(content, { defaultName: 'expressions.json', extension: 'json', prompt: 'Export expressions' });
+export function exportJson(content: string, defaultName = 'expressions.json'): Promise<FileResult<{ path: string }>> {
+  return exportAs(content, { defaultName, extension: 'json', prompt: 'Export' });
 }
 
 export function exportTex(content: string, defaultName: string): Promise<FileResult<{ path: string }>> {

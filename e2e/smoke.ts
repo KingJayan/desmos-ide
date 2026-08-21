@@ -147,6 +147,13 @@ stage = 'waiting for the editor';
 await page.waitForSelector('#editor-container .monaco-editor', { timeout: 20_000 });
 stage = 'checking the page';
 
+// a first run opens the welcome dialog, and everything after this needs it gone
+await page.waitForSelector('.welcome-overlay:not(.hidden)', { timeout: 10_000 });
+check(await page.locator('.welcome-modal .welcome-mark').count() === 1, 'the welcome dialog wears the app mark');
+await page.keyboard.press('Escape');
+await page.waitForSelector('.welcome-overlay', { state: 'hidden' });
+check(true, 'escape closes the welcome dialog');
+
 check(await page.locator('#status-msg').getAttribute('aria-live') === 'polite', 'status is announced');
 check(await page.locator('#status-msg').getAttribute('role') === 'status', 'status has a role');
 

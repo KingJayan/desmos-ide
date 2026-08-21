@@ -713,9 +713,6 @@ class Parser {
     }
   }
 
-  // `2x`, `3sin(t)` and `2(x+1)` multiply the way they do in desmos. the factors must
-  // be adjacent: a space means separate things, which is what keeps the newline-separated
-  // bindings of an `expr { }` block from merging into one expression.
   private startsImplicitFactor(): boolean {
     if (this.peek().spaceBefore) return false;
     return this.check('num') || this.check('ident') || this.check('lparen');

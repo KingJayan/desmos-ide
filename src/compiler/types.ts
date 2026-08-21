@@ -41,7 +41,7 @@ export interface VarDecl {
   pos: Pos;
 }
 
-/** alias r = expr  — named binding, identical semantics to VarDecl */
+/** alias r = expr: named binding, identical semantics to VarDecl */
 export interface AliasDecl {
   type: 'AliasDecl';
   name: string;
@@ -49,14 +49,14 @@ export interface AliasDecl {
   pos: Pos;
 }
 
-/** use "plugin-id"  — names a plugin the file needs, no output */
+/** use "plugin-id": names a plugin the file needs, no output */
 export interface UseDecl {
   type: 'UseDecl';
   plugin: string;
   pos: Pos;
 }
 
-/** debug expr  — compile-time only, no output */
+/** debug expr: compile-time only, no output */
 export interface DebugDecl {
   type: 'DebugDecl';
   expr: Expr;

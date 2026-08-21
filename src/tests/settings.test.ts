@@ -11,7 +11,7 @@ const store = new Map<string, string>();
   clear: () => { store.clear(); },
 };
 
-const { loadSettings, UI_SCALES } = await import('../../renderer/settings');
+const { loadSettings, settingsFromJson, settingsToJson, UI_SCALES } = await import('../../renderer/settings');
 
 const KEY = 'desmos-ide-settings';
 
@@ -77,5 +77,37 @@ describe('the autosave setting', () => {
       stored({ autosave: bad });
       assert.equal(loadSettings().autosave, false, JSON.stringify(bad));
     }
+  });
+});
+
+describe('settings.json', () => {
+  beforeEach(() => store.clear());
+
+  test('what the app writes it reads back unchanged', () => {
+    const written = settingsToJson(loadSettings());
+    assert.deepEqual(settingsFromJson(written), loadSettings());
+  });
+
+  test('a file the user edited by hand is taken key by key', () => {
+    const next = settingsFromJson('{"fontSize": 18, "wordWrap": "on"}');
+    assert.equal(next?.fontSize, 18);
+    assert.equal(next?.wordWrap, 'on');
+    assert.equal(next?.uiScale, 'default');
+  });
+
+  test('a value out of range is clamped, not obeyed', () => {
+    assert.equal(settingsFromJson('{"fontSize": 400}')?.fontSize, 20);
+    assert.equal(settingsFromJson('{"lineNumbers": "sometimes"}')?.lineNumbers, 'on');
+  });
+
+  test('a file that is not an object is refused, so the app keeps what it has', () => {
+    assert.equal(settingsFromJson('{ not json'), null);
+    assert.equal(settingsFromJson('[]'), null);
+    assert.equal(settingsFromJson('7'), null);
+  });
+
+  test('the tour flag lives in the file, so the tour can be asked for again', () => {
+    assert.equal(loadSettings().tourDone, false);
+    assert.equal(settingsFromJson('{"tourDone": true}')?.tourDone, true);
   });
 });

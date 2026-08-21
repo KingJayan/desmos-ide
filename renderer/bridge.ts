@@ -1,5 +1,5 @@
 import Electrobun, { Electroview } from 'electrobun/view';
-import type { AIConfig, AIMessage, DesmosIdeRPC } from '../src/shared/rpc-schema';
+import type { AIConfig, AIMessage, ConfigFile, DesmosIdeRPC } from '../src/shared/rpc-schema';
 
 type Listener<T extends unknown[]> = (...args: T) => void;
 
@@ -15,6 +15,7 @@ const aiChunkCbs: Listener<[string, string]>[] = [];
 const aiDoneCbs: Listener<[string]>[] = [];
 const aiErrorCbs: Listener<[string, string]>[] = [];
 const fileChangedCbs: Listener<[string, string]>[] = [];
+const configChangedCbs: Listener<[ConfigFile, string]>[] = [];
 const menuCbs: Record<'new' | 'open' | 'save' | 'saveAs' | 'exportTex', Listener<[]>[]> = {
   new: [], open: [], save: [], saveAs: [], exportTex: [],
 };
@@ -33,6 +34,7 @@ const rpc = Electroview.defineRPC<DesmosIdeRPC>({
       aiDone: ({ reqId }) => aiDoneCbs.forEach(cb => cb(reqId)),
       aiError: ({ reqId, error }) => aiErrorCbs.forEach(cb => cb(reqId, error)),
       fileChanged: ({ path, content }) => fileChangedCbs.forEach(cb => cb(path, content)),
+      configChanged: ({ file, content }) => configChangedCbs.forEach(cb => cb(file, content)),
       menuNew: () => menuCbs.new.forEach(cb => cb()),
       menuOpen: () => menuCbs.open.forEach(cb => cb()),
       menuSave: () => menuCbs.save.forEach(cb => cb()),
@@ -58,7 +60,8 @@ try {
 export const electronAPI = {
   openFile: () => rpc.request.openFile(),
   saveFile: (path: string | null, content: string) => rpc.request.saveFile({ path, content }),
-  exportJson: (content: string) => rpc.request.exportJson({ content }),
+  exportJson: (content: string, defaultName?: string) => rpc.request.exportJson({ content, defaultName }),
+  openJsonFile: () => rpc.request.openJsonFile(),
   exportTex: (content: string, defaultName: string) => rpc.request.exportTex({ content, defaultName }),
   exportImage: (data: string, defaultName: string, format: 'png' | 'svg') =>
     rpc.request.exportImage({ data, defaultName, format }),
@@ -141,6 +144,12 @@ export const electronAPI = {
   watchFile: (path: string) => rpc.request.watchFile({ path }),
   unwatchFile: (path: string) => rpc.request.unwatchFile({ path }),
   onFileChanged: (cb: (path: string, content: string) => void) => subscribe(fileChangedCbs, cb),
+
+  configRead: (file: ConfigFile) =>
+    rpc.request.configRead({ file }).catch(() => null),
+  configWrite: (file: ConfigFile, content: string) =>
+    rpc.request.configWrite({ file, content }).catch(() => false),
+  onConfigChanged: (cb: (file: ConfigFile, content: string) => void) => subscribe(configChangedCbs, cb),
 };
 
 export type ElectronAPI = typeof electronAPI;

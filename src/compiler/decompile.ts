@@ -365,7 +365,7 @@ function quote(s: string): string {
 }
 
 /**
- * a DSL statement for a desmos expression, or null
+ * a DSL statement for a desmos expression or null
  */
 export function decompile(expr: DesmosExpr, name: string): string | null {
   if (expr.type === 'folder') return expr.title ? `group ${name} as ${quote(expr.title)}` : null;
@@ -379,8 +379,6 @@ export function decompile(expr: DesmosExpr, name: string): string | null {
   if (expr.slider && node.k === 'cmp' && node.op === '=' && isPlainName(node.l)) {
     const { min, max, isPlaying } = expr.slider;
     if (min === undefined || max === undefined) return null;
-    // an animating slider is either a clock or a slider with a speed, and this
-    // spelling says neither, so writing it back would stop the animation
     if (isPlaying) return null;
     return `${node.l.v} = slider(${print(node.r)}, ${min}, ${max})`;
   }

@@ -1,13 +1,14 @@
 import Electrobun, { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/bun';
 import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
-import { exportImage, exportJson, exportTex, openFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
+import { exportImage, exportJson, exportTex, openFile, openJsonFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
 import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
 import { fetchRegistry, installPlugin, listPlugins, pluginIcon, pluginReadme, setPluginEnabled, uninstallPlugin } from './plugins';
 import {
   deletePluginSecret, getPluginSecret, pluginState, setSyncKeys, storePluginSecret, updatePluginState,
 } from './plugin-storage';
 import { allowRoot, loadAllowed } from './paths';
+import { ensureConfig, readConfig, watchConfig, writeConfig } from './config';
 import { searchFolder, searchPaths } from './search';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import {
@@ -25,6 +26,7 @@ import {
 const DEV_SERVER_URL = 'http://localhost:5173';
 
 await loadAllowed();
+await ensureConfig();
 
 // git push/pull and provider calls far exceed the 1s rpc default
 const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
@@ -33,7 +35,8 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
     requests: {
       openFile: () => openFile(),
       saveFile: ({ path, content }) => saveFile(path, content),
-      exportJson: ({ content }) => exportJson(content),
+      exportJson: ({ content, defaultName }) => exportJson(content, defaultName),
+      openJsonFile: () => openJsonFile(),
       exportTex: ({ content, defaultName }) => exportTex(content, defaultName),
       exportImage: ({ data, defaultName, format }) => exportImage(data, defaultName, format),
       pickFolder: async () => allowRoot(await showFolderDialog()),
@@ -89,6 +92,9 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       pluginSecretStore: ({ id, key, value }) => storePluginSecret(id, key, value),
       pluginSecretDelete: ({ id, key }) => deletePluginSecret(id, key),
 
+      configRead: ({ file }) => readConfig(file),
+      configWrite: ({ file, content }) => writeConfig(file, content),
+
       openExternal: ({ url }) => {
         if (/^https?:\/\//i.test(url)) Utils.openExternal(url);
       },
@@ -115,6 +121,8 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
     },
   },
 });
+
+watchConfig((file, content) => rpc.send.configChanged({ file, content }));
 
 async function resolveViewUrl(): Promise<string> {
   if (process.env['DESMOS_IDE_DEV']) {

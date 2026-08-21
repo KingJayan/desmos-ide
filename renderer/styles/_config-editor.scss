@@ -1,0 +1,92 @@
+@use 'tokens' as *;
+
+.config-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: color-mix(in srgb, var(--crust) 62%, transparent);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.config-overlay.hidden { display: none; }
+
+.config-modal {
+  @include panel;
+  width: 720px;
+  max-width: calc(100vw - 48px);
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--font-ui);
+}
+
+.config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, var(--mantle), var(--crust));
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.config-path {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--overlay1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-close {
+  background: none;
+  border: none;
+  color: var(--overlay0);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  transition: color 0.12s, background 0.12s;
+  flex-shrink: 0;
+}
+.config-close:hover { color: var(--text); background: var(--surface0); }
+
+.config-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.config-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--mantle);
+  flex-shrink: 0;
+}
+
+.config-note {
+  font-size: var(--fs-micro);
+  color: var(--overlay1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.config-note--bad { color: var(--red); }
+
+.config-save {
+  --btn-accent: var(--mauve);
+  font-size: var(--fs-micro);
+  padding: 3px 12px;
+  flex-shrink: 0;
+}

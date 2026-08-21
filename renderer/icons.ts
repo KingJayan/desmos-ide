@@ -1,4 +1,4 @@
-// one icon source for the whole UI
+// unified icon source for all ui
 
 import {
   ArrowDown, Check, ChevronDown, ChevronRight, CircleX, Copy, ExternalLink, FileCode, FileText, FolderOpen,
@@ -9,7 +9,14 @@ import { escapeHtml } from './escape';
 
 type IconNode = [tag: string, attrs: Record<string, string | number>][];
 
+const DsmxMark: IconNode = [
+  ['path', { d: 'M2.5 12h19', opacity: '0.4' }],
+  ['path', { d: 'M12 2.5v19', opacity: '0.4' }],
+  ['path', { d: 'M3 6 Q12 17.5 21 6' }],
+];
+
 const ICONS = {
+  'dsmx-mark': DsmxMark,
   'arrow-down': ArrowDown as IconNode,
   check: Check as IconNode,
   plus: Plus as IconNode,

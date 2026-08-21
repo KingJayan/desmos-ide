@@ -25,8 +25,11 @@ import { Layout } from './layout';
 import { EnhancedPane } from './enhanced';
 import { Transport } from './transport';
 import { AISidebar } from './ai-sidebar';
-import { SettingsPanel, loadSettings } from './settings';
-import type { ColorTheme, UiScale } from './settings';
+import { SettingsPanel, loadSettings, settingsFromJson, settingsToJson } from './settings';
+import type { ColorTheme, EditorSettings, UiScale } from './settings';
+import { Keymap, chordOf, keybindsToJson, parseKeybinds, DEFAULT_KEYBINDS } from './keybinds';
+import { ConfigEditor } from './config-editor';
+import { Onboarding } from './onboarding';
 import { compileStatus, errorsByPhase } from './compile-status';
 import { CommandPalette } from './command-palette';
 import type { PaletteCommand } from './command-palette';
@@ -38,6 +41,8 @@ import { OptimizerPanel, groupByLine, lineHint } from './optimizer-panel';
 import { typingElsewhere } from './keys';
 import { decompile } from '../src/compiler/decompile';
 import type { Mode } from './session';
+import type { ConfigFile } from '../src/shared/rpc-schema';
+import exampleSrc from '../example/rose.dsmx?raw';
 import {
   loadRecent, loadSession, pushRecent, recentLabel, removeRecent, saveRecent, saveSession,
 } from './session';
@@ -746,7 +751,6 @@ function setMarkers(owner: string, markers: monaco.editor.IMarkerData[]): void {
 
 let sliderVersion = -1;
 
-/** the sliders come from the text, not the compile, so only a real edit can move them */
 function updateSliders(): void {
   const version = model.getVersionId();
   if (version === sliderVersion) return;
@@ -939,8 +943,6 @@ async function runCompile(): Promise<void> {
   compileRequestId += 1;
   const id = compileRequestId;
 
-  // expansion is a worker round trip of its own, and a file with no invocation in it
-  // has nothing to expand
   const expanded = src.includes('@')
     ? await pluginHost.expand(src)
     : { src, errors: [] as MacroError[], lineMap: undefined };
@@ -1005,8 +1007,6 @@ let registryEntries: RegistryEntry[] = [];
 
 const toasts = new Toasts();
 
-// the app commands a plugin may run, and the only ones. the host refuses anything not
-// named here before it ever reaches this map
 const appCommands: Record<string, () => void | Promise<void>> = {
   format: () => runEditorAction('editor.action.formatDocument'),
   compile: () => { void runCompile(); },
@@ -1023,6 +1023,7 @@ const appCommands: Record<string, () => void | Promise<void>> = {
 const pluginServices: HostServices = {
   notify: (kind, text) => toasts.show(kind, text, 'plugin'),
   status: text => setStatus(text, 'info'),
+
   editorText: () => editor.getValue(),
   editorSelection: () => {
     const selection = editor.getSelection();
@@ -1032,8 +1033,7 @@ const pluginServices: HostServices = {
   editorInsert: text => insertAtCursor(text),
   editorReplace: text => replaceSelection(text),
   editorSetText: text => { editor.setValue(text); editor.focus(); },
-  // a file keeps its state with the folder it sits in, so every file beside it sees
-  // the same workspace state
+
   workspace: () => folderOf(currentPath),
   runApp: async command => { await appCommands[command]?.(); },
 };
@@ -1137,7 +1137,6 @@ const pluginMenu = new PluginContextMenu(pluginHost, (plugin, command) => {
   void runPluginCommand(plugin, command);
 });
 
-/** what a plugin put in the status bar, redrawn whole every time anything changes */
 function renderPluginStatusItems(): void {
   statusPlugins.replaceChildren();
   for (const { plugin, item } of pluginHost.statusItems()) {
@@ -1154,7 +1153,6 @@ function renderPluginStatusItems(): void {
   }
 }
 
-// alt changes what a key reports on macOS, so the combo is read off the physical key
 function comboOf(e: KeyboardEvent): string | null {
   const code = e.code;
   const base = /^Key([A-Z])$/.exec(code)?.[1]?.toLowerCase()
@@ -1180,8 +1178,6 @@ window.addEventListener('keydown', e => {
   void runPluginCommand(owner.plugin, owner.command);
 });
 
-// the editor already has monaco's menu, so a plugin item joins that one rather than
-// putting a second menu over it
 let editorMenuActions: { dispose(): void }[] = [];
 
 function syncEditorMenu(): void {
@@ -1302,8 +1298,6 @@ function folderOf(p: string | null): string | null {
 }
 
 function setFilename(p: string | null): Promise<unknown> {
-  // a plugin keeps workspace state per folder, so moving to another one hands every
-  // plugin the state that belongs there
   const moved = folderOf(p) !== folderOf(currentPath);
   currentPath = p;
   if (moved) void pluginHost.reloadWorkspace();
@@ -1599,86 +1593,24 @@ function runFindWithRegex(): void {
   });
 }
 
-window.addEventListener('keydown', e => {
-  const mod = e.metaKey || e.ctrlKey;
-  if (!mod) return;
+const EDITOR_ONLY = new Set(['editor.find', 'editor.replace', 'editor.find-regex']);
 
-  const k = e.key.toLowerCase();
-  const elsewhere = typingElsewhere(e.target);
-
-  if (!e.shiftKey && !e.altKey && k === 'n') {
-    e.preventDefault();
-    void cmdNew();
-    return;
-  }
-
-  if (!e.shiftKey && !e.altKey && k === 'o') {
-    e.preventDefault();
-    void cmdOpen();
-    return;
-  }
-
-  if (!e.shiftKey && !e.altKey && k === 's') {
-    e.preventDefault();
-    void cmdSave();
-    return;
-  }
-
-  if (!e.shiftKey && !e.altKey && k === 'f') {
-    if (elsewhere) return;
-    e.preventDefault();
-    runEditorAction('actions.find');
-    return;
-  }
-
-  if (!e.altKey && k === 'h') {
-    if (elsewhere) return;
-    e.preventDefault();
-    runEditorAction('editor.action.startFindReplaceAction');
-    return;
-  }
-
-  if (e.shiftKey && !e.altKey && k === 'f') {
-    e.preventDefault();
-    searchPanel.toggle();
-    return;
-  }
-
-  if (e.altKey && k === 'r') {
-    if (elsewhere) return;
-    e.preventDefault();
-    runFindWithRegex();
-    return;
-  }
-
-  if (e.shiftKey && !e.altKey && k === 'p') {
-    e.preventDefault();
-    palette.toggle();
-    return;
-  }
-
-  // ⌘1..⌘7 toggle the tool windows, the way the rail tooltips say
-  if (!e.shiftKey && !e.altKey && TOOL_KEYS[k]) {
-    e.preventDefault();
-    TOOL_KEYS[k]();
-  }
-});
-
-const TOOL_KEYS: Record<string, () => void> = {
-  '1': () => setSidebarView(leftView === 'git' ? null : 'git'),
-  '2': () => setSidebarView(leftView === 'outline' ? null : 'outline'),
-  '3': () => toggleBottom('problems'),
-  '4': () => toggleBottom('timeline'),
-  '5': () => setSidebarView(sidebarView === 'ai' ? null : 'ai'),
-  '6': () => toggleBottom('optimizer'),
-  '7': () => setSidebarView(leftView === 'plugins' ? null : 'plugins'),
-};
+function inOwnDialog(target: EventTarget | null): boolean {
+  const el = target instanceof Element ? target : null;
+  return !!el?.closest('.config-overlay, .settings-overlay, .welcome-overlay');
+}
 
 window.addEventListener('keydown', e => {
-  if (e.key === 'F1') {
-    e.preventDefault();
-    palette.toggle();
-  }
+  if (inOwnDialog(e.target)) return;
+  const chord = chordOf(e);
+  if (!chord) return;
+  const id = keymap.commandFor(chord);
+  if (!id) return;
+  const command = commandIndex.get(id);
+  if (!command) return;
+  if (EDITOR_ONLY.has(id) && typingElsewhere(e.target)) return;
+  e.preventDefault();
+  void command.action();
 }, true);
 
 window.electronAPI?.onMenuNew(cmdNew);
@@ -2074,7 +2006,7 @@ function ensureSettingsPanel(): SettingsPanel {
       minimap:     { enabled: s.minimap },
       wordWrap:    s.wordWrap,
     });
-  });
+  }, file => void configEditor.open(file));
   settingsPanel.setExtraThemes(pluginThemes);
   return settingsPanel;
 }
@@ -2103,21 +2035,18 @@ const baseCommands: PaletteCommand[] = [
     id: 'file.new',
     label: 'new file',
     description: 'Clear the editor and start fresh',
-    keybinding: '⌘N',
     action: () => cmdNew(),
   },
   {
     id: 'file.open',
     label: 'open file…',
     description: 'Open a .dsmx file from disk',
-    keybinding: '⌘O',
     action: () => cmdOpen(),
   },
   {
     id: 'file.save',
     label: 'save file',
     description: 'Save the current DSL file',
-    keybinding: '⌘S',
     action: () => cmdSave(),
   },
   {
@@ -2130,7 +2059,6 @@ const baseCommands: PaletteCommand[] = [
     id: 'file.exporttex',
     label: 'export tex figure…',
     description: 'Write the graph as a standalone pgfplots document',
-    keybinding: '⌘⇧T',
     action: () => cmdExportTex(),
   },
   {
@@ -2160,7 +2088,6 @@ const baseCommands: PaletteCommand[] = [
     id: 'graph.export-png',
     label: 'export png…',
     description: 'Write the graph as it looks now to a PNG file',
-    keybinding: '⌘⇧E',
     action: () => cmdExportImage('png'),
   },
   {
@@ -2180,14 +2107,12 @@ const baseCommands: PaletteCommand[] = [
     id: 'editor.find',
     label: 'find',
     description: 'Open the find widget',
-    keybinding: '⌘F',
     action: () => runEditorAction('actions.find'),
   },
   {
     id: 'editor.replace',
     label: 'find & replace',
     description: 'Open find & replace widget',
-    keybinding: '⌘H',
     action: () => runEditorAction('editor.action.startFindReplaceAction'),
   },
   {
@@ -2212,7 +2137,7 @@ const baseCommands: PaletteCommand[] = [
     id: 'sidebar.git',
     label: 'toggle source control sidebar',
     description: 'Open or close the Git panel',
-    action: () => setSidebarView(sidebarView === 'git' ? null : 'git'),
+    action: () => setSidebarView(leftView === 'git' ? null : 'git'),
   },
   {
     id: 'sidebar.ai',
@@ -2224,13 +2149,12 @@ const baseCommands: PaletteCommand[] = [
     id: 'sidebar.outline',
     label: 'toggle outline sidebar',
     description: 'Open or close the symbol outline',
-    action: () => setSidebarView(sidebarView === 'outline' ? null : 'outline'),
+    action: () => setSidebarView(leftView === 'outline' ? null : 'outline'),
   },
   {
     id: 'tool.optimizer',
     label: 'show optimizer report',
     description: 'List every fold, inline and drop the compiler made',
-    keybinding: '⌘6',
     action: () => toggleBottom('optimizer'),
   },
   {
@@ -2253,17 +2177,183 @@ const baseCommands: PaletteCommand[] = [
     id: 'sidebar.plugins',
     label: 'toggle plugins sidebar',
     description: 'Manage what is installed, and browse the marketplace',
-    keybinding: '⌘7',
     action: () => setSidebarView(leftView === 'plugins' ? null : 'plugins'),
   },
   {
     id: 'file.search',
     label: 'search in recent files',
     description: 'Find text across the files you have opened',
-    keybinding: '⇧⌘F',
     action: () => searchPanel.show(),
   },
+  {
+    id: 'editor.find-regex',
+    label: 'find with a regular expression',
+    description: 'Open the find widget with regex matching already on',
+    action: () => runFindWithRegex(),
+  },
+  {
+    id: 'palette.toggle',
+    label: 'show all commands',
+    description: 'Open or close this palette',
+    action: () => palette.toggle(),
+  },
+  {
+    id: 'tool.problems',
+    label: 'toggle problems panel',
+    description: 'Open or close the list of compile errors',
+    action: () => toggleBottom('problems'),
+  },
+  {
+    id: 'tool.timeline',
+    label: 'toggle timeline panel',
+    description: 'Open or close the record of what the session did',
+    action: () => toggleBottom('timeline'),
+  },
+  {
+    id: 'preferences.open',
+    label: 'preferences: open settings',
+    description: 'The settings dialog',
+    action: () => ensureSettingsPanel().toggle(),
+  },
+  {
+    id: 'preferences.settings-json',
+    label: 'preferences: open settings.json',
+    description: 'Edit every setting as text — this file is what the app reads',
+    action: () => configEditor.open('settings'),
+  },
+  {
+    id: 'preferences.keybinds-json',
+    label: 'preferences: open keybinds.json',
+    description: 'Bind your own keys to any command in this palette',
+    action: () => configEditor.open('keybinds'),
+  },
+  {
+    id: 'preferences.reset-keybinds',
+    label: 'preferences: reset keybinds',
+    description: 'Write the default keys back into keybinds.json',
+    action: () => cmdResetKeybinds(),
+  },
+  {
+    id: 'preferences.export',
+    label: 'preferences: export settings…',
+    description: 'Write the current settings to a JSON file you can carry',
+    action: () => cmdExportSettings(),
+  },
+  {
+    id: 'preferences.import',
+    label: 'preferences: import settings…',
+    description: 'Read settings back from a JSON file',
+    action: () => cmdImportSettings(),
+  },
+  {
+    id: 'help.tour',
+    label: 'help: run the welcome tour',
+    description: 'Point out the editor, the graph and the palette again',
+    action: () => onboarding.start(),
+  },
 ];
+
+const keymap = new Keymap();
+const commandIndex = new Map<string, PaletteCommand>();
+
+const configEditor = new ConfigEditor({
+  read: file => window.electronAPI?.configRead(file) ?? Promise.resolve(null),
+  write: async (file, content) => {
+    const ok = (await window.electronAPI?.configWrite(file, content)) ?? false;
+    if (ok) applyConfig(file, content);
+    return ok;
+  },
+  theme: () => settingsNow().editorTheme,
+  fontSize: () => settingsNow().fontSize,
+  fontFamily: () => settingsNow().codeFontFamily,
+});
+
+const onboarding = new Onboarding({
+  steps: [
+    {
+      target: () => editorContainer,
+      title: 'write dsmx here',
+      body: 'One statement per line. Every line you write compiles to a Desmos expression as you type.',
+    },
+    {
+      target: () => graphContainer,
+      title: 'the graph is the output',
+      body: 'It follows the file. Click an expression and the editor moves to the line that made it.',
+    },
+    {
+      target: () => document.getElementById('statusbar'),
+      title: 'the status bar tells you the state',
+      body: 'Compile result, branch, cursor position and whether the file has unsaved work.',
+    },
+    {
+      target: () => searchWidget,
+      title: 'every command is here',
+      body: 'Press ⇧⌘P for the palette. Files, export, git, plugins and preferences all start there.',
+    },
+  ],
+  openExample: () => { editor.setValue(exampleSrc); void runCompile(); },
+  onFinish: () => ensureSettingsPanel().patch({ tourDone: true }),
+});
+
+function settingsNow(): EditorSettings {
+  return settingsPanel ? settingsPanel.current() : initSettings;
+}
+
+function applyConfig(file: ConfigFile, content: string): void {
+  if (file === 'settings') {
+    const next = settingsFromJson(content);
+    if (next) ensureSettingsPanel().adopt(next);
+    return;
+  }
+  const rules = parseKeybinds(content);
+  if (!rules) return;
+  keymap.apply(rules);
+  refreshPaletteCommands();
+}
+
+async function loadConfigFiles(): Promise<void> {
+  const settings = await window.electronAPI?.configRead('settings');
+  if (settings) {
+    if (settings.content.trim().replace(/[{}\s]/g, '') === '') {
+      void window.electronAPI?.configWrite('settings', settingsToJson(settingsNow()));
+    } else {
+      applyConfig('settings', settings.content);
+    }
+  }
+  const keybinds = await window.electronAPI?.configRead('keybinds');
+  if (keybinds) applyConfig('keybinds', keybinds.content);
+}
+
+async function cmdResetKeybinds(): Promise<void> {
+  const text = keybindsToJson(DEFAULT_KEYBINDS);
+  const ok = await window.electronAPI?.configWrite('keybinds', text);
+  keymap.apply([]);
+  refreshPaletteCommands();
+  setStatus(ok ? 'Keybinds reset to the defaults' : 'Could not write keybinds.json', ok ? 'success' : 'error');
+}
+
+async function cmdExportSettings(): Promise<void> {
+  const result = await window.electronAPI?.exportJson(settingsToJson(settingsNow()), 'dsmx-settings.json');
+  if (!result) { setStatus('Exporting settings needs the desktop app.', 'error'); return; }
+  if (!result.ok) {
+    if (!result.canceled) setStatus(result.message, 'error');
+    return;
+  }
+  setStatus(`Settings written to ${result.path}`, 'success');
+}
+
+async function cmdImportSettings(): Promise<void> {
+  const result = await window.electronAPI?.openJsonFile();
+  if (!result) { setStatus('Importing settings needs the desktop app.', 'error'); return; }
+  if (!result.ok) {
+    if (!result.canceled) setStatus(result.message, 'error');
+    return;
+  }
+  const next = settingsFromJson(result.content);
+  if (!next) { setStatus('That file is not a settings file.', 'error'); return; }
+  ensureSettingsPanel().patch(next);
+  setStatus('Settings imported', 'success');
+}
 
 function syncRecent(): void {
   refreshPaletteCommands();
@@ -2279,7 +2369,6 @@ function insertAtCursor(text: string): void {
   editor.focus();
 }
 
-/** with nothing selected a replace is an insert, which is what a plugin means by it */
 function replaceSelection(text: string): void {
   const selection = editor.getSelection();
   if (!selection || selection.isEmpty()) { insertAtCursor(text); return; }
@@ -2297,7 +2386,7 @@ async function runPluginCommand(plugin: string, command: string): Promise<void> 
 
 function refreshPaletteCommands(): void {
   const paths = recentFiles.map(f => f.path);
-  palette.register([
+  const commands: PaletteCommand[] = [
     ...baseCommands,
     ...pluginHost.commands().map(c => ({
       id: `plugin.${c.plugin}.${c.id}`,
@@ -2314,7 +2403,14 @@ function refreshPaletteCommands(): void {
         action: () => void openPath(f.path),
       };
     }),
-  ]);
+  ].map((command: PaletteCommand) => ({
+    ...command,
+    keybinding: keymap.labelFor(command.id) ?? command.keybinding,
+  }));
+
+  palette.register(commands);
+  commandIndex.clear();
+  for (const command of commands) commandIndex.set(command.id, command);
 }
 
 syncRecent();
@@ -2360,11 +2456,22 @@ void gitPanel.refreshStatus();
 gitPanel.applyAutofetch(initSettings);
 editor.focus();
 
+window.electronAPI?.onConfigChanged((file, content) => {
+  applyConfig(file, content);
+  configEditor.reload(file, content);
+});
+
+void loadConfigFiles().then(() => {
+  if (!settingsNow().tourDone) onboarding.showWelcome();
+});
+
 window.addEventListener('beforeunload', () => {
   if (persistTimer !== null) clearTimeout(persistTimer);
   persistSession();
   searchPanel.dispose();
   sliderManager.dispose();
   aiSidebar?.dispose();
+  configEditor.dispose();
+  onboarding.dispose();
   layout.dispose();
 });

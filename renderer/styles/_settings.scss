@@ -105,6 +105,37 @@
   padding: 6px 16px 8px;
 }
 
+.settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--mantle);
+  flex-shrink: 0;
+}
+
+.settings-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.settings-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--overlay1);
+  transition: color 0.12s;
+}
+.settings-link:hover { color: var(--mauve); }
+.settings-link:focus-visible { outline: 1px solid var(--mauve); outline-offset: 2px; }
+
 .settings-hint-row {
   padding: 0 16px 4px;
 }

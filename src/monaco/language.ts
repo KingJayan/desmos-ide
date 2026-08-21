@@ -42,16 +42,6 @@ export const languageConfig = {
 
 // monarch tokenizer
 
-// Token classes:
-//   kw          - let fn in map point circle line points time camera
-//   function.builtin - sin cos tan …
-//   identifier       - user-defined names
-//   number           - 3  3.14
-//   operator         - + - * / ^ =
-//   operator.ellipsis- ...
-//   comment          - // …
-//   delimiter.*      - { } [ ] ( ) , :
-
 export const monarchTokens = {
   keywords:  [...KEYWORDS],
   builtins:  [...BUILTIN_NAMES, 'gradient'],

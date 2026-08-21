@@ -63,6 +63,8 @@ export type CopilotModelsResult =
   | { ok: true; models: string[] }
   | { ok: false; error: string };
 
+export type ConfigFile = 'settings' | 'keybinds';
+
 export type PluginActionResult =
   | { ok: true }
   | { ok: false; message: string };
@@ -72,7 +74,8 @@ export type DesmosIdeRPC = {
     requests: {
       openFile: { params: void; response: FileResult<{ path: string; content: string }> };
       saveFile: { params: { path: string | null; content: string }; response: FileResult<{ path: string }> };
-      exportJson: { params: { content: string }; response: FileResult<{ path: string }> };
+      exportJson: { params: { content: string; defaultName?: string }; response: FileResult<{ path: string }> };
+      openJsonFile: { params: void; response: FileResult<{ path: string; content: string }> };
       exportTex: { params: { content: string; defaultName: string }; response: FileResult<{ path: string }> };
       exportImage: { params: { data: string; defaultName: string; format: 'png' | 'svg' }; response: FileResult<{ path: string }> };
       watchFile: { params: { path: string }; response: void };
@@ -125,6 +128,9 @@ export type DesmosIdeRPC = {
       pluginSecretStore: { params: { id: string; key: string; value: string }; response: boolean };
       pluginSecretDelete: { params: { id: string; key: string }; response: boolean };
 
+      configRead: { params: { file: ConfigFile }; response: { path: string; content: string } };
+      configWrite: { params: { file: ConfigFile; content: string }; response: boolean };
+
       openExternal: { params: { url: string }; response: void };
       setRecentFiles: { params: { paths: string[] }; response: void };
       confirm: { params: { message: string }; response: boolean };
@@ -141,6 +147,7 @@ export type DesmosIdeRPC = {
       aiDone: { reqId: string };
       aiError: { reqId: string; error: string };
       fileChanged: { path: string; content: string };
+      configChanged: { file: ConfigFile; content: string };
       menuNew: void;
       menuOpen: void;
       menuSave: void;
