@@ -1,6 +1,6 @@
 {
   "name": "desmos-ide",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "an IDE for Desmos with a custom DSL",
   "license": "Apache-2.0",
   "scripts": {
@@ -12,6 +12,7 @@
     "build:cli": "bun run scripts/build-cli.ts",
     "pack:vsix": "bun run scripts/pack-vsix.ts",
     "pack:cli": "bun run scripts/build-cli.ts && bun run scripts/pack-cli.ts",
+    "pack:linux": "bun run scripts/pack-linux.ts",
     "formula": "bun run scripts/gen-formula.ts",
     "cask": "bun run scripts/gen-cask.ts",
     "build": "bun build:view && electrobun build",

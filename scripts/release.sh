@@ -10,17 +10,9 @@
 #   xcrun notarytool store-credentials desmos-ide \
 #     --apple-id <id> --team-id <team> --password <app-specific-password>
 #
-# with no SIGN_IDENTITY the nested binaries are signed ad hoc and notarization is
-# skipped. the app bundle itself is left unsigned, because any signature on it
-# stops the electrobun launcher before it spawns bun. an ad-hoc signature does
-# not satisfy Gatekeeper anyway, so the cask strips the quarantine flag.
+#   scripts/release.sh --tag       # after the version bump is committed and pushed
 #
-# a zip carries the arch of the machine that built it, so a two-arch release is
-# made on two Macs:
-#
-#   scripts/release.sh --stage     # on the Apple Silicon Mac, then on the Intel one
-#   scripts/release.sh --publish   # once, with both zips in build/
-#
+#   --tag       tag the commit and push it. ci builds and publishes all three
 #   --dry-run   build and sign, no notarization and no publishing
 #   --stage     build, sign, notarize and zip. no tag, no release
 #   --publish   tag and publish the zips already in build/
@@ -35,12 +27,32 @@ case "${1:-}" in
   --dry-run) DRY_RUN=1 ;;
   --stage)   MODE=stage ;;
   --publish) MODE=publish ;;
+  --tag)     MODE=tag ;;
   '')        ;;
   *)         echo "release: unknown option $1" >&2; exit 1 ;;
 esac
 
 die() { echo "release: $*" >&2; exit 1; }
 step() { echo; echo "==> $*"; }
+
+if [[ "$MODE" == "tag" ]]; then
+  [[ -z "$(git status --porcelain)" ]] || die "working tree is dirty"
+  VERSION="$(bun --print 'require("./package.json").version')"
+  TAG="v${VERSION}"
+  git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && die "tag ${TAG} already exists"
+  BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  [[ -z "$(git log "origin/${BRANCH}..HEAD" --oneline 2>/dev/null)" ]] \
+    || die "push ${BRANCH} first — ci builds the tag, not your disk"
+
+  step "tagging ${TAG}"
+  git tag -a "$TAG" -m "$TAG"
+  git push origin "$TAG"
+
+  echo
+  echo "ci is building the release. watch it with:"
+  echo "  gh run watch --workflow=release.yml"
+  exit 0
+fi
 
 [[ "$(uname)" == "Darwin" ]] || die "macOS only"
 [[ "$MODE" == "stage" ]] || command -v gh >/dev/null || die "gh is not installed"
@@ -181,7 +193,8 @@ shasum -a 256 "${ZIPS[@]}"
 }
 
 case "$MODE" in
+  tag)     ;;
   stage)   stage ;;
   publish) publish ;;
-  full)    stage; publish ;;
+  full)    die "pass --tag. one mac cannot build the arm64 and linux halves of a release" ;;
 esac

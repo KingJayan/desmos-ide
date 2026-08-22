@@ -7,14 +7,22 @@
 
 set -euo pipefail
 
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# in a release tarball the AppImage is next to this script, so the argument is optional
 APPIMAGE="${1:-}"
+if [[ -z "$APPIMAGE" ]]; then
+  APPIMAGE="$(find "$HERE" -maxdepth 1 -name '*.AppImage' | head -1)"
+fi
 [[ -n "$APPIMAGE" ]] || { echo "usage: install.sh <path to the .AppImage>" >&2; exit 1; }
 [[ -f "$APPIMAGE" ]] || { echo "install: no file at ${APPIMAGE}" >&2; exit 1; }
 APPIMAGE="$(cd "$(dirname "$APPIMAGE")" && pwd)/$(basename "$APPIMAGE")"
 chmod +x "$APPIMAGE"
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
 DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+
+ICON="${HERE}/dsmx.svg"
+[[ -f "$ICON" ]] || ICON="${HERE}/../../docs/static/favicon-scalable.svg"
 
 for lib in libgtk-3.so.0 libwebkit2gtk-4.1.so.0; do
   ldconfig -p 2>/dev/null | grep -q "$lib" \
@@ -25,7 +33,7 @@ mkdir -p "${DATA}/applications" "${DATA}/mime/packages" "${DATA}/icons/hicolor/s
 
 sed "s|@EXEC@|${APPIMAGE}|" "${HERE}/dsmx.desktop" > "${DATA}/applications/dsmx.desktop"
 cp "${HERE}/dsmx.xml" "${DATA}/mime/packages/dsmx.xml"
-cp "${HERE}/../../docs/static/favicon-scalable.svg" "${DATA}/icons/hicolor/scalable/apps/dsmx.svg"
+cp "$ICON" "${DATA}/icons/hicolor/scalable/apps/dsmx.svg"
 
 update-mime-database "${DATA}/mime" 2>/dev/null || true
 update-desktop-database "${DATA}/applications" 2>/dev/null || true

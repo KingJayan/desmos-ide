@@ -83,7 +83,7 @@ api keys go to the system keyring through `secret-tool` (`libsecret-tools`). wit
 
 ⌘ is Ctrl on linux. the window wears its native decoration, and the menu bar is the command palette (Ctrl+Shift+P), which carries every menu action.
 
-## syntax
+## dsl syntax
 
 see the [examples](example/), or the [full tour](example/demo.dsmx)
 
@@ -99,13 +99,12 @@ bun run build  # prod build → build/<channel>-<platform>/
 bun test       # compiler + editor tests
 bun test:e2e   # webkit over built app
 bun demo       # run compiler in the terminal w/o app shell
-bun dsmx       # the cli, straight from source
+bun dsmx       # run the cli from source
 bun pack:cli   # bundle + tarball the cli for a release
 ```
 
 ## troubleshooting/bugs [see here](https://github.com/KingJayan/desmos-ide/issues/9)
 
-##
 <div align="center">
 <p>made with :) by jayan</p>
 <p>licensed under Apache 2.0</p>

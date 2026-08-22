@@ -1,0 +1,108 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mac:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: bash scripts/release.sh --stage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.os }}
+          path: build/*.zip
+          retention-days: 7
+
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Install the desktop libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-0 \
+            libwebkit2gtk-4.1-0 \
+            libayatana-appindicator3-1 \
+            librsvg2-2
+
+      - run: |
+          bun run build:view
+          bunx electrobun build --env=stable
+          bun run pack:linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-linux
+          path: build/*-linux-*.tar.gz
+          retention-days: 7
+
+  publish:
+    needs: [mac, linux]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - id: version
+        name: the tag and package.json must agree
+        run: |
+          version="$(bun --print 'require("./package.json").version')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "the tag is ${GITHUB_REF_NAME}, but package.json says ${version}" >&2
+            exit 1
+          fi
+          echo "value=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: app-*
+          merge-multiple: true
+          path: build
+
+      - run: bun run pack:cli
+
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la build
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
+            || echo "the release is already there"
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            build/*-${{ steps.version.outputs.value }}-*.zip \
+            build/*-linux-*.tar.gz \
+            "build/dsmx-${{ steps.version.outputs.value }}.tar.gz"
+
+  tap:
+    needs: publish
+    uses: ./.github/workflows/formula.yml
+    secrets: inherit
+    with:
+      version: ${{ needs.publish.outputs.version }}
