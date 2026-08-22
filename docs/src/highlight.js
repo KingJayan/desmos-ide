@@ -1,6 +1,7 @@
 // syntax highlighting for the snippets on this page
 
-import { LANGUAGE_ID, languageConfig, monarchTokens, themeRules, themeColors } from '../../src/monaco/language';
+import { LANGUAGE_ID, languageConfig, monarchTokens } from '../../src/monaco/language';
+import { monacoTheme } from '../../renderer/themes';
 
 const CACHE_KEY = 'docs-snippets-v1';
 
@@ -36,12 +37,8 @@ async function colorizeAll(blocks) {
   monaco.languages.register({ id: LANGUAGE_ID });
   monaco.languages.setLanguageConfiguration(LANGUAGE_ID, languageConfig);
   monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, monarchTokens);
-  monaco.editor.defineTheme('desmos-docs', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: themeRules,
-    colors: themeColors,
-  });
+  const theme = monacoTheme('catppuccin-mocha');
+  monaco.editor.defineTheme('desmos-docs', theme);
   monaco.editor.setTheme('desmos-docs');
 
   const cache = {};
