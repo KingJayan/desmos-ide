@@ -44,8 +44,6 @@ jobs:
 
       - run: bunx vite build
 
-      # the view is the same on every platform, so it is built once and the smoke
-      # runs download it
       - uses: actions/upload-artifact@v4
         with:
           name: view
@@ -92,8 +90,6 @@ jobs:
 
     strategy:
       fail-fast: false
-      # a pull request is answered by the linux run alone. a mac minute is billed
-      # as ten, so the macs wait for the merge
       matrix:
         os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-22.04", "macos-15", "macos-13"]' || '["ubuntu-22.04"]') }}
 
@@ -168,4 +164,4 @@ jobs:
 
       - run: |
           bunx electrobun build
-          ls -la build/stable-linux-x64
+          find build -maxdepth 2 -print
