@@ -218,7 +218,7 @@ export class AISidebar {
     void this.secrets.load().then(() => {
       keyNote.textContent = this.secrets.secure
         ? 'The key is kept in the system keychain, not in the app.'
-        : 'No keychain answered, so the key stays in this app\u2019s local storage.';
+        : 'No keychain answered, so the key stays unencrypted in this app\u2019s local storage.';
     });
     this.cfgCopilotEl = this.el.querySelector('.ai-config-copilot')!;
     this.scrollFabEl  = this.el.querySelector('.ai-scroll-fab')!;

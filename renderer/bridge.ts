@@ -1,5 +1,5 @@
 import Electrobun, { Electroview } from 'electrobun/view';
-import type { AIConfig, AIMessage, ConfigFile, DesmosIdeRPC } from '../src/shared/rpc-schema';
+import type { AIConfig, AIMessage, ConfigFile, DesmosIdeRPC, PlatformInfo } from '../src/shared/rpc-schema';
 
 type Listener<T extends unknown[]> = (...args: T) => void;
 
@@ -134,6 +134,7 @@ export const electronAPI = {
   searchFolder: (root: string, query: string, useRegex = false) =>
     rpc.request.searchFolder({ root, query, useRegex }),
   pickFolder: () => rpc.request.pickFolder().catch(() => null),
+  platform: (): Promise<PlatformInfo | null> => rpc.request.platform().catch(() => null),
   secretsAvailable: () => rpc.request.secretsAvailable().catch(() => false),
   secretGet: (account: string) => rpc.request.secretGet({ account }).catch(() => null),
   secretSet: (account: string, value: string) =>

@@ -19,7 +19,8 @@ export default {
       'dist/assets': 'views/mainview/assets',
       'dist/vendor': 'views/mainview/vendor',
       'dist/fonts': 'views/mainview/fonts',
-      'dist/native': 'bun/native',
+
+      ...(process.platform === 'darwin' ? { 'dist/native': 'bun/native' } : {}),
     },
     watchIgnore: ['dist/**'],
     mac: { bundleCEF: false },

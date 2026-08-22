@@ -1,11 +1,11 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'fs/promises';
-import { homedir } from 'os';
 import { join } from 'path';
+import { storePath } from './store';
 import { iconIsImage, imageType, parseManifest, parseRegistry, pluginFiles } from '../src/plugin/manifest';
 import type { InstalledPlugin, PluginManifest, RegistryIndex } from '../src/plugin/manifest';
 
-const ROOT = join(homedir(), '.dsmx', 'plugins');
-const STATE = join(ROOT, 'state.json');
+const root = (): string => storePath('plugins');
+const stateFile = (): string => storePath('plugins', 'state.json');
 
 const REGISTRY_INDEX = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main/index.json';
 const REGISTRY_RAW = 'https://raw.githubusercontent.com/KingJayan/dsmx-registry/main';
@@ -16,7 +16,7 @@ export type PluginResult<T> = ({ ok: true } & T) | { ok: false; message: string 
 
 async function readState(): Promise<Record<string, boolean>> {
   try {
-    const raw = JSON.parse(await readFile(STATE, 'utf-8')) as unknown;
+    const raw = JSON.parse(await readFile(stateFile(), 'utf-8')) as unknown;
     if (!raw || typeof raw !== 'object') return {};
     const out: Record<string, boolean> = {};
     for (const [id, on] of Object.entries(raw as Record<string, unknown>)) {
@@ -29,8 +29,8 @@ async function readState(): Promise<Record<string, boolean>> {
 }
 
 async function writeState(state: Record<string, boolean>): Promise<void> {
-  await mkdir(ROOT, { recursive: true });
-  await writeFile(STATE, JSON.stringify(state, null, 2), 'utf-8');
+  await mkdir(root(), { recursive: true });
+  await writeFile(stateFile(), JSON.stringify(state, null, 2), 'utf-8');
 }
 
 async function readIfPresent(dir: string, name: string | undefined): Promise<string | null> {
@@ -44,7 +44,7 @@ async function readIfPresent(dir: string, name: string | undefined): Promise<str
 }
 
 async function readPlugin(id: string, enabled: boolean): Promise<InstalledPlugin | null> {
-  const dir = join(ROOT, id);
+  const dir = join(root(), id);
   const raw = await readIfPresent(dir, 'plugin.json');
   if (!raw) return null;
 
@@ -67,7 +67,7 @@ export async function listPlugins(): Promise<InstalledPlugin[]> {
   const state = await readState();
   let entries: string[];
   try {
-    entries = (await readdir(ROOT, { withFileTypes: true }))
+    entries = (await readdir(root(), { withFileTypes: true }))
       .filter(e => e.isDirectory())
       .map(e => e.name);
   } catch {
@@ -95,7 +95,7 @@ export async function uninstallPlugin(id: string): Promise<PluginResult<object>>
   const manifest = await readPlugin(id, true);
   if (!manifest) return { ok: false, message: `'${id}' is not installed` };
   try {
-    await rm(join(ROOT, id), { recursive: true, force: true });
+    await rm(join(root(), id), { recursive: true, force: true });
     const state = await readState();
     delete state[id];
     await writeState(state);
@@ -149,7 +149,7 @@ export async function installPlugin(id: string): Promise<PluginResult<{ plugin: 
     return { ok: false, message: `'${id}' names ${manifest.main} but does not ship it` };
   }
 
-  const dir = join(ROOT, id);
+  const dir = join(root(), id);
   try {
     await rm(dir, { recursive: true, force: true });
     await mkdir(dir, { recursive: true });
@@ -198,7 +198,7 @@ export async function pluginIcon(id: string): Promise<string | null> {
 
   if (local) {
     try {
-      const bytes = await readFile(join(ROOT, id, manifest.icon!));
+      const bytes = await readFile(join(root(), id, manifest.icon!));
       return bytes.length > MAX_ICON ? null : dataUri(type, bytes);
     } catch {
       return null;

@@ -1,10 +1,9 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { realpathSync } from 'fs';
-import { homedir } from 'os';
 import { basename, dirname, join, resolve, sep } from 'path';
+import { storePath } from './store';
 
-const STORE = process.env.DSMX_HOME || join(homedir(), '.dsmx');
-const LIST = join(STORE, 'allowed.json');
+
 const MAX_FILES = 400;
 const MAX_ROOTS = 20;
 
@@ -13,8 +12,6 @@ const roots = new Set<string>();
 let loaded = false;
 let writing: Promise<void> | null = null;
 
-// fs follows symlinks, so a path is only comparable to a root after the links are resolved.
-// a file that does not exist yet still has its parents resolved, which is what a save needs.
 function real(path: string): string {
   try {
     return realpathSync.native(path);
@@ -43,8 +40,8 @@ async function persist(): Promise<void> {
   const body = JSON.stringify({ files: [...files], roots: [...roots] });
   writing = (async () => {
     try {
-      await mkdir(STORE, { recursive: true });
-      await writeFile(LIST, body, { encoding: 'utf-8', mode: 0o600 });
+      await mkdir(storePath(), { recursive: true });
+      await writeFile(storePath('allowed.json'), body, { encoding: 'utf-8', mode: 0o600 });
     } catch {
     }
   })();
@@ -55,7 +52,7 @@ export async function loadAllowed(): Promise<void> {
   if (loaded) return;
   loaded = true;
   try {
-    const raw: unknown = JSON.parse(await readFile(LIST, 'utf-8'));
+    const raw: unknown = JSON.parse(await readFile(storePath('allowed.json'), 'utf-8'));
     const held = raw as { files?: unknown; roots?: unknown };
     for (const path of Array.isArray(held.files) ? held.files : []) {
       const full = clean(path);

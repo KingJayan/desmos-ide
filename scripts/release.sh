@@ -15,20 +15,35 @@
 # stops the electrobun launcher before it spawns bun. an ad-hoc signature does
 # not satisfy Gatekeeper anyway, so the cask strips the quarantine flag.
 #
-# pass --dry-run to build and sign without notarizing or publishing.
+# a zip carries the arch of the machine that built it, so a two-arch release is
+# made on two Macs:
+#
+#   scripts/release.sh --stage     # on the Apple Silicon Mac, then on the Intel one
+#   scripts/release.sh --publish   # once, with both zips in build/
+#
+#   --dry-run   build and sign, no notarization and no publishing
+#   --stage     build, sign, notarize and zip. no tag, no release
+#   --publish   tag and publish the zips already in build/
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 DRY_RUN=0
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
+MODE=full
+case "${1:-}" in
+  --dry-run) DRY_RUN=1 ;;
+  --stage)   MODE=stage ;;
+  --publish) MODE=publish ;;
+  '')        ;;
+  *)         echo "release: unknown option $1" >&2; exit 1 ;;
+esac
 
 die() { echo "release: $*" >&2; exit 1; }
 step() { echo; echo "==> $*"; }
 
 [[ "$(uname)" == "Darwin" ]] || die "macOS only"
-command -v gh >/dev/null || die "gh is not installed"
+[[ "$MODE" == "stage" ]] || command -v gh >/dev/null || die "gh is not installed"
 ADHOC=0
 if [[ -z "${SIGN_IDENTITY:-}" ]]; then
   ADHOC=1
@@ -41,8 +56,11 @@ fi
 
 VERSION="$(bun --print 'require("./package.json").version')"
 TAG="v${VERSION}"
-git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && die "tag ${TAG} already exists"
+if [[ "$MODE" != "stage" ]]; then
+  git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && die "tag ${TAG} already exists"
+fi
 
+stage() {
 step "building ${TAG}"
 rm -rf build/stable-*
 bun run build:release
@@ -136,16 +154,34 @@ if [[ $ADHOC -eq 0 ]]; then
   ditto -c -k --keepParent "$APP" "$ZIP"
 fi
 
+echo
+shasum -a 256 "$ZIP"
+}
+
+publish() {
 step "packing the cli"
 bun run scripts/build-cli.ts
 CLI_TGZ="build/dsmx-${VERSION}.tar.gz"
 rm -f "$CLI_TGZ"
 bun run scripts/pack-cli.ts
 
+ZIPS=()
+while IFS= read -r found; do ZIPS+=("$found"); done \
+  < <(find build -maxdepth 1 -name "*-${VERSION}-*.zip" | sort)
+[[ ${#ZIPS[@]} -gt 0 ]] || die "no app zip for ${VERSION} in build/ — run --stage first"
+echo "publishing: ${ZIPS[*]}"
+
 step "publishing ${TAG}"
 git tag -a "$TAG" -m "$TAG"
 git push origin "$TAG"
-gh release create "$TAG" "$ZIP" "$CLI_TGZ" --title "$TAG" --generate-notes
+gh release create "$TAG" "${ZIPS[@]}" "$CLI_TGZ" --title "$TAG" --generate-notes
 
 echo
-shasum -a 256 "$ZIP"
+shasum -a 256 "${ZIPS[@]}"
+}
+
+case "$MODE" in
+  stage)   stage ;;
+  publish) publish ;;
+  full)    stage; publish ;;
+esac

@@ -6,9 +6,6 @@ import { existsSync } from 'fs';
 
 const execFileAsync = promisify(execFile);
 
-/**
- * scripts/build-native.ts compiles these before the bundle
- */
 function nativeBinary(name: string): string {
   const binary = join(__dirname, 'native', name);
   if (!existsSync(binary)) {
@@ -58,19 +55,16 @@ export async function showSaveDialog(opts: SaveDialogOptions): Promise<string | 
   }
 }
 
-// use nsalert cuz browser confirm() doesnt look native in a webview
-// throws on non-darwin so the caller can fall back to window.confirm
 export async function showConfirm(message: string): Promise<boolean> {
-  if (process.platform !== 'darwin') throw new Error('native confirm is macOS-only');
-
-  const binary = nativeBinary('confirm');
-  try {
-    await execFileAsync(binary, [message], { maxBuffer: 64 * 1024 });
-    return true;
-  } catch (err) {
-    if ((err as { code?: number }).code === 1) return false;
-    throw err;
-  }
+  const { response } = await Utils.showMessageBox({
+    type: 'question',
+    title: 'desmos-ide',
+    message,
+    buttons: ['OK', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  return response === 0;
 }
 
 export async function showPrompt(message: string, defaultValue: string): Promise<string | null> {

@@ -30,10 +30,13 @@ await mkdir(OUT_DIR, { recursive: true });
 
 // if compile if unchanged
 const { stdout: swiftVersion } = await execFileAsync('swiftc', ['--version']);
-const TARGET_ARCH = process.arch === 'arm64' ? 'arm64' : 'x86_64';
+
+// the helpers are universal, so one machine builds what either arch release needs
+const ARCHES = ['arm64', 'x86_64'];
+const DEPLOYMENT = '14.0';
 
 const hashOf = (parts: string[]): string => {
-  const h = createHash('sha256').update(swiftVersion).update(TARGET_ARCH);
+  const h = createHash('sha256').update(swiftVersion).update(ARCHES.join()).update(DEPLOYMENT);
   for (const p of parts) h.update(p);
   return h.digest('hex');
 };
@@ -41,6 +44,17 @@ const hashOf = (parts: string[]): string => {
 const upToDate = async (stamp: string, hash: string, outputs: string[]): Promise<boolean> => {
   if (!outputs.every(o => existsSync(o))) return false;
   return (await readFile(stamp, 'utf8').catch(() => '')) === hash;
+};
+
+const universal = async (args: string[], out: string): Promise<void> => {
+  const slices: string[] = [];
+  for (const arch of ARCHES) {
+    const slice = `${out}.${arch}`;
+    await execFileAsync('swiftc', ['-target', `${arch}-apple-macos${DEPLOYMENT}`, ...args, '-o', slice]);
+    slices.push(slice);
+  }
+  await execFileAsync('lipo', ['-create', ...slices, '-output', out]);
+  await Promise.all(slices.map(s => rm(s, { force: true })));
 };
 
 // dialog helpers
@@ -65,7 +79,7 @@ for (const file of sources) {
     continue;
   }
 
-  await execFileAsync('swiftc', ['-O', join(SOURCE_DIR, file), '-o', out]);
+  await universal(['-O', join(SOURCE_DIR, file)], out);
   await writeFile(stamp, hash);
   console.log(`build-native: ${name}`);
 }
@@ -106,17 +120,15 @@ if (await upToDate(qlStamp, qlHash, [qlBinary, qlPlist])) {
   await rm(APPEX, { recursive: true, force: true });
   await mkdir(join(APPEX, 'Contents', 'MacOS'), { recursive: true });
 
-  await execFileAsync('swiftc', [
+  await universal([
     '-O',
     '-parse-as-library',
     '-module-name', 'DsmxQuickLook',
-    '-target', `${TARGET_ARCH}-apple-macos12.0`,
     '-framework', 'QuickLookUI',
     '-Xlinker', '-e', '-Xlinker', '_NSExtensionMain',
     ...qlSources,
     join(GEN_DIR, 'Tables.swift'),
-    '-o', qlBinary,
-  ]);
+  ], qlBinary);
 
   await writeFile(qlPlist, plistTemplate.replaceAll('__VERSION__', pkg.version));
   await writeFile(qlStamp, qlHash);

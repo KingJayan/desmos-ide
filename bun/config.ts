@@ -1,12 +1,9 @@
 import { watch } from 'fs';
 import type { FSWatcher } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
-import { homedir } from 'os';
-import { join } from 'path';
-
 import type { ConfigFile } from '../src/shared/rpc-schema';
+import { storePath } from './store';
 
-const STORE = process.env.DSMX_HOME || join(homedir(), '.dsmx');
 const SEED: Record<ConfigFile, string> = { settings: '{}\n', keybinds: '[]\n' };
 const MAX_BYTES = 256 * 1024;
 
@@ -14,7 +11,7 @@ const selfWrites = new Map<ConfigFile, string>();
 const watchers = new Map<ConfigFile, { watcher: FSWatcher; debounce: ReturnType<typeof setTimeout> | null }>();
 
 export function configPath(file: ConfigFile): string {
-  return join(STORE, `${file}.json`);
+  return storePath(`${file}.json`);
 }
 
 export async function readConfig(file: ConfigFile): Promise<{ path: string; content: string }> {
@@ -30,7 +27,7 @@ export async function readConfig(file: ConfigFile): Promise<{ path: string; cont
 export async function writeConfig(file: ConfigFile, content: string): Promise<boolean> {
   if (typeof content !== 'string' || content.length > MAX_BYTES) return false;
   try {
-    await mkdir(STORE, { recursive: true });
+    await mkdir(storePath(), { recursive: true });
     selfWrites.set(file, content);
     await writeFile(configPath(file), content, { encoding: 'utf-8', mode: 0o600 });
     return true;
@@ -73,7 +70,7 @@ export function unwatchConfig(): void {
 }
 
 export async function ensureConfig(): Promise<void> {
-  await mkdir(STORE, { recursive: true }).catch(() => {});
+  await mkdir(storePath(), { recursive: true }).catch(() => {});
   for (const file of ['settings', 'keybinds'] as const) {
     try {
       await readFile(configPath(file), 'utf-8');

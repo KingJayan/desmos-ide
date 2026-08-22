@@ -31,6 +31,7 @@ import type { ColorTheme, EditorSettings, UiScale } from './settings';
 import type { AISidebar } from './ai-sidebar';
 import type { ConfigEditor } from './config-editor';
 import { Keymap, chordOf, keybindsToJson, parseKeybinds, DEFAULT_KEYBINDS } from './keybinds';
+import { initPlatform, refreshPlatform } from './platform';
 import { Onboarding } from './onboarding';
 import { compileStatus, errorsByPhase } from './compile-status';
 import { CommandPalette } from './command-palette';
@@ -165,6 +166,8 @@ region upper = y > osc(x, 2) as { color purple opacity 0.15 }
 
 text lbl = "hello, desmos" at (0, 1.5)
 `;
+
+initPlatform();
 
 const initSettings = loadSettings();
 const workspaceState = new WorkspaceState({ onRecents: () => syncRecent() });
@@ -2086,6 +2089,16 @@ function refreshPaletteCommands(): void {
   palette.register(commands);
   commandIndex.clear();
   for (const command of commands) commandIndex.set(command.id, command);
+  syncTooltips();
+}
+
+function syncTooltips(): void {
+  for (const el of document.querySelectorAll<HTMLElement>('[data-chord]')) {
+    const id = el.dataset['chord'] ?? '';
+    el.dataset['tip'] ??= el.title;
+    const label = keymap.labelFor(id);
+    el.title = label ? `${el.dataset['tip']}  ${label}` : el.dataset['tip'];
+  }
 }
 
 syncRecent();
@@ -2134,6 +2147,10 @@ editor.focus();
 window.electronAPI?.onConfigChanged((file, content) => {
   applyConfig(file, content);
   configEditor?.reload(file, content);
+});
+
+void refreshPlatform().then(changed => {
+  if (changed) refreshPaletteCommands();
 });
 
 void loadConfigFiles().then(() => {

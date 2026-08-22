@@ -26,7 +26,7 @@
       </div>
 
       <div class="tb-group tb-group--center">
-        <button id="search-widget" class="tb-search" type="button" title="run a command  ⌘⇧P">
+        <button id="search-widget" class="tb-search" type="button" title="run a command" data-chord="palette.toggle">
           <i data-lucide="search" aria-hidden="true"></i>
           <span id="filename">untitled.dsmx</span>
           <span id="saved-dot" class="hidden" aria-hidden="true"></span>
@@ -40,9 +40,9 @@
           <button id="btn-enhanced" class="mode-btn" title="Edit the expressions the way Desmos does. Edits are written back into the DSL file when they have a DSL form.">enhanced</button>
         </div>
         <div class="tb-actions">
-          <button id="btn-new"  class="tb-icon" title="new file  ⌘N" aria-label="new file"><i data-lucide="file-plus" aria-hidden="true"></i></button>
-          <button id="btn-open" class="tb-icon" title="open file  ⌘O" aria-label="open file"><i data-lucide="folder-open" aria-hidden="true"></i></button>
-          <button id="btn-save" class="tb-icon" title="save  ⌘S" aria-label="save"><i data-lucide="save" aria-hidden="true"></i></button>
+          <button id="btn-new"  class="tb-icon" title="new file" data-chord="file.new" aria-label="new file"><i data-lucide="file-plus" aria-hidden="true"></i></button>
+          <button id="btn-open" class="tb-icon" title="open file" data-chord="file.open" aria-label="open file"><i data-lucide="folder-open" aria-hidden="true"></i></button>
+          <button id="btn-save" class="tb-icon" title="save" data-chord="file.save" aria-label="save"><i data-lucide="save" aria-hidden="true"></i></button>
         </div>
       </div>
     </header>
@@ -50,33 +50,33 @@
     <div id="canvas">
       <aside id="rail-left" class="rail" aria-label="left tool windows">
         <div class="rail-group">
-          <button id="btn-sidebar-git" class="rail-btn" title="commit  ⌘1" aria-label="commit">
+          <button id="btn-sidebar-git" class="rail-btn" title="commit" data-chord="sidebar.git" aria-label="commit">
             <i data-lucide="git-branch" aria-hidden="true"></i>
           </button>
-          <button id="btn-sidebar-outline" class="rail-btn" title="structure  ⌘2" aria-label="structure">
+          <button id="btn-sidebar-outline" class="rail-btn" title="structure" data-chord="sidebar.outline" aria-label="structure">
             <i data-lucide="list-tree" aria-hidden="true"></i>
           </button>
-          <button id="btn-sidebar-plugins" class="rail-btn" title="plugins  ⌘7" aria-label="plugins">
+          <button id="btn-sidebar-plugins" class="rail-btn" title="plugins" data-chord="sidebar.plugins" aria-label="plugins">
             <i data-lucide="puzzle" aria-hidden="true"></i>
           </button>
         </div>
         <span class="rail-rule"></span>
         <div class="rail-group">
-          <button id="btn-tool-problems" class="rail-btn" title="problems  ⌘3" aria-label="problems">
+          <button id="btn-tool-problems" class="rail-btn" title="problems" data-chord="tool.problems" aria-label="problems">
             <i data-lucide="circle-alert" aria-hidden="true"></i>
             <span id="problems-badge" class="rail-badge hidden">0</span>
           </button>
-          <button id="btn-tool-timeline" class="rail-btn" title="timeline  ⌘4" aria-label="timeline">
+          <button id="btn-tool-timeline" class="rail-btn" title="timeline" data-chord="tool.timeline" aria-label="timeline">
             <i data-lucide="history" aria-hidden="true"></i>
           </button>
-          <button id="btn-tool-optimizer" class="rail-btn" title="optimizer  ⌘6" aria-label="optimizer">
+          <button id="btn-tool-optimizer" class="rail-btn" title="optimizer" data-chord="tool.optimizer" aria-label="optimizer">
             <i data-lucide="zap" aria-hidden="true"></i>
             <span id="optimizer-badge" class="rail-badge hidden">0</span>
           </button>
         </div>
         <span class="rail-spacer"></span>
         <div class="rail-group">
-          <button id="btn-sidebar-settings" class="rail-btn" title="settings  ⌘," aria-label="settings">
+          <button id="btn-sidebar-settings" class="rail-btn" title="settings" data-chord="preferences.open" aria-label="settings">
             <i data-lucide="settings" aria-hidden="true"></i>
           </button>
         </div>
@@ -286,7 +286,7 @@
 
       <aside id="rail-right" class="rail" aria-label="right tool windows">
         <div class="rail-group">
-          <button id="btn-sidebar-ai" class="rail-btn" title="ai assistant  ⌘5" aria-label="ai assistant">
+          <button id="btn-sidebar-ai" class="rail-btn" title="ai assistant" data-chord="sidebar.ai" aria-label="ai assistant">
             <i data-lucide="bot" aria-hidden="true"></i>
           </button>
         </div>

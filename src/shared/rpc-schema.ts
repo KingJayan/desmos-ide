@@ -65,6 +65,10 @@ export type CopilotModelsResult =
 
 export type ConfigFile = 'settings' | 'keybinds';
 
+export type OS = 'macos' | 'linux' | 'win';
+export type Arch = 'arm64' | 'x64';
+export type PlatformInfo = { os: OS; arch: Arch };
+
 export type PluginActionResult =
   | { ok: true }
   | { ok: false; message: string };
@@ -84,6 +88,8 @@ export type DesmosIdeRPC = {
       searchFiles: { params: { paths: string[]; query: string; useRegex: boolean }; response: SearchResult };
       searchFolder: { params: { root: string; query: string; useRegex: boolean }; response: SearchResult };
       pickFolder: { params: void; response: string | null };
+
+      platform: { params: void; response: PlatformInfo };
 
       secretsAvailable: { params: void; response: boolean };
       secretGet: { params: { account: string }; response: string | null };

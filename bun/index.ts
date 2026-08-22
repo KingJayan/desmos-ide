@@ -1,6 +1,7 @@
 import Electrobun, { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/bun';
 import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
+import { platformOf } from '../src/shared/platform';
 import { exportImage, exportJson, exportTex, openFile, openJsonFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
 import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
 import { fetchRegistry, installPlugin, listPlugins, pluginIcon, pluginReadme, setPluginEnabled, uninstallPlugin } from './plugins';
@@ -10,7 +11,7 @@ import {
 import { allowRoot, loadAllowed } from './paths';
 import { ensureConfig, readConfig, watchConfig, writeConfig } from './config';
 import { searchFolder, searchPaths } from './search';
-import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
+import { deleteSecret, getSecret, probeSecrets, secretsAvailable, setSecret } from './secrets';
 import {
   getGitBranches, getGitHistory, getGitRemotes, getGitStatus,
   gitCheckoutBranch, gitCreateBranch, gitFetch, gitPull, gitPush,
@@ -27,8 +28,8 @@ const DEV_SERVER_URL = 'http://localhost:5173';
 
 await loadAllowed();
 await ensureConfig();
+await probeSecrets();
 
-// git push/pull and provider calls far exceed the 1s rpc default
 const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
   maxRequestTime: 60_000,
   handlers: {
@@ -40,6 +41,7 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       exportTex: ({ content, defaultName }) => exportTex(content, defaultName),
       exportImage: ({ data, defaultName, format }) => exportImage(data, defaultName, format),
       pickFolder: async () => allowRoot(await showFolderDialog()),
+      platform: () => platformOf(process.platform, process.arch),
       watchFile: ({ path }) => {
         watchFile(path, (changedPath, content) =>
           rpc.send.fileChanged({ path: changedPath, content }));
@@ -135,15 +137,16 @@ async function resolveViewUrl(): Promise<string> {
   return 'views://mainview/index.html';
 }
 
+const IS_MAC = process.platform === 'darwin';
+
 const win = new BrowserWindow({
   title: 'Desmos IDE',
   url: await resolveViewUrl(),
   frame: { x: 100, y: 100, width: 1440, height: 900 },
-  titleBarStyle: 'hiddenInset',
+  ...(IS_MAC ? { titleBarStyle: 'hiddenInset' as const } : {}),
   rpc,
 });
 
-// the recent list lives in the renderer, so the menu is rebuilt whenever it changes
 let recentPaths: string[] = [];
 
 function setRecentFiles(paths: string[]): void {
@@ -152,8 +155,8 @@ function setRecentFiles(paths: string[]): void {
 }
 
 function buildMenu(): void {
-  ApplicationMenu.setApplicationMenu([
-  {
+  const menu = [
+  ...(IS_MAC ? [{
     label: 'desmos-ide',
     submenu: [
       { role: 'about' },
@@ -161,7 +164,7 @@ function buildMenu(): void {
       { role: 'hide' },
       { role: 'quit' },
     ],
-  },
+  }] : []),
   {
     label: 'File',
     submenu: [
@@ -203,7 +206,13 @@ function buildMenu(): void {
       { role: 'minimize' },
     ],
   },
-  ]);
+  ];
+
+  try {
+    ApplicationMenu.setApplicationMenu(menu as Parameters<typeof ApplicationMenu.setApplicationMenu>[0]);
+  } catch (err) {
+    console.warn('no application menu on this desktop — the command palette carries the same actions', err);
+  }
 }
 
 buildMenu();
@@ -222,7 +231,6 @@ ApplicationMenu.on('application-menu-clicked', (event: unknown) => {
   else if (action?.startsWith('menu:recent:')) rpc.send.menuOpenRecent({ path: action.slice('menu:recent:'.length) });
 });
 
-// the marketplace on the website opens a plugin in the app with dsmx://plugin/<id>
 Electrobun.events.on('open-url', (event: unknown) => {
   const url = (event as { data?: { url?: string } })?.data?.url;
   const id = /^dsmx:\/\/plugin\/([a-z0-9-]{2,40})\/?$/i.exec(url ?? '')?.[1];

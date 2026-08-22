@@ -131,6 +131,7 @@ await page.addInitScript(() => {
     pluginSecret: () => Promise.resolve(null),
     pluginSecretStore: () => Promise.resolve(true),
     pluginSecretDelete: () => Promise.resolve(true),
+    platform: () => Promise.resolve({ os: 'macos', arch: 'arm64' }),
   };
 
   // anything the stub does not answer behaves the way a missing bridge does, so the

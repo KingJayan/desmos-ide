@@ -56,7 +56,8 @@ html, body {
 .tb-group--center { flex: 1; justify-content: center; min-width: 0; }
 .tb-group--right  { flex: 0 0 auto; gap: 8px; }
 
-.tb-traffic { width: 68px; -webkit-app-region: drag; }
+.tb-traffic { width: 0; -webkit-app-region: drag; }
+:root[data-os="macos"] .tb-traffic { width: 68px; }
 
 .tb-widget {
   display: flex;

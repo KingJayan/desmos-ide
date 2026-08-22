@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=desmos-ide
+GenericName=Desmos IDE
+Comment=an ide for Desmos with a custom dsl
+Exec=@EXEC@ %f
+Icon=dsmx
+Terminal=false
+Categories=Development;IDE;Education;Math;
+MimeType=application/x-dsmx;x-scheme-handler/dsmx;
+StartupWMClass=desmos-ide

@@ -11,71 +11,161 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    runs-on: macos-15
-    timeout-minutes: 20
-
+  types:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: bun run check
 
-      - uses: oven-sh/setup-bun@v2
+  lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: bun run lint
+
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: bun test src/tests/
+
+  view:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: bunx vite build
+
+      # the view is the same on every platform, so it is built once and the smoke
+      # runs download it
+      - uses: actions/upload-artifact@v4
         with:
-          bun-version: 1.3.14
+          name: view
+          path: dist
+          retention-days: 1
 
-      - run: bun install --frozen-lockfile
+  cli:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
 
-      - name: types
-        run: bun run check
-
-      - name: lint
-        run: bun run lint
-
-      - name: tests
-        run: bun test src/tests/
-
-      - name: view bundle
-        run: bunx vite build
-
-      - name: cli bundle
-        run: |
-          bun run scripts/build-cli.ts
+      - run: |
+          bun run build:cli
           node dist/cli/dsmx.mjs --version
           node dist/cli/dsmx.mjs build example/orbit.dsmx -o /dev/null
 
-      - name: vscode extension
+  grammar:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: the generated extension matches the compiler tables
         run: |
           bun run build:grammar
           git diff --exit-code editors/vscode
-          bun run pack:vsix
 
-      - uses: actions/upload-artifact@v4
+      - if: github.event_name == 'push'
+        run: bun run pack:vsix
+
+      - if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
         with:
           name: desmos-dsl-vsix
           path: build/*.vsix
 
-      - name: Cache native helpers
+  smoke:
+    needs: view
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      # a pull request is answered by the linux run alone. a mac minute is billed
+      # as ten, so the macs wait for the merge
+      matrix:
+        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-22.04", "macos-15", "macos-13"]' || '["ubuntu-22.04"]') }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: view
+          path: dist
+
+      - id: playwright
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: playwright-webkit-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+
+      - if: steps.playwright.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps webkit
+        timeout-minutes: 8
+
+      - run: bun run e2e/smoke.ts
+        timeout-minutes: 8
+
+  native:
+    if: github.event_name == 'push'
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      # the helpers are universal, so one mac builds what either release needs
+      - id: cache
         uses: actions/cache@v4
         with:
           path: |
             dist/native
             dist/quicklook
-          key: native-${{ runner.os }}-${{ hashFiles('bun/native/**', 'src/compiler/builtins.ts', 'src/compiler/lexer.ts', 'package.json') }}
+          key: native-${{ hashFiles('bun/native/**', 'scripts/build-native.ts') }}
 
-      - name: native helpers
+      - if: steps.cache.outputs.cache-hit != 'true'
         run: bun run build:native
 
-      - name: Cache Playwright
-        id: playwright-cache
-        uses: actions/cache@v4
+      - run: lipo -info dist/native/prompt
+
+  app:
+    if: github.event_name == 'push'
+    needs: view
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Install the desktop libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-0 \
+            libwebkit2gtk-4.1-0 \
+            libayatana-appindicator3-1 \
+            librsvg2-2
+
+      - uses: actions/download-artifact@v4
         with:
-          path: ~/Library/Caches/ms-playwright
-          key: playwright-webkit-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          name: view
+          path: dist
 
-      - name: Install WebKit
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install webkit
-        timeout-minutes: 5
-
-      - name: smoke
-        run: bun run e2e/smoke.ts
-        timeout-minutes: 8
+      - run: |
+          bunx electrobun build
+          ls -la build/stable-linux-x64

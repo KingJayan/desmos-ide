@@ -44,9 +44,14 @@ macOS and Linux, req `node`, loads desmos api over network on the first time
 
 ## desktop app
 
+### macOS
+
 ```bash
 brew install --cask KingJayan/dsmx/dsmx-app
 ```
+
+req macOS 14 (Sonoma) or later, apple silicon or intel.
+
 the cask installs it ready to run — it clears the quarantine flag for you.
 
 the app carries an ad-hoc signature, not an apple developer id one, because i don't have one. so if you download the `.app` from the releases page instead, macOS blocks it on first launch. the source is all here and the release is built by the CI workflow in this repo. to open it, either:
@@ -57,6 +62,26 @@ the app carries an ad-hoc signature, not an apple developer id one, because i do
 ```bash
 xattr -dr com.apple.quarantine /Applications/desmos-ide.app
 ```
+
+### linux
+
+x86_64 only, as an AppImage from the [releases page](https://github.com/KingJayan/desmos-ide/releases). the app does not carry gtk or webkit, so install them first:
+
+```bash
+sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0        # debian/ubuntu
+sudo dnf install gtk3 webkit2gtk4.1                    # fedora
+```
+
+then register the launcher, the `.dsmx` file type and the `dsmx://` links:
+
+```bash
+chmod +x desmos-ide-Setup.AppImage
+packaging/linux/install.sh ./desmos-ide-Setup.AppImage
+```
+
+api keys go to the system keyring through `secret-tool` (`libsecret-tools`). with no keyring the ai panel still works, and says that the key is unencrypted.
+
+⌘ is Ctrl on linux. the window wears its native decoration, and the menu bar is the command palette (Ctrl+Shift+P), which carries every menu action.
 
 ## syntax
 

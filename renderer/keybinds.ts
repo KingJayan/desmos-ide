@@ -1,28 +1,41 @@
+import { isMac } from './platform';
+
 export interface KeybindRule {
   key: string;
   command: string;
 }
 
 const ALIASES: Record<string, string> = {
-  meta: 'cmd',
-  command: 'cmd',
-  mod: 'cmd',
-  control: 'ctrl',
-  option: 'alt',
   esc: 'escape',
   return: 'enter',
   ' ': 'space',
 };
 
-const MOD_ORDER = ['cmd', 'ctrl', 'alt', 'shift'];
-const MOD_SYMBOLS: Record<string, string> = { cmd: '⌘', ctrl: '⌃', alt: '⌥', shift: '⇧' };
+const MAC_MODS: Record<string, string> = {
+  cmd: 'mod', command: 'mod', meta: 'mod', mod: 'mod',
+  ctrl: 'ctrl', control: 'ctrl',
+  alt: 'alt', option: 'alt',
+  shift: 'shift',
+};
+
+const PC_MODS: Record<string, string> = {
+  cmd: 'mod', command: 'mod', meta: 'mod', mod: 'mod',
+  ctrl: 'mod', control: 'mod',
+  alt: 'alt',  option: 'alt',
+  shift: 'shift',
+};
+
+const MOD_ORDER = ['mod', 'ctrl', 'alt', 'shift'];
+const MAC_SYMBOLS: Record<string, string> = { mod: '⌘', ctrl: '⌃', alt: '⌥', shift: '⇧' };
+const PC_SYMBOLS: Record<string, string> = { mod: 'Ctrl+', ctrl: 'Ctrl+', alt: 'Alt+', shift: 'Shift+' };
 const KEY_SYMBOLS: Record<string, string> = {
   escape: 'esc', enter: '↩', space: '␣', arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→',
 };
 
 function normalizePart(part: string): string {
   const lower = part.trim().toLowerCase();
-  return ALIASES[lower] ?? lower;
+  const mods = isMac() ? MAC_MODS : PC_MODS;
+  return mods[lower] ?? ALIASES[lower] ?? lower;
 }
 
 export function normalizeChord(raw: string): string | null {
@@ -38,8 +51,13 @@ export function chordOf(e: KeyboardEvent): string | null {
   const key = normalizePart(e.key);
   if (!key || MOD_ORDER.includes(key)) return null;
   const parts: string[] = [];
-  if (e.metaKey) parts.push('cmd');
-  if (e.ctrlKey) parts.push('ctrl');
+  if (isMac()) {
+    if (e.metaKey) parts.push('mod');
+    if (e.ctrlKey) parts.push('ctrl');
+  } else {
+    if (e.metaKey) return null;
+    if (e.ctrlKey) parts.push('mod');
+  }
   if (e.altKey) parts.push('alt');
   if (e.shiftKey) parts.push('shift');
   parts.push(key);
@@ -49,33 +67,34 @@ export function chordOf(e: KeyboardEvent): string | null {
 export function chordLabel(chord: string): string {
   const parts = chord.split('+');
   const key = parts[parts.length - 1] ?? '';
-  const mods = parts.slice(0, -1).map(m => MOD_SYMBOLS[m] ?? m).join('');
+  const symbols = isMac() ? MAC_SYMBOLS : PC_SYMBOLS;
+  const mods = parts.slice(0, -1).map(m => symbols[m] ?? m).join('');
   const shown = KEY_SYMBOLS[key] ?? (key.length === 1 ? key.toUpperCase() : key);
   return mods + shown;
 }
 
 export const DEFAULT_KEYBINDS: readonly KeybindRule[] = [
-  { key: 'cmd+n', command: 'file.new' },
-  { key: 'cmd+o', command: 'file.open' },
-  { key: 'cmd+s', command: 'file.save' },
-  { key: 'cmd+shift+s', command: 'file.saveas' },
-  { key: 'cmd+shift+t', command: 'file.exporttex' },
-  { key: 'cmd+shift+e', command: 'graph.export-png' },
-  { key: 'cmd+f', command: 'editor.find' },
-  { key: 'cmd+h', command: 'editor.replace' },
-  { key: 'cmd+shift+h', command: 'editor.replace' },
-  { key: 'cmd+alt+r', command: 'editor.find-regex' },
-  { key: 'cmd+shift+f', command: 'file.search' },
-  { key: 'cmd+shift+p', command: 'palette.toggle' },
+  { key: 'mod+n', command: 'file.new' },
+  { key: 'mod+o', command: 'file.open' },
+  { key: 'mod+s', command: 'file.save' },
+  { key: 'mod+shift+s', command: 'file.saveas' },
+  { key: 'mod+shift+t', command: 'file.exporttex' },
+  { key: 'mod+shift+e', command: 'graph.export-png' },
+  { key: 'mod+f', command: 'editor.find' },
+  { key: 'mod+h', command: 'editor.replace' },
+  { key: 'mod+shift+h', command: 'editor.replace' },
+  { key: 'mod+alt+r', command: 'editor.find-regex' },
+  { key: 'mod+shift+f', command: 'file.search' },
+  { key: 'mod+shift+p', command: 'palette.toggle' },
   { key: 'f1', command: 'palette.toggle' },
-  { key: 'cmd+1', command: 'sidebar.git' },
-  { key: 'cmd+2', command: 'sidebar.outline' },
-  { key: 'cmd+3', command: 'tool.problems' },
-  { key: 'cmd+4', command: 'tool.timeline' },
-  { key: 'cmd+5', command: 'sidebar.ai' },
-  { key: 'cmd+6', command: 'tool.optimizer' },
-  { key: 'cmd+7', command: 'sidebar.plugins' },
-  { key: 'cmd+,', command: 'preferences.open' },
+  { key: 'mod+1', command: 'sidebar.git' },
+  { key: 'mod+2', command: 'sidebar.outline' },
+  { key: 'mod+3', command: 'tool.problems' },
+  { key: 'mod+4', command: 'tool.timeline' },
+  { key: 'mod+5', command: 'sidebar.ai' },
+  { key: 'mod+6', command: 'tool.optimizer' },
+  { key: 'mod+7', command: 'sidebar.plugins' },
+  { key: 'mod+,', command: 'preferences.open' },
 ];
 
 export function parseKeybinds(text: string): KeybindRule[] | null {

@@ -1,12 +1,12 @@
 
 import { createHash } from 'crypto';
 import { chmod, mkdir, readFile, writeFile } from 'fs/promises';
-import { homedir } from 'os';
 import { join } from 'path';
+import { storePath } from './store';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import type { PluginState } from '../src/plugin/manifest';
 
-const ROOT = join(homedir(), '.dsmx', 'plugins', 'storage');
+const root = (): string => storePath('plugins', 'storage');
 
 const ID = /^[a-z][a-z0-9-]{1,38}[a-z0-9]$/;
 const KEY = /^[\w.-]{1,64}$/;
@@ -27,7 +27,7 @@ function workspaceTag(workspace: string | null): string | null {
 }
 
 function pluginDir(id: string): string {
-  return join(ROOT, id);
+  return join(root(), id);
 }
 
 async function readJson(path: string): Promise<Record<string, unknown> | null> {
