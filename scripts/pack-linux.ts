@@ -25,8 +25,10 @@ const find = async (dir: string, depth: number, match: (name: string) => boolean
   return null;
 };
 
-const setupTarball = await find('build', 3, name => name.endsWith('-Setup.tar.gz'));
-if (!setupTarball) die('no *-Setup.tar.gz under build/ — did electrobun build --env=stable run?');
+const setupTarball =
+  (await find('artifacts', 2, name => name.endsWith('-Setup.tar.gz'))) ??
+  (await find('build', 3, name => name.endsWith('-Setup.tar.gz')));
+if (!setupTarball) die('no *-Setup.tar.gz under artifacts/ or build/ — did electrobun build --env=stable run?');
 
 const name = `desmos-ide-${pkg.version}-linux-x86_64`;
 const stage = join('build', name);
