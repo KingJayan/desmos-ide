@@ -1,37 +1,41 @@
 #!/usr/bin/env bash
 #
-# registers the AppImage with the desktop: the launcher entry, the .dsmx file
-# type and the dsmx:// scheme. electrobun writes none of these.
+# runs electrobun's own installer, then registers the .dsmx file type and
+# the dsmx:// scheme, which electrobun does not do on its own.
 #
-#   packaging/linux/install.sh ~/Applications/desmos-ide-Setup.AppImage
+#   packaging/linux/install.sh [~/Applications/desmos-ide-Setup/installer]
 
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
-# in a release tarball the AppImage is next to this script, so the argument is optional
-APPIMAGE="${1:-}"
-if [[ -z "$APPIMAGE" ]]; then
-  APPIMAGE="$(find "$HERE" -maxdepth 1 -name '*.AppImage' | head -1)"
+INSTALLER="${1:-}"
+if [[ -z "$INSTALLER" ]]; then
+  INSTALLER="${HERE}/installer"
 fi
-[[ -n "$APPIMAGE" ]] || { echo "usage: install.sh <path to the .AppImage>" >&2; exit 1; }
-[[ -f "$APPIMAGE" ]] || { echo "install: no file at ${APPIMAGE}" >&2; exit 1; }
-APPIMAGE="$(cd "$(dirname "$APPIMAGE")" && pwd)/$(basename "$APPIMAGE")"
-chmod +x "$APPIMAGE"
-
-DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
-
-ICON="${HERE}/dsmx.svg"
-[[ -f "$ICON" ]] || ICON="${HERE}/../../docs/static/favicon-scalable.svg"
+[[ -f "$INSTALLER" ]] || { echo "usage: install.sh <path to the installer>" >&2; exit 1; }
+chmod +x "$INSTALLER"
 
 for lib in libgtk-3.so.0 libwebkit2gtk-4.1.so.0; do
   ldconfig -p 2>/dev/null | grep -q "$lib" \
     || echo "install: ${lib} is not installed. the app cannot start without it — see the README" >&2
 done
 
+echo "running electrobun's installer..."
+"$INSTALLER"
+
+IDENTIFIER="dev.desmoside.app"
+CHANNEL="stable"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+LAUNCHER="${DATA}/${IDENTIFIER}/${CHANNEL}/app/bin/launcher"
+[[ -f "$LAUNCHER" ]] || { echo "install: electrobun's installer did not create ${LAUNCHER}" >&2; exit 1; }
+
+ICON="${HERE}/dsmx.svg"
+[[ -f "$ICON" ]] || ICON="${HERE}/../../docs/static/favicon-scalable.svg"
+
 mkdir -p "${DATA}/applications" "${DATA}/mime/packages" "${DATA}/icons/hicolor/scalable/apps"
 
-sed "s|@EXEC@|${APPIMAGE}|" "${HERE}/dsmx.desktop" > "${DATA}/applications/dsmx.desktop"
+sed "s|@EXEC@|${LAUNCHER}|" "${HERE}/dsmx.desktop" > "${DATA}/applications/dsmx.desktop"
 cp "${HERE}/dsmx.xml" "${DATA}/mime/packages/dsmx.xml"
 cp "$ICON" "${DATA}/icons/hicolor/scalable/apps/dsmx.svg"
 

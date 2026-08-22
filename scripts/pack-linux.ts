@@ -25,19 +25,29 @@ const find = async (dir: string, depth: number, match: (name: string) => boolean
   return null;
 };
 
-const appimage = await find('build', 3, name => name.endsWith('.AppImage'));
-if (!appimage) die('no .AppImage under build/ — did electrobun build --env=stable run?');
+const setupTarball = await find('build', 3, name => name.endsWith('-Setup.tar.gz'));
+if (!setupTarball) die('no *-Setup.tar.gz under build/ — did electrobun build --env=stable run?');
 
 const name = `desmos-ide-${pkg.version}-linux-x86_64`;
 const stage = join('build', name);
 const out = join('build', `${name}.tar.gz`);
+const extractDir = join('build', 'linux-installer-extract');
 
 await rm(stage, { recursive: true, force: true });
 await rm(out, { force: true });
+await rm(extractDir, { recursive: true, force: true });
 await mkdir(stage, { recursive: true });
+await mkdir(extractDir, { recursive: true });
 
-await copyFile(appimage!, join(stage, 'desmos-ide.AppImage'));
-await chmod(join(stage, 'desmos-ide.AppImage'), 0o755);
+const untar = spawnSync('tar', ['-xzf', setupTarball!, '-C', extractDir], { stdio: 'inherit' });
+if (untar.status !== 0) process.exit(untar.status ?? 1);
+const installerBin = join(extractDir, 'installer');
+if (!existsSync(installerBin)) die(`no installer executable inside ${setupTarball}`);
+
+await copyFile(installerBin, join(stage, 'installer'));
+await chmod(join(stage, 'installer'), 0o755);
+await rm(extractDir, { recursive: true, force: true });
+
 await copyFile('packaging/linux/install.sh', join(stage, 'install.sh'));
 await chmod(join(stage, 'install.sh'), 0o755);
 await copyFile('packaging/linux/dsmx.desktop', join(stage, 'dsmx.desktop'));

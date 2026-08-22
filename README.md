@@ -65,18 +65,19 @@ xattr -dr com.apple.quarantine /Applications/desmos-ide.app
 
 ### linux
 
-x86_64 only, as an AppImage from the [releases page](https://github.com/KingJayan/desmos-ide/releases). the app does not carry gtk or webkit, so install them first:
+x86_64 only, as a tarball from the [releases page](https://github.com/KingJayan/desmos-ide/releases). the app does not carry gtk or webkit, so install them first:
 
 ```bash
 sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0        # debian/ubuntu
 sudo dnf install gtk3 webkit2gtk4.1                    # fedora
 ```
 
-then register the launcher, the `.dsmx` file type and the `dsmx://` links:
+then unpack it and run the installer, which also registers the `.dsmx` file type and the `dsmx://` links:
 
 ```bash
-chmod +x desmos-ide-Setup.AppImage
-packaging/linux/install.sh ./desmos-ide-Setup.AppImage
+tar -xzf desmos-ide-*-linux-x86_64.tar.gz
+cd desmos-ide-*-linux-x86_64
+./install.sh
 ```
 
 api keys go to the system keyring through `secret-tool` (`libsecret-tools`). with no keyring the ai panel still works, and says that the key is unencrypted.
