@@ -18,7 +18,8 @@ writeFileSync(join(project, 'other.dsmx'), 'x = 2\n');
 writeFileSync(join(outside, 'id_rsa'), 'secret\n');
 symlinkSync(outside, join(project, 'escape'));
 
-const { allowFile, allowRoot, allowed, allowedRoot, flushAllowed } = await import('../../bun/paths');
+const { allowFile, allowRoot, allowed, allowedRoot, compareKey, flushAllowed, stripLongPrefix } =
+  await import('../../bun/paths');
 
 after(async () => {
   await flushAllowed();
@@ -52,5 +53,40 @@ describe('the filesystem allow-list', () => {
     const link = join(project, 'escape', 'new.dsmx');
     assert.equal(allowed(link), null);
     assert.equal(allowed(join(project, 'new.dsmx')), join(project, 'new.dsmx'));
+  });
+});
+
+describe('windows path comparison', () => {
+  test('the same folder in a different case is the same folder', () => {
+    assert.equal(compareKey('C:\\Users\\x', true), compareKey('c:\\users\\X', true));
+    assert.notEqual(compareKey('C:\\Users\\x', false), compareKey('c:\\users\\X', false));
+  });
+
+  test('a long path keeps the same identity with or without the \\\\?\\ prefix', () => {
+    const long = `C:\\Users\\x\\${'d'.repeat(300)}\\graph.dsmx`;
+    assert.ok(long.length > 260);
+    assert.equal(stripLongPrefix(`\\\\?\\${long}`), long);
+    assert.equal(compareKey(`\\\\?\\${long}`, true), compareKey(long, true));
+  });
+
+  test('a unc path keeps its two leading slashes', () => {
+    assert.equal(stripLongPrefix('\\\\?\\UNC\\server\\share\\g.dsmx'), '\\\\server\\share\\g.dsmx');
+    assert.equal(
+      compareKey('\\\\?\\UNC\\Server\\Share\\g.dsmx', true),
+      compareKey('\\\\server\\share\\g.dsmx', true),
+    );
+  });
+
+  test('a path that is not a long path is left alone', () => {
+    assert.equal(stripLongPrefix('/home/x/graph.dsmx'), '/home/x/graph.dsmx');
+    assert.equal(stripLongPrefix('C:\\Users\\x'), 'C:\\Users\\x');
+  });
+});
+
+describe('save as', () => {
+  test('a file that does not exist yet is granted, and the grant is that file only', () => {
+    const fresh = join(project, 'saved-as.dsmx');
+    assert.equal(allowFile(fresh), fresh);
+    assert.equal(allowed(fresh), fresh);
   });
 });
