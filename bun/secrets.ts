@@ -1,13 +1,35 @@
 // api keys and the copilot token
 
 import { execFile } from 'child_process';
+import { mkdirSync, rmSync } from 'fs';
+import { grantOwnerOnly } from './perms';
+import { storePath } from './store';
 
 const SERVICE = 'desmos-ide';
 const NOT_FOUND = 44;
 
-type Backend = 'keychain' | 'libsecret' | 'none';
+type Backend = 'keychain' | 'libsecret' | 'dpapi' | 'none';
 
-let backend: Backend = process.platform === 'darwin' ? 'keychain' : 'none';
+let backend: Backend =
+  process.platform === 'darwin' ? 'keychain' : process.platform === 'win32' ? 'dpapi' : 'none';
+
+// dpapi ties the ciphertext to the windows account, so the file is only readable by the
+// user who wrote it even if it is copied off the disk
+const ACCOUNT = /^[A-Za-z0-9._-]+$/;
+const POWERSHELL = ['-NoProfile', '-NonInteractive', '-Command', '-'];
+
+function vaultPath(account: string): string {
+  return storePath('secrets', `${account}.txt`);
+}
+
+function psQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+// the script goes over stdin, never over argv, because argv is readable by every process
+function powershell(script: string): Promise<Run> {
+  return run('powershell', POWERSHELL, script);
+}
 
 export function secretsAvailable(): boolean {
   return backend !== 'none';
@@ -15,7 +37,7 @@ export function secretsAvailable(): boolean {
 
 // libsecret is not part of a minimal desktop, so the answer must be the real one
 export async function probeSecrets(): Promise<void> {
-  if (backend === 'keychain') return;
+  if (backend === 'keychain' || backend === 'dpapi') return;
   const { code } = await run('secret-tool', ['--version']);
   backend = code === 0 ? 'libsecret' : 'none';
 }
@@ -36,6 +58,19 @@ function run(command: string, args: string[], stdin?: string): Promise<Run> {
 
 export async function getSecret(account: string): Promise<string | null> {
   if (!secretsAvailable() || !account) return null;
+  if (backend === 'dpapi') {
+    if (!ACCOUNT.test(account)) return null;
+    const { code, stdout } = await powershell(`
+$path = ${psQuote(vaultPath(account))}
+if (-not (Test-Path -LiteralPath $path)) { exit 44 }
+$sealed = (Get-Content -LiteralPath $path -Raw).Trim()
+$secure = ConvertTo-SecureString -String $sealed
+$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try { [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+`);
+    return code === 0 && stdout ? stdout : null;
+  }
   if (backend === 'libsecret') {
     const { code, stdout } = await run('secret-tool', ['lookup', 'service', SERVICE, 'account', account]);
     return code === 0 && stdout ? stdout.replace(/\n$/, '') : null;
@@ -52,6 +87,24 @@ export async function setSecret(account: string, value: string): Promise<boolean
   if (!secretsAvailable() || !account) return false;
   if (!value) return deleteSecret(account);
   // the value goes over stdin
+  if (backend === 'dpapi') {
+    if (!ACCOUNT.test(account)) return false;
+    const path = vaultPath(account);
+    try {
+      mkdirSync(storePath('secrets'), { recursive: true });
+    } catch {
+      return false;
+    }
+    const packed = Buffer.from(value, 'utf-8').toString('base64');
+    const { code } = await powershell(`
+$plain = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${packed}'))
+$secure = ConvertTo-SecureString -String $plain -AsPlainText -Force
+ConvertFrom-SecureString -SecureString $secure | Set-Content -LiteralPath ${psQuote(path)} -Encoding ascii
+`);
+    if (code !== 0) return false;
+    await grantOwnerOnly(path);
+    return true;
+  }
   if (backend === 'libsecret') {
     const { code } = await run(
       'secret-tool',
@@ -70,6 +123,15 @@ export async function setSecret(account: string, value: string): Promise<boolean
 
 export async function deleteSecret(account: string): Promise<boolean> {
   if (!secretsAvailable() || !account) return false;
+  if (backend === 'dpapi') {
+    if (!ACCOUNT.test(account)) return false;
+    try {
+      rmSync(vaultPath(account), { force: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
   if (backend === 'libsecret') {
     const { code } = await run('secret-tool', ['clear', 'service', SERVICE, 'account', account]);
     return code === 0;
