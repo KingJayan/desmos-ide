@@ -15,6 +15,7 @@
     "pack:linux": "bun run scripts/pack-linux.ts",
     "formula": "bun run scripts/gen-formula.ts",
     "cask": "bun run scripts/gen-cask.ts",
+    "windows": "bun run scripts/gen-windows.ts",
     "build": "bun build:view && electrobun build",
     "build:release": "bun build:view && electrobun build --env=stable",
     "check": "tsc --noEmit",

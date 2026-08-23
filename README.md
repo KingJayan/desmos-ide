@@ -83,6 +83,47 @@ api keys are in sys keyring through `secret-tool` (`libsecret-tools`). w/o keyri
 
 **notes**: ⌘ defaults to Ctrl on linux. the window uses its native deco, and menu bar is the command palette (Ctrl+Shift+P)
 
+### windows
+
+x64 only. windows 11 is what this is tested on. windows 10 x64 21H2 or later should work
+but is not covered by ci. **windows on ARM is not supported** — there is no arm64 build,
+and the x64 one runs only under emulation, which no one has measured. no arm64 download is
+published, on purpose.
+
+winget and chocolatey are the install path to take. the installer carries no authenticode
+certificate, so a browser download hits SmartScreen and some antivirus products report an
+unknown publisher. a package manager avoids most of that:
+
+```powershell
+winget install KingJayan.DesmosIDE
+```
+
+```powershell
+choco install dsmx-app
+```
+
+the `.exe` is on the [releases page](https://github.com/KingJayan/desmos-ide/releases) as
+well. if you take it, SmartScreen shows **Windows protected your PC** — press **More info**
+then **Run anyway**. the source is all here and the release is built by CI in this repo.
+
+the app needs the **WebView2 Runtime**, which windows 11 already carries. on windows 10 get
+it from [microsoft](https://developer.microsoft.com/microsoft-edge/webview2/) if the window
+opens blank.
+
+the installer does not claim the `.dsmx` file type or the `dsmx://` scheme, so
+`dsmx://plugin/<id>` links from the marketplace do nothing until they are registered. winget
+and chocolatey do it for you. after a manual install, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File register.ps1
+```
+
+api keys are sealed with DPAPI under `%USERPROFILE%\.dsmx\secrets`, which ties them to the
+windows account.
+
+**notes**: ⌘ defaults to Ctrl on windows. the window uses its native deco and menu bar.
+AltGr characters are left to the editor, so a chord cannot swallow `@` or `#`.
+
 ## dsl syntax
 
 see the [examples](example/), or the [full demo](example/demo.dsmx)
@@ -97,11 +138,20 @@ bun dev        # build then launch
 bun dev:hmr    # vite dev server + app for renderer hmr
 bun run build  # prod build → build/<channel>-<platform>/
 bun test       # compiler + editor tests
-bun test:e2e   # webkit over built app
+bun test:e2e   # webkit over built app (chromium on windows)
 bun demo       # run compiler in the terminal w/o app shell
 bun dsmx       # run the cli from source
 bun pack:cli   # bundle + tarball the cli for a release
 ```
+
+### known upstream gaps
+
+* electrobun has no native save panel, so macOS uses a Swift helper and every other desktop
+  falls back to a folder pick — [electrobun](https://github.com/blackboardsh/electrobun/issues)
+* electrobun writes no windows registry entries for a file type or a url scheme, which is why
+  `register.ps1` exists — [electrobun](https://github.com/blackboardsh/electrobun/issues)
+* there is no arm64 windows build, because neither electrobun nor bun ships one —
+  [bun](https://github.com/oven-sh/bun/issues)
 
 ## troubleshooting/bugs [see here](https://github.com/KingJayan/desmos-ide/issues/9)
 

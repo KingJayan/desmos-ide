@@ -1,0 +1,18 @@
+$ErrorActionPreference = 'Stop'
+
+$packageName = 'dsmx-app'
+$url64 = '{{URL}}'
+$checksum64 = '{{SHA256}}'
+
+Install-ChocolateyPackage `
+  -PackageName $packageName `
+  -FileType 'exe' `
+  -SilentArgs '/S' `
+  -Url64bit $url64 `
+  -Checksum64 $checksum64 `
+  -ChecksumType64 'sha256'
+
+$register = Join-Path $PSScriptRoot 'register.ps1'
+if (Test-Path $register) {
+  try { & $register } catch { Write-Warning "could not register .dsmx and dsmx:// — $_" }
+}
