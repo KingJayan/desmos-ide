@@ -134,4 +134,13 @@ describe('tokenizeIncremental', () => {
       cache = step.cache;
     }
   });
+
+  it('reuses the cache across a crlf document', () => {
+    const crlf = BASE.replace(/\r?\n/g, '\r\n');
+    const cache = lexCacheOf(crlf);
+    const edited = crlf.replace('point p (1, 2)', 'point p (3, 4)');
+    const step = tokenizeIncremental(edited, cache);
+    expect(step.tokens).toEqual(tokenize(edited));
+    expect(step.cache.chunks.length).toBeGreaterThan(1);
+  });
 });
