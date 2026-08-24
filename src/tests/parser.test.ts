@@ -286,8 +286,9 @@ describe('formatter', () => {
   });
 
   test('a crlf file compiles to the same expressions as its lf twin', () => {
-    const src = readFileSync(new URL('../../example/demo.dsmx', import.meta.url), 'utf8');
-    const crlf = src.replace(/\r?\n/g, '\r\n');
+    const src = readFileSync(new URL('../../example/demo.dsmx', import.meta.url), 'utf8')
+      .replace(/\r\n/g, '\n');
+    const crlf = src.replace(/\n/g, '\r\n');
     const formatted = formatDsl(crlf);
     assert.ok(formatted.includes('\r\n'), 'crlf must survive the formatter');
     assert.equal(formatted, formatDsl(formatted));

@@ -8,7 +8,7 @@ import { join } from 'node:path';
 const home = mkdtempSync(join(tmpdir(), 'dsmx-paths-home-'));
 process.env.DSMX_HOME = home;
 
-const box = realpathSync(mkdtempSync(join(tmpdir(), 'dsmx-paths-')));
+const box = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsmx-paths-')));
 const project = join(box, 'project');
 const outside = join(box, 'outside');
 mkdirSync(project);

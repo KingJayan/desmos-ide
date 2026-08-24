@@ -47,6 +47,9 @@ jobs:
       - run: bun run test
       - run: bunx vite build
 
+      - name: dpapi probe
+        run: bun run scripts/dpapi-probe.ts
+
       - run: |
           bun run build:cli
           node dist/cli/dsmx.mjs --version
@@ -73,6 +76,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+
+      - name: dpapi probe
+        run: bun run scripts/dpapi-probe.ts
 
       - run: |
           bun run build:cli

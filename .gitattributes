@@ -1,3 +1,5 @@
+* text=auto eol=lf
+
 packaging/** linguist-generated=true
 cli/** linguist-generated=true
 renderer/public/fonts/** linguist-generated=true
