@@ -13,7 +13,9 @@ const files = readdirSync(DIR)
 const failed: string[] = [];
 
 for (const file of files) {
-  const result = spawnSync(process.execPath, ['test', file, ...process.argv.slice(2)], {
+  // the keyring tests spawn powershell, and its first run on a cold machine costs several
+  // seconds more than the default limit allows
+  const result = spawnSync(process.execPath, ['test', file, '--timeout', '30000', ...process.argv.slice(2)], {
     stdio: 'inherit',
     env,
   });

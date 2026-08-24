@@ -13,8 +13,6 @@ type Backend = 'keychain' | 'libsecret' | 'dpapi' | 'none';
 let backend: Backend =
   process.platform === 'darwin' ? 'keychain' : process.platform === 'win32' ? 'dpapi' : 'none';
 
-// dpapi ties the ciphertext to the windows account, so the file is only readable by the
-// user who wrote it even if it is copied off the disk
 const ACCOUNT = /^[A-Za-z0-9._-]+$/;
 const POWERSHELL = ['-NoProfile', '-NonInteractive'];
 const MODULE_PATH = `$env:PSModulePath = "$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\Modules"\n`;
@@ -27,13 +25,6 @@ function psQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-// a script fed over stdin is run a line at a time, so a try/finally that spans lines never
-// runs as one statement and its value is lost. a script that has to answer therefore goes
-// over argv, which is safe as long as it carries no secret, and one that carries a secret
-// goes over stdin, where no other process can read it.
-// PSModulePath is reset first either way: a parent process that sets it for powershell 7
-// stops windows powershell finding Microsoft.PowerShell.Security, and with it
-// ConvertTo-SecureString
 function powershellReading(script: string): Promise<Run> {
   const encoded = Buffer.from(MODULE_PATH + script, 'utf16le').toString('base64');
   return run('powershell', [...POWERSHELL, '-EncodedCommand', encoded]);
@@ -47,7 +38,6 @@ export function secretsAvailable(): boolean {
   return backend !== 'none';
 }
 
-// libsecret is not part of a minimal desktop, so the answer must be the real one
 export async function probeSecrets(): Promise<void> {
   if (backend === 'keychain' || backend === 'dpapi') return;
   const { code } = await run('secret-tool', ['--version']);
