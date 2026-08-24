@@ -44,9 +44,6 @@ jobs:
 
       - run: bun run check
       - run: bun run lint
-      - name: dpapi probe
-        run: bun run scripts/dpapi-probe.ts
-
       - run: bun run test
       - run: bunx vite build
 
@@ -76,9 +73,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-
-      - name: dpapi probe
-        run: bun run scripts/dpapi-probe.ts
 
       - run: |
           bun run build:cli

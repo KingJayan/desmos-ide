@@ -27,10 +27,10 @@ function psQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-// a script fed over stdin has nowhere to write its answer: powershell renders the result
-// to its host, not to the pipe. a script that has to answer therefore goes over argv,
-// which is safe as long as it carries no secret, and one that carries a secret goes over
-// stdin, where no other process can read it.
+// a script fed over stdin is run a line at a time, so a try/finally that spans lines never
+// runs as one statement and its value is lost. a script that has to answer therefore goes
+// over argv, which is safe as long as it carries no secret, and one that carries a secret
+// goes over stdin, where no other process can read it.
 // PSModulePath is reset first either way: a parent process that sets it for powershell 7
 // stops windows powershell finding Microsoft.PowerShell.Security, and with it
 // ConvertTo-SecureString
