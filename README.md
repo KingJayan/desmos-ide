@@ -83,6 +83,31 @@ api keys are in sys keyring through `secret-tool` (`libsecret-tools`). w/o keyri
 
 **notes**: ⌘ defaults to Ctrl on linux. the window uses its native deco, and menu bar is the command palette (Ctrl+Shift+P)
 
+### windows
+
+x64 only(no full ARM support). windows 10 untested, windows 11 fully supported.
+
+install via winget/chocolatey (avoids ms defender):
+
+```powershell
+winget install KingJayan.DesmosIDE
+```
+
+```powershell
+choco install dsmx-app
+```
+
+also installable with the `.exe` on the [releases page](https://github.com/KingJayan/desmos-ide/releases).
+to bypass SmartScreen, press **More info** then **Run anyway**.
+
+after a manual install(not necessary if installed with winget/choco), run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File register.ps1
+```
+
+**notes**: ⌘ defaults to Ctrl on windows. the window uses its native deco and menu bar.
+
 ## dsl syntax
 
 see the [examples](example/), or the [full demo](example/demo.dsmx)
@@ -97,7 +122,7 @@ bun dev        # build then launch
 bun dev:hmr    # vite dev server + app for renderer hmr
 bun run build  # prod build → build/<channel>-<platform>/
 bun test       # compiler + editor tests
-bun test:e2e   # webkit over built app
+bun test:e2e   # webkit over built app (chromium on windows)
 bun demo       # run compiler in the terminal w/o app shell
 bun dsmx       # run the cli from source
 bun pack:cli   # bundle + tarball the cli for a release

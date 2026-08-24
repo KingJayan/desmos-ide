@@ -2,6 +2,7 @@ import { watch } from 'fs';
 import type { FSWatcher } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import type { ConfigFile } from '../src/shared/rpc-schema';
+import { grantOwnerOnly } from './perms';
 import { storePath } from './store';
 
 const SEED: Record<ConfigFile, string> = { settings: '{}\n', keybinds: '[]\n' };
@@ -30,6 +31,7 @@ export async function writeConfig(file: ConfigFile, content: string): Promise<bo
     await mkdir(storePath(), { recursive: true });
     selfWrites.set(file, content);
     await writeFile(configPath(file), content, { encoding: 'utf-8', mode: 0o600 });
+    await grantOwnerOnly(configPath(file));
     return true;
   } catch {
     selfWrites.delete(file);
@@ -76,6 +78,7 @@ export async function ensureConfig(): Promise<void> {
       await readFile(configPath(file), 'utf-8');
     } catch {
       await writeFile(configPath(file), SEED[file], { encoding: 'utf-8', mode: 0o600 }).catch(() => {});
+      await grantOwnerOnly(configPath(file));
     }
   }
 }

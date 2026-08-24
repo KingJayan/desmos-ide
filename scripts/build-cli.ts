@@ -28,6 +28,20 @@ fi
 exec "$node" "$here/dsmx.mjs" "$@"
 `;
 
+// windows has no shebang, so the same entry point needs a batch file next to it
+const CMD_WRAPPER = `@echo off
+setlocal
+set "DSMX_NODE_BIN=%DSMX_NODE%"
+if "%DSMX_NODE_BIN%"=="" set "DSMX_NODE_BIN=node"
+where "%DSMX_NODE_BIN%" >nul 2>nul
+if errorlevel 1 (
+  echo dsmx: needs node on PATH - install it, or set DSMX_NODE 1>&2
+  exit /b 1
+)
+"%DSMX_NODE_BIN%" "%~dp0dsmx.mjs" %*
+exit /b %ERRORLEVEL%
+`;
+
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
@@ -48,6 +62,7 @@ if (!built.success) {
 
 await writeFile(`${OUT}/dsmx`, WRAPPER);
 await chmod(`${OUT}/dsmx`, 0o755);
+await writeFile(`${OUT}/dsmx.cmd`, CMD_WRAPPER.replace(/\n/g, '\r\n'));
 
 await mkdir(`${OUT}/example`, { recursive: true });
 for (const name of await readdir('example')) {

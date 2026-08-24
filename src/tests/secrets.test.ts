@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { test, describe } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { deleteSecret, getSecret, probeSecrets, secretsAvailable, setSecret } from '../../bun/secrets';
@@ -8,15 +8,19 @@ import { deleteSecret, getSecret, probeSecrets, secretsAvailable, setSecret } fr
 const ACCOUNT = 'desmos-ide-test-account';
 const VALUE = 'test-value-not-a-secret';
 
-await probeSecrets();
-
 // these tests write to the real keyring, so they need one that answers. a build agent
-// often has no keyring at all, and that is not a failure of the code
+// often has no keyring at all, and that is not a failure of the code.
+// the answer is worked out without awaiting, because a top-level await here suspends the
+// loader long enough for every later test file to register inside a running test
 function keyringUsable(): boolean {
-  if (!secretsAvailable()) return false;
-  if (process.platform !== 'darwin') return true;
+  const probe = process.platform === 'darwin'
+    ? ['security', ['default-keychain']] as const
+    : process.platform === 'win32'
+      ? null
+      : ['secret-tool', ['--version']] as const;
+  if (!probe) return true;
   try {
-    execFileSync('security', ['default-keychain'], { stdio: 'ignore' });
+    execFileSync(probe[0], probe[1], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -24,6 +28,8 @@ function keyringUsable(): boolean {
 }
 
 (keyringUsable() ? describe : describe.skip)('the keyring', () => {
+  before(async () => { await probeSecrets(); });
+
   test('reports that it is there', () => {
     assert.equal(secretsAvailable(), true);
   });

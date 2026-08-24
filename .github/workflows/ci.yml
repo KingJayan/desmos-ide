@@ -33,7 +33,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - run: bun test src/tests/
+      - run: bun run test
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: bun run check
+      - run: bun run lint
+      - run: bun run test
+      - run: bunx vite build
+
+      - run: |
+          bun run build:cli
+          node dist/cli/dsmx.mjs --version
+          node dist/cli/dsmx.mjs build example/orbit.dsmx -o out.html
 
   view:
     runs-on: ubuntu-22.04
@@ -91,7 +108,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-22.04", "macos-15"]' || '["ubuntu-22.04"]') }}
+        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-22.04", "macos-15", "windows-2022"]' || '["ubuntu-22.04"]') }}
+
+    env:
+      SMOKE_BROWSER: ${{ startsWith(matrix.os, 'windows') && 'chromium' || 'webkit' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -108,14 +128,15 @@ jobs:
           path: |
             ~/.cache/ms-playwright
             ~/Library/Caches/ms-playwright
-          key: playwright-webkit-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+            ~/AppData/Local/ms-playwright
+          key: playwright-${{ env.SMOKE_BROWSER }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
 
       - if: runner.os == 'Linux'
-        run: bunx playwright install-deps webkit
+        run: bunx playwright install-deps $SMOKE_BROWSER
         timeout-minutes: 8
 
       - if: steps.playwright.outputs.cache-hit != 'true'
-        run: bunx playwright install webkit
+        run: bunx playwright install ${{ env.SMOKE_BROWSER }}
         timeout-minutes: 8
 
       - run: bun run e2e/smoke.ts
@@ -145,13 +166,20 @@ jobs:
   app:
     if: github.event_name == 'push'
     needs: view
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
-      - name: Install the desktop libraries
+      - if: runner.os == 'Linux'
+        name: Install the desktop libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -165,6 +193,25 @@ jobs:
           name: view
           path: dist
 
-      - run: |
-          bunx electrobun build
-          find build -maxdepth 2 -print
+      - run: bunx electrobun build
+
+      - if: runner.os == 'Linux'
+        run: find build -maxdepth 3 -print
+
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Depth 3 build | Select-Object -ExpandProperty FullName
+          $setup = Get-ChildItem -Recurse -Filter '*Setup*.exe' build | Select-Object -First 1
+          if (-not $setup) { throw 'no *Setup*.exe under build/' }
+          Write-Host "installer: $($setup.FullName)"
+          $keys = @(
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+            'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          )
+          $found = $keys | Where-Object { Test-Path $_ }
+          if ($found) {
+            Write-Host "webview2 runtime: $((Get-ItemProperty $found[0]).pv)"
+          } else {
+            Write-Host 'webview2 runtime: absent — the installer must chain the evergreen bootstrapper'
+          }

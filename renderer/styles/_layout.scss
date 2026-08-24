@@ -42,7 +42,6 @@ html, body {
   padding: 0 8px;
   gap: 8px;
   flex-shrink: 0;
-  -webkit-app-region: drag;
   user-select: none;
 }
 
@@ -50,14 +49,20 @@ html, body {
   display: flex;
   align-items: center;
   gap: 4px;
-  -webkit-app-region: no-drag;
 }
 .tb-group--left   { flex: 0 0 auto; }
 .tb-group--center { flex: 1; justify-content: center; min-width: 0; }
 .tb-group--right  { flex: 0 0 auto; gap: 8px; }
 
-.tb-traffic { width: 0; -webkit-app-region: drag; }
-:root[data-os="macos"] .tb-traffic { width: 68px; }
+.tb-traffic { width: 0; }
+
+// only macOS hides the system title bar, so only there does the chrome have to be the
+// thing the user drags. windows and linux keep their native decoration
+:root[data-os="macos"] {
+  .tb-traffic { width: 68px; }
+  #titlebar { -webkit-app-region: drag; }
+  .tb-group { -webkit-app-region: no-drag; }
+}
 
 .tb-widget {
   display: flex;
