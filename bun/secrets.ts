@@ -26,9 +26,12 @@ function psQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-// the script goes over stdin, never over argv, because argv is readable by every process
+// the script goes over stdin, never over argv, because argv is readable by every process.
+// PSModulePath is reset first: a parent process that sets it for powershell 7 stops
+// windows powershell finding Microsoft.PowerShell.Security, and with it ConvertTo-SecureString
 function powershell(script: string): Promise<Run> {
-  return run('powershell', POWERSHELL, script);
+  const reset = `$env:PSModulePath = "$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\Modules"\n`;
+  return run('powershell', POWERSHELL, reset + script);
 }
 
 export function secretsAvailable(): boolean {

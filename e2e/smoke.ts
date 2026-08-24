@@ -7,8 +7,6 @@ import { platformOf } from '../src/shared/platform';
 const engine = (process.env['SMOKE_BROWSER'] ?? (process.platform === 'win32' ? 'chromium' : 'webkit')) === 'chromium'
   ? chromium
   : webkit;
-const HOST = platformOf(process.platform, process.arch);
-const MOD = HOST.os === 'macos' ? 'Meta' : 'Control';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 if (!existsSync(join(DIST, 'index.html'))) {
@@ -40,6 +38,12 @@ const watchdog = setTimeout(() => {
 const browser = await engine.launch();
 stage = 'opening a page';
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+
+// monaco reads the user agent to pick its own chords, so the host the app is told about
+// has to be the one the engine already claims. playwright's linux webkit says macintosh
+const ua = await page.evaluate(() => navigator.userAgent);
+const HOST = platformOf(/Mac|iPhone|iPad/.test(ua) ? 'darwin' : process.platform, process.arch);
+const MOD = HOST.os === 'macos' ? 'Meta' : 'Control';
 
 // there is no bun process behind a browser, so the plugin bridge is stubbed with one
 // real plugin. everything past this point — the sandbox, the macro pass, the panel and

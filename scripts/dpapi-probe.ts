@@ -19,7 +19,7 @@ function ps(script: string): Promise<void> {
         resolve();
       },
     );
-    child.stdin?.end(script);
+    child.stdin?.end(`$env:PSModulePath = "$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\Modules"\n` + script);
   });
 }
 
