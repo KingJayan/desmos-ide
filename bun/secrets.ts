@@ -69,10 +69,12 @@ if (-not (Test-Path -LiteralPath $path)) { exit 44 }
 $sealed = (Get-Content -LiteralPath $path -Raw).Trim()
 $secure = ConvertTo-SecureString -String $sealed
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-try { [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)) }
+try { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr))) }
 finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 `);
-    return code === 0 && stdout ? stdout : null;
+    // the value comes back base64, so a trailing newline the host adds cannot change it
+    if (code !== 0 || !stdout.trim()) return null;
+    return Buffer.from(stdout.trim(), 'base64').toString('utf-8');
   }
   if (backend === 'libsecret') {
     const { code, stdout } = await run('secret-tool', ['lookup', 'service', SERVICE, 'account', account]);

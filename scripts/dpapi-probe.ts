@@ -32,6 +32,6 @@ await ps(`
 $sealed = (Get-Content -LiteralPath '${path}' -Raw).Trim()
 $secure = ConvertTo-SecureString -String $sealed
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-try { [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)) }
+try { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr))) }
 finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 `);
