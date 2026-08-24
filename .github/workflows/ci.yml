@@ -44,11 +44,11 @@ jobs:
 
       - run: bun run check
       - run: bun run lint
-      - run: bun run test
-      - run: bunx vite build
-
       - name: dpapi probe
         run: bun run scripts/dpapi-probe.ts
+
+      - run: bun run test
+      - run: bunx vite build
 
       - run: |
           bun run build:cli
