@@ -190,6 +190,8 @@ check(((await page.locator('#status-save').textContent()) ?? '').length > 0, 'th
 
 await page.click('#btn-sidebar-ai');
 await page.waitForSelector('#ai-panel:not(.hidden)');
+// the chat panel is imported on demand, so its markup lands after the panel is shown
+await page.waitForSelector('#ai-del-btn svg', { timeout: 10_000 }).catch(() => {});
 check(
   await page.locator('#ai-del-btn svg').count() === 1 && await page.locator('#ai-new-btn svg').count() === 1,
   'every button in the chat header draws its icon',
