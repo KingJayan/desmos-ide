@@ -7,11 +7,16 @@ const home = join(tmpdir(), 'dsmx-probe');
 mkdirSync(join(home, 'secrets'), { recursive: true });
 const path = join(home, 'secrets', 'probe.txt');
 
-function ps(script: string): Promise<void> {
+const MODULE_PATH = `$env:PSModulePath = "$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\Modules"\n`;
+
+function ps(script: string, viaArgv = false): Promise<void> {
   return new Promise(resolve => {
+    const args = viaArgv
+      ? ['-EncodedCommand', Buffer.from(MODULE_PATH + script, 'utf16le').toString('base64')]
+      : ['-Command', '-'];
     const child = execFile(
       'powershell',
-      ['-NoProfile', '-NonInteractive', '-Command', '-'],
+      ['-NoProfile', '-NonInteractive', ...args],
       (err, stdout, stderr) => {
         console.log('err', err && (err as { code?: unknown }).code, JSON.stringify(err?.message ?? null));
         console.log('stdout', JSON.stringify(stdout));
@@ -19,7 +24,8 @@ function ps(script: string): Promise<void> {
         resolve();
       },
     );
-    child.stdin?.end(`$env:PSModulePath = "$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\Modules"\n` + script);
+    if (viaArgv) child.stdin?.end();
+    else child.stdin?.end(MODULE_PATH + script);
   });
 }
 
@@ -34,4 +40,9 @@ $secure = ConvertTo-SecureString -String $sealed
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
 try { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr))) }
 finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-`);
+`, true);
+
+console.log('--- stdin form, echoing a value');
+await ps(`'hello-from-stdin'`);
+console.log('--- argv form, echoing a value');
+await ps(`'hello-from-argv'`, true);

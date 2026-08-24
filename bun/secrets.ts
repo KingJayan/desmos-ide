@@ -16,7 +16,8 @@ let backend: Backend =
 // dpapi ties the ciphertext to the windows account, so the file is only readable by the
 // user who wrote it even if it is copied off the disk
 const ACCOUNT = /^[A-Za-z0-9._-]+$/;
-const POWERSHELL = ['-NoProfile', '-NonInteractive', '-Command', '-'];
+const POWERSHELL = ['-NoProfile', '-NonInteractive'];
+const MODULE_PATH = `$env:PSModulePath = "$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\Modules"\n`;
 
 function vaultPath(account: string): string {
   return storePath('secrets', `${account}.txt`);
@@ -26,12 +27,20 @@ function psQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-// the script goes over stdin, never over argv, because argv is readable by every process.
-// PSModulePath is reset first: a parent process that sets it for powershell 7 stops
-// windows powershell finding Microsoft.PowerShell.Security, and with it ConvertTo-SecureString
-function powershell(script: string): Promise<Run> {
-  const reset = `$env:PSModulePath = "$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\Modules"\n`;
-  return run('powershell', POWERSHELL, reset + script);
+// a script fed over stdin has nowhere to write its answer: powershell renders the result
+// to its host, not to the pipe. a script that has to answer therefore goes over argv,
+// which is safe as long as it carries no secret, and one that carries a secret goes over
+// stdin, where no other process can read it.
+// PSModulePath is reset first either way: a parent process that sets it for powershell 7
+// stops windows powershell finding Microsoft.PowerShell.Security, and with it
+// ConvertTo-SecureString
+function powershellReading(script: string): Promise<Run> {
+  const encoded = Buffer.from(MODULE_PATH + script, 'utf16le').toString('base64');
+  return run('powershell', [...POWERSHELL, '-EncodedCommand', encoded]);
+}
+
+function powershellWriting(script: string): Promise<Run> {
+  return run('powershell', [...POWERSHELL, '-Command', '-'], MODULE_PATH + script);
 }
 
 export function secretsAvailable(): boolean {
@@ -63,7 +72,7 @@ export async function getSecret(account: string): Promise<string | null> {
   if (!secretsAvailable() || !account) return null;
   if (backend === 'dpapi') {
     if (!ACCOUNT.test(account)) return null;
-    const { code, stdout } = await powershell(`
+    const { code, stdout } = await powershellReading(`
 $path = ${psQuote(vaultPath(account))}
 if (-not (Test-Path -LiteralPath $path)) { exit 44 }
 $sealed = (Get-Content -LiteralPath $path -Raw).Trim()
@@ -101,7 +110,7 @@ export async function setSecret(account: string, value: string): Promise<boolean
       return false;
     }
     const packed = Buffer.from(value, 'utf-8').toString('base64');
-    const { code } = await powershell(`
+    const { code } = await powershellWriting(`
 $plain = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${packed}'))
 $secure = ConvertTo-SecureString -String $plain -AsPlainText -Force
 ConvertFrom-SecureString -SecureString $secure | Set-Content -LiteralPath ${psQuote(path)} -Encoding ascii
