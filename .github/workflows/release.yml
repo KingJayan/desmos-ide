@@ -58,8 +58,38 @@ jobs:
           path: build/*-linux-*.tar.gz
           retention-days: 7
 
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: |
+          bun run build:view
+          bunx electrobun build --env=stable
+
+      # the installer ships under one name, because the winget and chocolatey manifests
+      # point at that name and nothing else
+      - shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Recurse -Filter '*Setup*.exe' build | Select-Object -First 1
+          if (-not $setup) {
+            Get-ChildItem -Recurse -Depth 3 build | Select-Object -ExpandProperty FullName
+            throw 'no *Setup*.exe under build/'
+          }
+          Copy-Item $setup.FullName 'build/desmos-ide-Setup.exe'
+          Get-FileHash 'build/desmos-ide-Setup.exe' -Algorithm SHA256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-windows
+          path: build/desmos-ide-Setup.exe
+          retention-days: 7
+
   publish:
-    needs: [mac, linux]
+    needs: [mac, linux, windows]
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
@@ -98,7 +128,27 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" --clobber \
             build/*-${{ steps.version.outputs.value }}-*.zip \
             build/*-linux-*.tar.gz \
+            build/desmos-ide-Setup.exe \
             "build/dsmx-${{ steps.version.outputs.value }}.tar.gz"
+
+  # winget and chocolatey are the install path this project asks windows users to take,
+  # because an unsigned installer downloaded from a browser is what smartscreen stops
+  packages:
+    needs: publish
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: bun run windows --version "${{ needs.publish.outputs.version }}" --out build/windows
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-packages
+          path: build/windows
+          retention-days: 30
 
   tap:
     needs: publish

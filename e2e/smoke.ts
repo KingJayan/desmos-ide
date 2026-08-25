@@ -1,22 +1,45 @@
 // `bun run test:e2e` after `bun run build:view`.
-import { webkit } from 'playwright';
-import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { chromium, webkit } from 'playwright';
+import { createServer } from 'node:http';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { platformOf } from '../src/shared/platform.ts';
 
-const DIST = join(import.meta.dir, '..', 'dist');
+const engine = (process.env['SMOKE_BROWSER'] ?? (process.platform === 'win32' ? 'chromium' : 'webkit')) === 'chromium'
+  ? chromium
+  : webkit;
+
+const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 if (!existsSync(join(DIST, 'index.html'))) {
   console.error('dist/ is missing — run `bun run build:view` first');
   process.exit(1);
 }
 
-const server = Bun.serve({
-  port: 0,
-  async fetch(req) {
-    const path = new URL(req.url).pathname;
-    const file = Bun.file(join(DIST, path === '/' ? 'index.html' : path));
-    return (await file.exists()) ? new Response(file) : new Response('not found', { status: 404 });
-  },
+const TYPES: Record<string, string> = {
+  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
+  '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml',
+  '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm', '.map': 'application/json',
+};
+
+// node's own http server, not bun's, because playwright cannot drive a browser under bun on
+// windows (oven-sh/bun#27977) and the smoke run there is `node e2e/smoke.ts`
+const server = createServer((req, res) => {
+  const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+  const file = join(DIST, path === '/' ? 'index.html' : path);
+  if (!file.startsWith(DIST) || !existsSync(file) || !statSync(file).isFile()) {
+    res.writeHead(404).end('not found');
+    return;
+  }
+  res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+  createReadStream(file).pipe(res);
 });
+
+await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+const address = server.address();
+const port = typeof address === 'object' && address ? address.port : 0;
 
 const problems: string[] = [];
 const check = (ok: boolean, what: string): void => {
@@ -24,20 +47,26 @@ const check = (ok: boolean, what: string): void => {
   if (!ok) problems.push(what);
 };
 
-let stage = 'launching webkit';
+let stage = 'launching the browser';
 const watchdog = setTimeout(() => {
   console.error(`\nsmoke gave up while ${stage}`);
   process.exit(1);
 }, 5 * 60_000);
 
-const browser = await webkit.launch();
+const browser = await engine.launch();
 stage = 'opening a page';
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+
+// monaco reads the user agent to pick its own chords, so the host the app is told about
+// has to be the one the engine already claims. playwright's linux webkit says macintosh
+const ua = await page.evaluate(() => navigator.userAgent);
+const HOST = platformOf(/Mac|iPhone|iPad/.test(ua) ? 'darwin' : process.platform, process.arch);
+const MOD = HOST.os === 'macos' ? 'Meta' : 'Control';
 
 // there is no bun process behind a browser, so the plugin bridge is stubbed with one
 // real plugin. everything past this point — the sandbox, the macro pass, the panel and
 // the extension page — is the shipping code
-await page.addInitScript(() => {
+await page.addInitScript((host: { os: string; arch: string }) => {
   const manifest = {
     id: 'starfield', name: 'Starfield', version: '1.0.0',
     description: 'scatters points in a spiral', author: 'desmos-ide',
@@ -110,6 +139,7 @@ await page.addInitScript(() => {
     readme: '# Starfield\n\nPuts points in a spiral.\n',
     enabled: true,
   };
+
   const stub: Record<string, unknown> = {
     pluginList: () => Promise.resolve([plugin]),
     pluginRegistry: () => Promise.resolve({
@@ -131,7 +161,7 @@ await page.addInitScript(() => {
     pluginSecret: () => Promise.resolve(null),
     pluginSecretStore: () => Promise.resolve(true),
     pluginSecretDelete: () => Promise.resolve(true),
-    platform: () => Promise.resolve({ os: 'macos', arch: 'arm64' }),
+    platform: () => Promise.resolve(host),
   };
 
   // anything the stub does not answer behaves the way a missing bridge does, so the
@@ -139,14 +169,14 @@ await page.addInitScript(() => {
   (window as unknown as { electronAPI: unknown }).electronAPI = new Proxy(stub, {
     get: (target, prop: string) => (prop in target ? target[prop] : () => undefined),
   });
-});
+}, HOST);
 
 const consoleErrors: string[] = [];
 page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 page.on('pageerror', e => consoleErrors.push(String(e)));
 
 stage = 'loading the page';
-await page.goto(`http://localhost:${server.port}/`);
+await page.goto(`http://localhost:${port}/`);
 stage = 'waiting for the editor';
 await page.waitForSelector('#editor-container .monaco-editor', { timeout: 20_000 });
 stage = 'checking the page';
@@ -168,7 +198,7 @@ await page.waitForFunction(
 check(true, 'the graph is drawn');
 
 await page.click('#editor-container .monaco-editor');
-await page.keyboard.press('Meta+A');
+await page.keyboard.press(`${MOD}+A`);
 await page.keyboard.type('q = nosuchname + 1');
 await page.waitForFunction(
   () => document.getElementById('status-msg')?.getAttribute('aria-live') === 'assertive',
@@ -182,6 +212,8 @@ check(((await page.locator('#status-save').textContent()) ?? '').length > 0, 'th
 
 await page.click('#btn-sidebar-ai');
 await page.waitForSelector('#ai-panel:not(.hidden)');
+// the chat panel is imported on demand, so its markup lands after the panel is shown
+await page.waitForSelector('#ai-del-btn svg', { timeout: 10_000 }).catch(() => {});
 check(
   await page.locator('#ai-del-btn svg').count() === 1 && await page.locator('#ai-new-btn svg').count() === 1,
   'every button in the chat header draws its icon',
@@ -189,7 +221,7 @@ check(
 
 const aiInput = page.locator('#ai-panel textarea').first();
 await aiInput.click();
-await page.keyboard.press('Meta+F');
+await page.keyboard.press(`${MOD}+F`);
 check(
   await page.locator('#editor-container .find-widget.visible').count() === 0,
   'find does not open while typing in the chat',
@@ -197,13 +229,13 @@ check(
 
 // and it still belongs to the editor
 await page.click('#editor-container .monaco-editor');
-await page.keyboard.press('Meta+F');
+await page.keyboard.press(`${MOD}+F`);
 await page.waitForSelector('#editor-container .find-widget.visible', { timeout: 5000 });
 check(true, 'find opens from the editor');
 
 await page.keyboard.press('Escape');
 await page.click('#editor-container .monaco-editor');
-await page.keyboard.press('Meta+A');
+await page.keyboard.press(`${MOD}+A`);
 await page.keyboard.type('a = 1');
 await page.waitForFunction(
   () => document.getElementById('status-msg')?.textContent?.includes('1 expression') ?? false,
@@ -216,6 +248,7 @@ await page.click('#btn-add-expr');
 await page.keyboard.type('y=2x');
 await page.keyboard.press('Enter');
 await page.click('#btn-dsl');
+
 // monaco renders its spaces as nbsp, so the text has to be normalised first
 let wroteBack = false;
 for (let i = 0; i < 20 && !wroteBack; i++) {
@@ -226,7 +259,7 @@ for (let i = 0; i < 20 && !wroteBack; i++) {
 check(wroteBack, 'an enhanced edit lands in the DSL file');
 
 await page.click('#editor-container .monaco-editor');
-await page.keyboard.press('Meta+A');
+await page.keyboard.press(`${MOD}+A`);
 await page.keyboard.type('a = 2*3 + 1');
 await page.click('#btn-tool-optimizer');
 await page.waitForSelector('#optimizer-body:not(.hidden) .optimizer-row', { timeout: 10_000 });
@@ -313,19 +346,23 @@ check(sealed.includes('sealed'), `the sandbox keeps the network out of reach —
 
 stage = 'checking a plugin view event';
 await page.click('#editor-container .monaco-editor');
-await page.keyboard.press('Meta+A');
+await page.keyboard.press(`${MOD}+A`);
 await page.keyboard.press('Backspace');
+
 // the rail button toggles, so it only gets a click when the sidebar is away
 if (await page.locator('#plugins-sidebar-container.hidden').count() === 1) {
   await page.click('#btn-sidebar-plugins');
 }
+
 await page.waitForSelector('#plugins-sidebar-container:not(.hidden)', { timeout: 10_000 });
 await page.locator('#plugins-views .plugin-widget-btn').first().click();
+
 let scattered = false;
 for (let i = 0; i < 30 && !scattered; i++) {
   scattered = ((await page.locator('#editor-container').textContent()) ?? '').includes('@stars(');
   if (!scattered) await page.waitForTimeout(200);
 }
+
 check(scattered, 'a button in a plugin view writes into the editor');
 check(
   ((await page.locator('#toast-stack').textContent()) ?? '').includes('scattered'),
@@ -334,7 +371,7 @@ check(
 
 stage = 'checking a plugin macro';
 await page.click('#editor-container .monaco-editor');
-await page.keyboard.press('Meta+A');
+await page.keyboard.press(`${MOD}+A`);
 await page.keyboard.type('use "starfield"\n@stars(3)\nb = twice(4)');
 let drew = false;
 for (let i = 0; i < 30 && !drew; i++) {
@@ -343,23 +380,27 @@ for (let i = 0; i < 30 && !drew; i++) {
 }
 check(drew, 'a macro expands into statements the compiler draws');
 
-await page.keyboard.press('Meta+A');
+await page.keyboard.press(`${MOD}+A`);
 await page.keyboard.type('@nosuchmacro(1)');
+
 let complained = false;
 for (let i = 0; i < 30 && !complained; i++) {
   complained = ((await page.locator('#problems-list').textContent()) ?? '').includes('No enabled plugin');
+
   if (!complained) { await page.click('#btn-tool-problems'); await page.waitForTimeout(250); }
 }
+
 check(complained, 'a macro no plugin provides is reported as a problem');
 
 check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: ${consoleErrors[0]}` : ''}`);
 
 clearTimeout(watchdog);
 await browser.close();
-await server.stop(true);
+server.close();
 
 if (problems.length) {
   console.error(`\n${problems.length} smoke check(s) failed`);
   process.exit(1);
 }
+
 console.log('\nsmoke ok');

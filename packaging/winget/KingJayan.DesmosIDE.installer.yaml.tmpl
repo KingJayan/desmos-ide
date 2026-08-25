@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+PackageIdentifier: KingJayan.DesmosIDE
+PackageVersion: {{VERSION}}
+MinimumOSVersion: 10.0.19044.0
+InstallerType: nullsoft
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+FileExtensions:
+  - dsmx
+Installers:
+  - Architecture: x64
+    InstallerUrl: {{URL}}
+    InstallerSha256: {{SHA256}}
+ManifestType: installer
+ManifestVersion: 1.6.0
