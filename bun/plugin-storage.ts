@@ -2,7 +2,6 @@
 import { createHash } from 'crypto';
 import { chmod, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { grantOwnerOnly } from './perms';
 import { storePath } from './store';
 import { deleteSecret, getSecret, secretsAvailable, setSecret } from './secrets';
 import type { PluginState } from '../src/plugin/manifest';
@@ -142,7 +141,6 @@ async function writeFallback(id: string, values: Record<string, string>): Promis
   const path = join(pluginDir(id), 'secrets.json');
   if (!(await writeJson(path, values))) return false;
   try { await chmod(path, 0o600); } catch {}
-  await grantOwnerOnly(path);
   return true;
 }
 

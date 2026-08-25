@@ -12,10 +12,10 @@
 #
 #   scripts/release.sh --tag       # after the version bump is committed and pushed
 #
-#   --tag       tag commit, push, publish ci
-#   --dry-run   build and sign, no notarization or publish ci
-#   --stage     build, sign, notarize, zip. no tag or release
-#   --publish   tag, publish zips curr in build/
+#   --tag       tag the commit and push it. ci builds and publishes all three
+#   --dry-run   build and sign, no notarization and no publishing
+#   --stage     build, sign, notarize and zip. no tag, no release
+#   --publish   tag and publish the zips already in build/
 
 set -euo pipefail
 
@@ -196,5 +196,5 @@ case "$MODE" in
   tag)     ;;
   stage)   stage ;;
   publish) publish ;;
-  full)    die "pass --tag. one mac cannot build the arm64, linux and windows halves of a release" ;;
+  full)    die "pass --tag. one mac cannot build the arm64 and linux halves of a release" ;;
 esac

@@ -47,23 +47,9 @@ export function normalizeChord(raw: string): string | null {
   return [...MOD_ORDER.filter(m => mods.has(m)), keys[0]].join('+');
 }
 
-// windows and linux layouts make @ # ~ and the rest with altgr, which the browser reports
-// as ctrl+alt. swallowing those as a chord would stop the user typing the character
-function isAltGraph(e: KeyboardEvent): boolean {
-  try {
-    if (e.getModifierState('AltGraph')) return true;
-  } catch {
-  }
-  // older webview2 never sets that state, so a composed character is the only sign left.
-  // ctrl+alt over a plain letter or digit stays a chord, which keeps mod+alt+r working
-  return e.ctrlKey && e.altKey && !e.metaKey
-    && e.key.length === 1 && !/^[a-z0-9]$/.test(e.key.toLowerCase());
-}
-
 export function chordOf(e: KeyboardEvent): string | null {
   const key = normalizePart(e.key);
   if (!key || MOD_ORDER.includes(key)) return null;
-  if (!isMac() && isAltGraph(e)) return null;
   const parts: string[] = [];
   if (isMac()) {
     if (e.metaKey) parts.push('mod');

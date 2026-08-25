@@ -12,14 +12,12 @@ const onLinux = (): void => setPlatform({ os: 'linux', arch: 'x64' });
 
 const press = (init: {
   key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean;
-  altGraph?: boolean;
 }): KeyboardEvent => ({
   key: init.key,
   metaKey: !!init.metaKey,
   ctrlKey: !!init.ctrlKey,
   altKey: !!init.altKey,
   shiftKey: !!init.shiftKey,
-  getModifierState: (name: string) => name === 'AltGraph' && !!init.altGraph,
 } as KeyboardEvent);
 
 describe('a chord is written one way', () => {
@@ -132,28 +130,5 @@ describe('the keymap', () => {
 
   test('a command with no chord has no label', () => {
     assert.equal(new Keymap().labelFor('compile.run'), null);
-  });
-});
-
-describe('altgr is not a chord', () => {
-  beforeEach(onLinux);
-
-  test('a key the layout composes with altgr is left to the editor', () => {
-    assert.equal(chordOf(press({ key: '@', ctrlKey: true, altKey: true, altGraph: true })), null);
-  });
-
-  test('an older webview2 reports no altgr state, so the character is the sign', () => {
-    assert.equal(chordOf(press({ key: '€', ctrlKey: true, altKey: true })), null);
-    assert.equal(chordOf(press({ key: 'ł', ctrlKey: true, altKey: true })), null);
-  });
-
-  test('ctrl+alt over a plain letter or digit is still a chord', () => {
-    assert.equal(chordOf(press({ key: 'r', ctrlKey: true, altKey: true })), 'mod+alt+r');
-    assert.equal(chordOf(press({ key: '4', ctrlKey: true, altKey: true })), 'mod+alt+4');
-  });
-
-  test('macOS has no altgr, so option chords are untouched', () => {
-    onMac();
-    assert.equal(chordOf(press({ key: '@', ctrlKey: true, altKey: true })), 'ctrl+alt+@');
   });
 });

@@ -272,29 +272,6 @@ describe('formatter', () => {
     assert.ok(compile(once).success, 'formatted output must still compile');
   });
 
-  test('keeps the crlf line endings the file arrived with', () => {
-    const src = 'a = 1\r\nb  =  2\r\n';
-    const once = formatDsl(src);
-    assert.equal(once, 'a = 1\r\nb = 2\r\n');
-    assert.equal(formatDsl(once), once);
-  });
-
-  test('keeps lf endings, and picks the dominant one in a mixed file', () => {
-    assert.equal(formatDsl('a = 1\nb  = 2\n'), 'a = 1\nb = 2\n');
-    assert.equal(formatDsl('a = 1\r\nb = 2\r\nc = 3\n'), 'a = 1\r\nb = 2\r\nc = 3\r\n');
-    assert.equal(formatDsl('a = 1\nb = 2\nc = 3\r\n'), 'a = 1\nb = 2\nc = 3\n');
-  });
-
-  test('a crlf file compiles to the same expressions as its lf twin', () => {
-    const src = readFileSync(new URL('../../example/demo.dsmx', import.meta.url), 'utf8')
-      .replace(/\r\n/g, '\n');
-    const crlf = src.replace(/\n/g, '\r\n');
-    const formatted = formatDsl(crlf);
-    assert.ok(formatted.includes('\r\n'), 'crlf must survive the formatter');
-    assert.equal(formatted, formatDsl(formatted));
-    assert.equal(formatted.replace(/\r\n/g, '\n'), formatDsl(src));
-  });
-
   test('formatting never changes the compiled output', () => {
     const src = readFileSync(new URL('../../example/demo.dsmx', import.meta.url), 'utf8');
     const before = compile(src);

@@ -68,8 +68,7 @@ export async function showConfirm(message: string): Promise<boolean> {
 }
 
 export async function showPrompt(message: string, defaultValue: string): Promise<string | null> {
-  // no other desktop has a helper for this, and the view answers with its own prompt
-  if (process.platform !== 'darwin') throw new Error('no native prompt on this desktop');
+  if (process.platform !== 'darwin') throw new Error('native prompt is macOS-only');
 
   const binary = nativeBinary('prompt');
   try {

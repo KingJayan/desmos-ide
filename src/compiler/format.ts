@@ -172,15 +172,7 @@ function leadingCloses(pieces: Piece[]): number {
   return n;
 }
 
-/** the line ending the file already uses, so formatting never rewrites every line */
-function dominantEol(src: string): string {
-  const crlf = src.match(/\r\n/g)?.length ?? 0;
-  const lf = (src.match(/\n/g)?.length ?? 0) - crlf;
-  return crlf > lf ? '\r\n' : '\n';
-}
-
 export function formatDsl(src: string): string {
-  const eol = dominantEol(src);
   const lines = src.replace(/\r\n?/g, '\n').split('\n');
   const out: string[] = [];
   let depth = 0;
@@ -205,5 +197,5 @@ export function formatDsl(src: string): string {
     parenDepth = Math.max(0, parenDepth + netDepth(pieces.filter(p => p.text === '(' || p.text === ')')));
   }
 
-  return out.length ? out.join(eol) + eol : '';
+  return out.length ? `${out.join('\n')}\n` : '';
 }

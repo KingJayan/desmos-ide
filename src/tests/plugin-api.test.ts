@@ -1,7 +1,6 @@
 /// <reference types="node" />
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 import { emptyContributions, parseContributions, parseKey, resolveKeys } from '../plugin/contributions';
 import { markdownToHtml } from '../shared/markdown';
 import { iconIsImage, imageType, parseManifest, pluginFiles } from '../plugin/manifest';
@@ -211,8 +210,6 @@ describe('plugin storage refuses anything that is not its own', () => {
 
 describe('the main process only reads a path the user gave it', () => {
   const load = () => import('../../bun/paths');
-  // windows has no /Users, and resolve() gives every literal below a drive letter there
-  const p = (path: string): string => resolve(path);
 
   test('nothing is reachable before a dialog picks something', async () => {
     const { allowed, allowedRoot } = await load();
@@ -223,7 +220,7 @@ describe('the main process only reads a path the user gave it', () => {
   test('a picked file is reachable, but the folder it sits in is not', async () => {
     const { allowFile, allowed } = await load();
     allowFile('/Users/someone/graphs/one.dsmx');
-    assert.equal(allowed('/Users/someone/graphs/one.dsmx'), p('/Users/someone/graphs/one.dsmx'));
+    assert.equal(allowed('/Users/someone/graphs/one.dsmx'), '/Users/someone/graphs/one.dsmx');
     assert.equal(allowed('/Users/someone/graphs/two.dsmx'), null);
     assert.equal(allowed('/Users/someone/other.dsmx'), null);
   });
@@ -232,7 +229,7 @@ describe('the main process only reads a path the user gave it', () => {
     const { allowRoot, allowed } = await load();
     allowRoot('/Users/someone/work');
     assert.equal(allowed('/Users/someone/work/../../secret'), null);
-    assert.equal(allowed('/Users/someone/work/./deep/file.dsmx'), p('/Users/someone/work/deep/file.dsmx'));
+    assert.equal(allowed('/Users/someone/work/./deep/file.dsmx'), '/Users/someone/work/deep/file.dsmx');
   });
 
   test('a folder name that only starts the same is not inside it', async () => {

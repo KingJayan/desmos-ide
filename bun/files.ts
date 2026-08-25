@@ -1,6 +1,5 @@
-import { readFile, stat, writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { watch, type FSWatcher } from 'fs';
-import { basename, dirname } from 'path';
 import { showOpenDialog, showSaveDialog } from './dialogs';
 import { allowFile, allowed } from './paths';
 import type { FileResult } from '../src/shared/rpc-schema';
@@ -170,38 +169,18 @@ export function watchFile(raw: string, onChange: (path: string, content: string)
   const path = allowed(raw);
   if (!path) return;
   unwatchFile(path);
-
-  // the parent directory is watched, not the file: an editor that saves by writing a
-  // temporary file and renaming it over the original leaves a file watch pointing at an
-  // inode nothing writes to again
-  const dir = dirname(path);
-  const name = basename(path);
-
   const entry: WatcherEntry = { watcher: null!, debounce: null };
-
-  const settle = () => {
+  entry.watcher = watch(path, { persistent: false }, eventType => {
+    if (eventType !== 'change') return;
     if (entry.debounce) clearTimeout(entry.debounce);
     entry.debounce = setTimeout(async () => {
       try {
-        // a rename is either a replace or a delete, and only a stat tells them apart
-        await stat(path);
         const content = await readFile(path, 'utf-8');
         if (selfWrites.get(path) === content) return;
         selfWrites.delete(path);
         onChange(path, content);
       } catch {}
     }, 250);
-  };
-
-  try {
-    entry.watcher = watch(dir, { persistent: false }, (eventType, filename) => {
-      if (eventType !== 'change' && eventType !== 'rename') return;
-      if (filename && basename(filename.toString()) !== name) return;
-      settle();
-    });
-  } catch {
-    return;
-  }
-
+  });
   fileWatchers.set(path, entry);
 }
