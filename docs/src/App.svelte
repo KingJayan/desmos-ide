@@ -149,8 +149,8 @@
       <h1>desmos ide</h1>
       <p class="landing-tagline">code your desmos graphs.</p>
       <div class="home-actions">
-        <a class="cta" href="/docs"><Icon icon="lucide:book-open" />&nbsp;read the docs</a>
-        <a class="cta" href="/download"><Icon icon="lucide:download" />&nbsp;downloads</a>
+        <a class="cta" href="/docs"><Icon icon="lucide:book-open" />&emsp;read the docs</a>
+        <a class="cta" href="/download"><Icon icon="lucide:download" />&emsp;downloads</a>
       </div>
     </section>
 

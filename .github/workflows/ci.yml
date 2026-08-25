@@ -139,7 +139,14 @@ jobs:
         run: bunx playwright install ${{ env.SMOKE_BROWSER }}
         timeout-minutes: 8
 
-      - run: bun run e2e/smoke.ts
+      # playwright cannot launch a browser under bun on windows (oven-sh/bun#27977), so the
+      # smoke runs on node there. the script uses no bun api
+      - if: runner.os != 'Windows'
+        run: bun run e2e/smoke.ts
+        timeout-minutes: 8
+
+      - if: runner.os == 'Windows'
+        run: node --experimental-strip-types e2e/smoke.ts
         timeout-minutes: 8
 
   native:
@@ -202,9 +209,11 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem -Recurse -Depth 3 build | Select-Object -ExpandProperty FullName
-          $setup = Get-ChildItem -Recurse -Filter '*Setup*.exe' build | Select-Object -First 1
-          if (-not $setup) { throw 'no *Setup*.exe under build/' }
-          Write-Host "installer: $($setup.FullName)"
+          # a dev build makes the app folder only. the installer is a stable build, which the
+          # release workflow makes and checks
+          $launcher = Get-ChildItem -Recurse -Filter 'launcher.exe' build | Select-Object -First 1
+          if (-not $launcher) { throw 'no launcher.exe under build/' }
+          Write-Host "app: $($launcher.FullName)"
           $keys = @(
             'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
             'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'

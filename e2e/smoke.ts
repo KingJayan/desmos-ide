@@ -1,27 +1,45 @@
 // `bun run test:e2e` after `bun run build:view`.
 import { chromium, webkit } from 'playwright';
-import { join } from 'node:path';
-import { existsSync } from 'node:fs';
-import { platformOf } from '../src/shared/platform';
+import { createServer } from 'node:http';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { platformOf } from '../src/shared/platform.ts';
 
 const engine = (process.env['SMOKE_BROWSER'] ?? (process.platform === 'win32' ? 'chromium' : 'webkit')) === 'chromium'
   ? chromium
   : webkit;
 
-const DIST = join(import.meta.dir, '..', 'dist');
+const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 if (!existsSync(join(DIST, 'index.html'))) {
   console.error('dist/ is missing — run `bun run build:view` first');
   process.exit(1);
 }
 
-const server = Bun.serve({
-  port: 0,
-  async fetch(req) {
-    const path = new URL(req.url).pathname;
-    const file = Bun.file(join(DIST, path === '/' ? 'index.html' : path));
-    return (await file.exists()) ? new Response(file) : new Response('not found', { status: 404 });
-  },
+const TYPES: Record<string, string> = {
+  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
+  '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml',
+  '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm', '.map': 'application/json',
+};
+
+// node's own http server, not bun's, because playwright cannot drive a browser under bun on
+// windows (oven-sh/bun#27977) and the smoke run there is `node e2e/smoke.ts`
+const server = createServer((req, res) => {
+  const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+  const file = join(DIST, path === '/' ? 'index.html' : path);
+  if (!file.startsWith(DIST) || !existsSync(file) || !statSync(file).isFile()) {
+    res.writeHead(404).end('not found');
+    return;
+  }
+  res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+  createReadStream(file).pipe(res);
 });
+
+await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+const address = server.address();
+const port = typeof address === 'object' && address ? address.port : 0;
 
 const problems: string[] = [];
 const check = (ok: boolean, what: string): void => {
@@ -158,7 +176,7 @@ page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text())
 page.on('pageerror', e => consoleErrors.push(String(e)));
 
 stage = 'loading the page';
-await page.goto(`http://localhost:${server.port}/`);
+await page.goto(`http://localhost:${port}/`);
 stage = 'waiting for the editor';
 await page.waitForSelector('#editor-container .monaco-editor', { timeout: 20_000 });
 stage = 'checking the page';
@@ -378,7 +396,7 @@ check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: 
 
 clearTimeout(watchdog);
 await browser.close();
-await server.stop(true);
+server.close();
 
 if (problems.length) {
   console.error(`\n${problems.length} smoke check(s) failed`);
