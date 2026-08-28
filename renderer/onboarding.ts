@@ -24,6 +24,7 @@ export class Onboarding {
   private nextBtn: HTMLButtonElement;
   private step = 0;
   private running = false;
+  private previousFocus: HTMLElement | null = null;
   private onKey = (e: KeyboardEvent) => {
     if (!this.running) return;
     if (e.key === 'Escape') { e.preventDefault(); this.end(); return; }
@@ -99,10 +100,23 @@ export class Onboarding {
     overlay.appendChild(modal);
 
     overlay.addEventListener('keydown', e => {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      this.hideWelcome();
-      this.opts.onFinish();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.hideWelcome();
+        this.opts.onFinish();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(modal.querySelectorAll<HTMLElement>('button'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     });
 
     return overlay;
@@ -150,6 +164,7 @@ export class Onboarding {
   }
 
   showWelcome(): void {
+    this.previousFocus = document.activeElement as HTMLElement | null;
     this.welcome.classList.remove('hidden');
     const first = this.welcome.querySelector<HTMLElement>('button');
     first?.focus();
@@ -157,6 +172,8 @@ export class Onboarding {
 
   private hideWelcome(): void {
     this.welcome.classList.add('hidden');
+    this.previousFocus?.focus();
+    this.previousFocus = null;
   }
 
   start(): void {
@@ -178,6 +195,7 @@ export class Onboarding {
   }
 
   private end(): void {
+    if (!this.running) return;
     this.running = false;
     this.pop.classList.add('hidden');
     this.ring.classList.add('hidden');

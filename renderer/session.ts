@@ -76,12 +76,30 @@ function store(): Storage | null {
   try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
 }
 
+let onStoreFailure: (message: string) => void = () => {};
+let reported = false;
+
+/** a store that refuses a write loses the session, which the user must be told about once */
+export function reportStoreFailures(report: (message: string) => void): void {
+  onStoreFailure = report;
+}
+
+function write(key: string, value: string): void {
+  try {
+    store()?.setItem(key, value);
+  } catch {
+    if (reported) return;
+    reported = true;
+    onStoreFailure('This browser refused to store the session, so the open file and the recent list are not remembered.');
+  }
+}
+
 export function loadRecent(): RecentFile[] {
   return parseRecent(store()?.getItem(RECENT_KEY) ?? null);
 }
 
 export function saveRecent(list: RecentFile[]): void {
-  try { store()?.setItem(RECENT_KEY, JSON.stringify(list)); } catch {}
+  write(RECENT_KEY, JSON.stringify(list));
 }
 
 export function loadSession(): SessionState | null {
@@ -89,5 +107,5 @@ export function loadSession(): SessionState | null {
 }
 
 export function saveSession(state: Omit<SessionState, 'savedAt'>): void {
-  try { store()?.setItem(SESSION_KEY, JSON.stringify({ ...state, savedAt: Date.now() })); } catch {}
+  write(SESSION_KEY, JSON.stringify({ ...state, savedAt: Date.now() }));
 }

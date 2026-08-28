@@ -1,0 +1,36 @@
+@use 'tokens' as *;
+
+:root[data-hide-statusbar] #statusbar,
+:root[data-hide-tabs] #tab-strip,
+:root[data-hide-breadcrumbs] #breadcrumbs { display: none; }
+
+:root[data-simple] {
+  #rail-left,
+  #rail-right,
+  #tool-left,
+  #tool-left-divider,
+  #tool-bottom,
+  #bottom-divider,
+  #tab-strip,
+  #breadcrumbs,
+  #status-facts { display: none; }
+
+  #canvas { padding: 0 var(--gap) var(--gap); }
+  #status-msg { color: var(--overlay0); }
+}
+
+.gutter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+:root[data-reduce-motion] {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

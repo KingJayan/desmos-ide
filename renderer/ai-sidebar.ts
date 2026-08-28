@@ -1,7 +1,7 @@
-import { iconSvg } from './icons';
-import { escapeHtml } from '../src/shared/escape';
+import { iconEl } from './icons';
 import { lineDiff } from './diff';
-import { sidebarMarkup } from './ai-template';
+import { buildSidebar } from './ai-template';
+import type { SidebarParts } from './ai-template';
 import { cleanTitle, parseResponse, truncateAtWord } from './ai-markdown';
 import { AI_MARKDOWN_CLASSES, renderMarkdown } from './markdown';
 import {
@@ -29,6 +29,32 @@ const PROMPT_SUGGESTIONS = [
 const SCROLL_AWAY_RATIO  = 0.25;
 const MAX_HISTORY        = 20;
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+const EMPTY_ICON_PARTS: [string, Record<string, string>][] = [
+  ['circle', { cx: '32', cy: '32', r: '28', stroke: 'currentColor', 'stroke-width': '2.5', opacity: '0.3' }],
+  ['path', {
+    d: 'M20 32 Q26 20 32 32 Q38 44 44 32', stroke: 'currentColor', 'stroke-width': '2.5',
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none',
+  }],
+  ['circle', { cx: '20', cy: '32', r: '2.5', fill: 'currentColor', opacity: '0.6' }],
+  ['circle', { cx: '44', cy: '32', r: '2.5', fill: 'currentColor', opacity: '0.6' }],
+];
+
+function emptyIcon(): SVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'ai-empty-icon');
+  svg.setAttribute('viewBox', '0 0 64 64');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [tag, attrs] of EMPTY_ICON_PARTS) {
+    const child = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) child.setAttribute(k, v);
+    svg.appendChild(child);
+  }
+  return svg;
+}
+
 export class AISidebar {
   private chats: Chat[] = [];
   private activeChat!: Chat;
@@ -50,6 +76,7 @@ export class AISidebar {
   private getContext: () => { dsl: string; selection: string };
 
   private el: HTMLElement;
+  private ui!: SidebarParts;
   private messagesEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private sendBtn!: HTMLButtonElement;
@@ -75,14 +102,17 @@ export class AISidebar {
   private ctxPillEl!: HTMLElement;
   private ctxPillCloseBtn!: HTMLButtonElement;
   private contextDisabledForMsg = false;
+  private readonly onError: (text: string) => void;
 
   constructor(
     container: HTMLElement,
     getContext: () => { dsl: string; selection: string },
     onApply: (action: ApplyAction) => void,
+    onError: (text: string) => void = () => {},
   ) {
     this.getContext = getContext;
     this.onApply = onApply;
+    this.onError = onError;
     this.el = container;
     this.provider = this.loadProvider();
     this.providerConfigs = this.loadProviderConfigs();
@@ -198,36 +228,36 @@ export class AISidebar {
   }
 
   private render(): void {
-    this.el.innerHTML = sidebarMarkup({ sendContext: this.sendContext, autoApprove: this.autoApprove });
+    const ui = buildSidebar(this.el, { sendContext: this.sendContext, autoApprove: this.autoApprove });
+    this.ui = ui;
 
-    this.messagesEl   = this.el.querySelector('.ai-messages')!;
-    this.inputEl      = this.el.querySelector('.ai-input')!;
-    this.sendBtn      = this.el.querySelector('.ai-send-btn')!;
-    this.chatSelectEl = this.el.querySelector('.ai-chat-select')!;
-    this.configBtnEl = this.el.querySelector('#ai-provider-chip')!;
-    this.providerLabelEl = this.el.querySelector('.ai-status-provider-label')!;
-    this.providerStateEl = this.el.querySelector('.ai-status-model')!;
-    this.configEl = this.el.querySelector('.ai-config-popover')!;
-    this.cfgProviderEl = this.el.querySelector('.ai-config-provider')!;
-    this.cfgModelEl = this.el.querySelector('.ai-config-model')!;
-    this.cfgBaseUrlEl = this.el.querySelector('.ai-config-baseurl')!;
-    this.cfgApiKeyEl = this.el.querySelector('.ai-config-key')!;
-    this.cfgSaveEl = this.el.querySelector('.ai-config-save')!;
+    this.messagesEl   = ui.messages;
+    this.inputEl      = ui.input;
+    this.sendBtn      = ui.sendBtn;
+    this.chatSelectEl = ui.chatSelect;
+    this.configBtnEl  = ui.providerChip;
+    this.providerLabelEl = ui.providerLabel;
+    this.providerStateEl = ui.statusModel;
+    this.configEl = ui.config;
+    this.cfgProviderEl = ui.cfgProvider;
+    this.cfgModelEl = ui.cfgModel;
+    this.cfgBaseUrlEl = ui.cfgBaseUrl;
+    this.cfgApiKeyEl = ui.cfgApiKey;
+    this.cfgSaveEl = ui.cfgSave;
     // says where the key lands, which depends on whether a keychain answered
-    const keyNote = this.el.querySelector('.ai-config-key-note') as HTMLElement;
     void this.secrets.load().then(() => {
-      keyNote.textContent = this.secrets.secure
+      ui.cfgKeyNote.textContent = this.secrets.secure
         ? 'The key is kept in the system keychain, not in the app.'
         : 'No keychain answered, so the key stays unencrypted in this app\u2019s local storage.';
     });
-    this.cfgCopilotEl = this.el.querySelector('.ai-config-copilot')!;
-    this.scrollFabEl  = this.el.querySelector('.ai-scroll-fab')!;
-    this.scrollFabDotEl = this.el.querySelector('.ai-scroll-fab-dot')!;
-    this.acEl         = this.el.querySelector('.ai-autocomplete')!;
-    this.autoApproveBtn = this.el.querySelector('#ai-autoapprove-btn') as HTMLButtonElement;
-    this.ctxPillEl = this.el.querySelector('.ai-ctx-pill')!;
-    this.ctxPillCloseBtn = this.el.querySelector('.ai-ctx-pill-close')!;
-    const ctxBtn      = this.el.querySelector('#ai-ctx-btn') as HTMLButtonElement;
+    this.cfgCopilotEl = ui.cfgCopilot;
+    this.scrollFabEl  = ui.scrollFab;
+    this.scrollFabDotEl = ui.scrollFabDot;
+    this.acEl         = ui.autocomplete;
+    this.autoApproveBtn = ui.autoApproveBtn;
+    this.ctxPillEl = ui.ctxPill;
+    this.ctxPillCloseBtn = ui.ctxPillClose;
+    const ctxBtn = ui.ctxBtn;
 
     this.syncChatSelect();
     this.syncMemoryBadge();
@@ -256,7 +286,7 @@ export class AISidebar {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submit(); }
     });
 
-    this.el.querySelector('#ai-new-btn')!.addEventListener('click', () => {
+    ui.newBtn.addEventListener('click', () => {
       const chat = this.newChat();
       this.chats.push(chat);
       this.activeChat = chat;
@@ -265,7 +295,7 @@ export class AISidebar {
       this.renderMessages();
     });
 
-    this.el.querySelector('#ai-del-btn')!.addEventListener('click', () => {
+    ui.delBtn.addEventListener('click', () => {
       if (this.streaming) return;
       if (this.chats.length === 1) {
         this.activeChat.history = [];
@@ -303,9 +333,8 @@ export class AISidebar {
     this.providerStateEl.addEventListener('click', (e: Event) => {
       e.stopPropagation();
       const cfg = this.getProviderConfig();
-      const standard = this.configEl.querySelector('.ai-config-standard') as HTMLElement;
       this.cfgCopilotEl.hidden = true;
-      standard.hidden = false;
+      this.ui.cfgStandard.hidden = false;
       this.cfgSaveEl.hidden = false;
       this.populateProviderSelect();
       this.populateModelSelect(this.provider, cfg.model);
@@ -345,8 +374,12 @@ export class AISidebar {
       this.appendSystemMsg('Provider config saved.');
     });
 
-    this.el.querySelector('.ai-copilot-connect')!.addEventListener('click', () => this.startCopilotAuth());
-    this.el.querySelector('.ai-copilot-disconnect')!.addEventListener('click', async () => {
+    ui.copilotLink.addEventListener('click', e => {
+      e.preventDefault();
+      if (this.copilotAuth) void window.electronAPI?.openExternal(this.copilotAuth.verificationUri);
+    });
+    ui.copilotConnect.addEventListener('click', () => this.startCopilotAuth());
+    ui.copilotDisconnect.addEventListener('click', async () => {
       const ok = await window.electronAPI?.confirm(
         'Disconnect GitHub Copilot? You can reconnect at any time.',
       );
@@ -397,12 +430,13 @@ export class AISidebar {
   }
 
   private syncChatSelect(): void {
-    this.chatSelectEl.innerHTML = this.chats
-      .map(c => {
-        const label = this.pendingTitles.has(c.id) ? 'Naming chat…' : c.title;
-        return `<option value="${escapeHtml(c.id)}"${c.id === this.activeChat.id ? ' selected' : ''}>${escapeHtml(label)}</option>`;
-      })
-      .join('');
+    this.chatSelectEl.replaceChildren(...this.chats.map(c => {
+      const option = document.createElement('option');
+      option.value = c.id;
+      option.textContent = this.pendingTitles.has(c.id) ? 'Naming chat…' : c.title;
+      option.selected = c.id === this.activeChat.id;
+      return option;
+    }));
     this.chatSelectEl.classList.toggle('ai-chat-select--pending', this.pendingTitles.has(this.activeChat.id));
   }
 
@@ -428,13 +462,27 @@ export class AISidebar {
     this.acItems = matchSlashCommands(val);
     if (!this.acItems.length) { this.hideAc(); return; }
     this.acIndex = -1;
-    this.acEl.innerHTML = this.acItems
-      .map((c, i) => `<div class="ai-ac-item" data-i="${i}"><span class="ai-ac-cmd">${escapeHtml(c.cmd)}</span>${c.arg ? `<span class="ai-ac-arg"> ${escapeHtml(c.arg)}</span>` : ''}<span class="ai-ac-desc">${escapeHtml(c.desc)}</span></div>`)
-      .join('');
+    this.acEl.replaceChildren(...this.acItems.map((c, i) => {
+      const item = document.createElement('div');
+      item.className = 'ai-ac-item';
+      const cmd = document.createElement('span');
+      cmd.className = 'ai-ac-cmd';
+      cmd.textContent = c.cmd;
+      item.appendChild(cmd);
+      if (c.arg) {
+        const arg = document.createElement('span');
+        arg.className = 'ai-ac-arg';
+        arg.textContent = ` ${c.arg}`;
+        item.appendChild(arg);
+      }
+      const desc = document.createElement('span');
+      desc.className = 'ai-ac-desc';
+      desc.textContent = c.desc;
+      item.appendChild(desc);
+      item.addEventListener('mousedown', e => { e.preventDefault(); this.applyAc(i); });
+      return item;
+    }));
     this.acEl.classList.add('ai-autocomplete--open');
-    this.acEl.querySelectorAll('.ai-ac-item').forEach((el, i) => {
-      el.addEventListener('mousedown', e => { e.preventDefault(); this.applyAc(i); });
-    });
   }
 
   private moveAc(dir: number): void {
@@ -454,13 +502,12 @@ export class AISidebar {
   private hideAc(): void {
     this.acItems = [];
     this.acIndex = -1;
-    this.acEl.innerHTML = '';
+    this.acEl.replaceChildren();
     this.acEl.classList.remove('ai-autocomplete--open');
   }
 
   private syncMemoryBadge(): void {
-    const el = this.el.querySelector('.ai-status-memory') as HTMLElement | null;
-    if (!el) return;
+    const el = this.ui.statusMemory;
     const n = this.memories.length;
     el.textContent = n ? `${n} mem` : '';
     el.title = n ? `${n} saved ${n === 1 ? 'memory' : 'memories'} — /memory list` : '';
@@ -471,7 +518,7 @@ export class AISidebar {
     const cfg = this.getProviderConfig();
     const p = PROVIDERS.find(x => x.id === this.provider);
 
-    const providerChip = this.el.querySelector('.ai-provider-chip') as HTMLElement;
+    const providerChip = this.ui.providerChip;
     if (this.provider === 'github-copilot') {
       const connected = !!cfg.apiKey;
       this.providerLabelEl.textContent = '';
@@ -490,21 +537,22 @@ export class AISidebar {
   }
 
   private populateProviderSelect(): void {
-    this.cfgProviderEl.innerHTML = PROVIDERS
-      .map(p => `<option value="${escapeHtml(p.id)}"${p.id === this.provider ? ' selected' : ''}>${escapeHtml(p.label)}</option>`)
-      .join('');
+    this.cfgProviderEl.replaceChildren(...PROVIDERS.map(p => {
+      const option = document.createElement('option');
+      option.value = p.id;
+      option.textContent = p.label;
+      option.selected = p.id === this.provider;
+      return option;
+    }));
   }
 
   private syncConfigFields(): void {
     const isCopilot = this.provider === 'github-copilot';
     const cfg = this.getProviderConfig();
-    const standard = this.configEl.querySelector('.ai-config-standard') as HTMLElement;
-    const saveBtn = this.cfgSaveEl;
-
     this.populateProviderSelect();
     this.cfgCopilotEl.hidden = !isCopilot;
-    standard.hidden = isCopilot;
-    saveBtn.hidden = isCopilot;
+    this.ui.cfgStandard.hidden = isCopilot;
+    this.cfgSaveEl.hidden = isCopilot;
 
     if (isCopilot) {
       this.renderCopilotStatus();
@@ -517,12 +565,15 @@ export class AISidebar {
 
   private populateModelSelect(provider: AIProvider, current: string, dynamicModels?: string[]): void {
     const models = dynamicModels ?? (provider === 'github-copilot' && this.copilotModels ? this.copilotModels : PROVIDER_MODELS[provider] ?? []);
-    this.cfgModelEl.innerHTML = models
-      .map(m => `<option value="${escapeHtml(m)}"${m === current ? ' selected' : ''}>${escapeHtml(m)}</option>`)
-      .join('');
-    if (!models.includes(current) && current) {
-      this.cfgModelEl.innerHTML = `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>` + this.cfgModelEl.innerHTML;
-    }
+    const option = (value: string): HTMLOptionElement => {
+      const node = document.createElement('option');
+      node.value = value;
+      node.textContent = value;
+      node.selected = value === current;
+      return node;
+    };
+    const shown = !models.includes(current) && current ? [current, ...models] : models;
+    this.cfgModelEl.replaceChildren(...shown.map(option));
   }
 
   private async fetchCopilotModels(githubToken: string): Promise<void> {
@@ -539,10 +590,10 @@ export class AISidebar {
   }
 
   private renderCopilotStatus(): void {
-    const statusEl = this.cfgCopilotEl.querySelector('.ai-copilot-status') as HTMLElement;
-    const connectBtn = this.cfgCopilotEl.querySelector('.ai-copilot-connect') as HTMLButtonElement;
-    const disconnectBtn = this.cfgCopilotEl.querySelector('.ai-copilot-disconnect') as HTMLButtonElement;
-    const codeWrap = this.cfgCopilotEl.querySelector('.ai-copilot-code-wrap') as HTMLElement;
+    const statusEl = this.ui.copilotStatus;
+    const connectBtn = this.ui.copilotConnect;
+    const disconnectBtn = this.ui.copilotDisconnect;
+    const codeWrap = this.ui.copilotCodeWrap;
     const cfg = this.getProviderConfig('github-copilot');
 
     if (cfg.apiKey) {
@@ -556,14 +607,8 @@ export class AISidebar {
       statusEl.className = 'ai-copilot-status ai-copilot-status--pending';
       connectBtn.hidden = true;
       disconnectBtn.hidden = true;
-      const codeEl = codeWrap.querySelector('.ai-copilot-user-code') as HTMLElement;
-      codeEl.textContent = this.copilotAuth.userCode;
-      const link = codeWrap.querySelector('#ai-copilot-verif-link') as HTMLAnchorElement;
-      link.href = this.copilotAuth.verificationUri;
-      link.addEventListener('click', e => {
-        e.preventDefault();
-        void window.electronAPI?.openExternal(this.copilotAuth!.verificationUri);
-      });
+      this.ui.copilotUserCode.textContent = this.copilotAuth.userCode;
+      this.ui.copilotLink.href = this.copilotAuth.verificationUri;
       codeWrap.hidden = false;
     } else {
       statusEl.textContent = 'Not connected';
@@ -651,7 +696,7 @@ export class AISidebar {
   }
 
   private renderMessages(): void {
-    this.messagesEl.innerHTML = '';
+    this.messagesEl.replaceChildren();
     if (!this.activeChat.history.length) { this.appendWelcome(); return; }
     const history = this.activeChat.history;
     for (let idx = 0; idx < history.length; idx++) {
@@ -684,18 +729,19 @@ export class AISidebar {
   private appendWelcome(): void {
     const el = document.createElement('div');
     el.className = 'ai-empty-state';
-    el.innerHTML = `
-      <svg class="ai-empty-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="2.5" opacity="0.3"/>
-        <path d="M20 32 Q26 20 32 32 Q38 44 44 32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <circle cx="20" cy="32" r="2.5" fill="currentColor" opacity="0.6"/>
-        <circle cx="44" cy="32" r="2.5" fill="currentColor" opacity="0.6"/>
-      </svg>
-      <p class="ai-empty-hint">Type <kbd>/help</kbd> to see all commands</p>
-      <div class="ai-prompt-chips"></div>
-    `;
+
+    const hint = document.createElement('p');
+    hint.className = 'ai-empty-hint';
+    const kbd = document.createElement('kbd');
+    kbd.textContent = '/help';
+    hint.append(document.createTextNode('Type '), kbd, document.createTextNode(' to see all commands'));
+
+    const chips = document.createElement('div');
+    chips.className = 'ai-prompt-chips';
+
+    el.append(emptyIcon(), hint, chips);
     this.messagesEl.appendChild(el);
-    this.initPromptChips();
+    this.initPromptChips(chips);
   }
 
   private submit(): void {
@@ -769,13 +815,18 @@ export class AISidebar {
       return;
     }
 
-    this.appendSystemMsg(`Unknown command: ${escapeHtml(cmd)}`);
+    this.appendSystemMsg(`Unknown command: ${cmd}`);
   }
 
   private appendSystemMsg(text: string): void {
     const el = document.createElement('div');
     el.className = 'ai-msg ai-msg--system';
-    el.innerHTML = `<div class="ai-bubble ai-bubble--system"><p>${escapeHtml(text)}</p></div>`;
+    const bubble = document.createElement('div');
+    bubble.className = 'ai-bubble ai-bubble--system';
+    const line = document.createElement('p');
+    line.textContent = text;
+    bubble.appendChild(line);
+    el.appendChild(bubble);
     this.messagesEl.appendChild(el);
     this.scrollToBottom(true);
   }
@@ -849,10 +900,10 @@ export class AISidebar {
 
   private updateSendBtn(): void {
     if (this.streaming && this.activeReqId) {
-      this.sendBtn.innerHTML = iconSvg('square', { size: 14, filled: true });
+      this.sendBtn.replaceChildren(iconEl('square', { size: 14, filled: true }));
       this.sendBtn.title = 'Stop generation';
     } else {
-      this.sendBtn.innerHTML = iconSvg('send', { size: 14, strokeWidth: 2.5 });
+      this.sendBtn.replaceChildren(iconEl('send', { size: 14, strokeWidth: 2.5 }));
       this.sendBtn.title = 'Send (Enter)';
     }
   }
@@ -894,6 +945,7 @@ export class AISidebar {
         s.textEl.textContent = hint ? `Error: ${error}\n\n${hint}` : `Error: ${error}`;
         s.textEl.classList.add('ai-error-text');
       }
+      this.onError(error);
       this.setLoading(false);
     }));
   }
@@ -903,7 +955,9 @@ export class AISidebar {
     el.className = 'ai-msg ai-msg--user';
     const bubble = document.createElement('div');
     bubble.className = 'ai-bubble';
-    bubble.innerHTML = `<p>${escapeHtml(text)}</p>`;
+    const line = document.createElement('p');
+    line.textContent = text;
+    bubble.appendChild(line);
     el.appendChild(bubble);
 
     // add toolbar
@@ -913,12 +967,11 @@ export class AISidebar {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'ai-toolbar-btn';
     copyBtn.title = 'Copy message';
-    copyBtn.innerHTML = iconSvg('copy', { size: 12 });
+    copyBtn.replaceChildren(iconEl('copy', { size: 12 }));
     copyBtn.addEventListener('click', () => {
       void navigator.clipboard.writeText(text);
-      const orig = copyBtn.innerHTML;
-      copyBtn.innerHTML = iconSvg('check', { size: 12 });
-      setTimeout(() => { copyBtn.innerHTML = orig; }, 1500);
+      copyBtn.replaceChildren(iconEl('check', { size: 12 }));
+      setTimeout(() => copyBtn.replaceChildren(iconEl('copy', { size: 12 })), 1500);
     });
     toolbar.appendChild(copyBtn);
 
@@ -926,7 +979,7 @@ export class AISidebar {
     const editBtn = document.createElement('button');
     editBtn.className = 'ai-toolbar-btn';
     editBtn.title = 'Edit and resend';
-    editBtn.innerHTML = iconSvg('square-pen', { size: 12 });
+    editBtn.replaceChildren(iconEl('square-pen', { size: 12 }));
     editBtn.addEventListener('click', () => {
       this.inputEl.value = text;
       this.autoResize();
@@ -953,7 +1006,7 @@ export class AISidebar {
     const typing = document.createElement('span');
     typing.className = 'ai-typing';
     typing.setAttribute('aria-label', 'Assistant is typing');
-    typing.innerHTML = '<span></span><span></span><span></span>';
+    typing.append(...[0, 1, 2].map(() => document.createElement('span')));
     bubble.appendChild(typing);
     msg.appendChild(bubble);
     this.messagesEl.appendChild(msg);
@@ -963,7 +1016,7 @@ export class AISidebar {
 
   private renderAssistantContent(bubble: HTMLElement, full: string): void {
     bubble.classList.remove('ai-bubble--streaming');
-    bubble.innerHTML = '';
+    bubble.replaceChildren();
     for (const part of parseResponse(full)) {
       if (part.type === 'text') {
         bubble.appendChild(renderMarkdown(part.content, { classes: AI_MARKDOWN_CLASSES }));
@@ -987,12 +1040,11 @@ export class AISidebar {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'ai-code-copy-btn';
     copyBtn.title = 'Copy code';
-    copyBtn.innerHTML = iconSvg('copy', { size: 14 });
+    copyBtn.replaceChildren(iconEl('copy', { size: 14 }));
     copyBtn.addEventListener('click', () => {
       void navigator.clipboard.writeText(code);
-      const orig = copyBtn.textContent;
-      copyBtn.innerHTML = iconSvg('check', { size: 14 });
-      setTimeout(() => { copyBtn.innerHTML = orig || iconSvg('copy', { size: 14 }); }, 1500);
+      copyBtn.replaceChildren(iconEl('check', { size: 14 }));
+      setTimeout(() => copyBtn.replaceChildren(iconEl('copy', { size: 14 })), 1500);
     });
     header.appendChild(copyBtn);
     wrap.appendChild(header);
@@ -1036,7 +1088,12 @@ export class AISidebar {
       });
     }
 
-    denyBtn.addEventListener('click', () => { actions.innerHTML = '<span class="ai-dismissed">Dismissed</span>'; });
+    denyBtn.addEventListener('click', () => {
+      const note = document.createElement('span');
+      note.className = 'ai-dismissed';
+      note.textContent = 'Dismissed';
+      actions.replaceChildren(note);
+    });
 
     actions.appendChild(insertBtn);
     actions.appendChild(replaceBtn);
@@ -1196,15 +1253,12 @@ export class AISidebar {
     this.updateCtxPill();
   }
 
-  private initPromptChips(): void {
-    const container = this.messagesEl.querySelector('.ai-prompt-chips') as HTMLElement;
-    if (!container) return;
-
+  private initPromptChips(container: HTMLElement): void {
     const chipsEl = document.createElement('div');
     chipsEl.className = 'ai-chips-container';
 
     const fill = (offset: number) => {
-      chipsEl.innerHTML = '';
+      chipsEl.replaceChildren();
       for (let i = 0; i < 3; i++) {
         const text = PROMPT_SUGGESTIONS[(offset + i) % PROMPT_SUGGESTIONS.length];
         const chip = document.createElement('button');

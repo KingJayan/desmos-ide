@@ -34,7 +34,7 @@
       </div>
 
       <div class="tb-group tb-group--right">
-        <div class="mode-toggle" role="group" aria-label="view mode">
+        <div id="mode-toggle" class="mode-toggle" role="group" aria-label="view mode">
           <button id="btn-dsl" class="mode-btn active" title="Write the DSL. This is the file that gets saved.">dsl</button>
           <button id="btn-split" class="mode-btn" title="DSL editor and the expression list side by side">split</button>
           <button id="btn-enhanced" class="mode-btn" title="Edit the expressions the way Desmos does. Edits are written back into the DSL file when they have a DSL form.">enhanced</button>
@@ -48,6 +48,8 @@
     </header>
 
     <div id="canvas">
+      <section id="start-page" class="hidden" aria-label="start"></section>
+
       <aside id="rail-left" class="rail" aria-label="left tool windows">
         <div class="rail-group">
           <button id="btn-sidebar-git" class="rail-btn" title="commit" data-chord="sidebar.git" aria-label="commit">

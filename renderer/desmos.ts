@@ -116,6 +116,16 @@ export class DesmosGraph {
     return { xmin: m.left, xmax: m.right, ymin: m.bottom, ymax: m.top };
   }
 
+  setOptions(options: {
+    zoomButtons: boolean;
+    settingsMenu: boolean;
+    keypad: boolean;
+    expressions: boolean;
+    lockViewport: boolean;
+  }): void {
+    this.calc.updateSettings({ ...options, expressionsList: options.expressions });
+  }
+
   setTheme(theme: ColorTheme): void {
     const before = themeFillScale(this.theme);
     this.theme = theme;

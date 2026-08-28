@@ -2,8 +2,11 @@ import { readFile, stat, writeFile } from 'fs/promises';
 import { watch, type FSWatcher } from 'fs';
 import { basename, dirname } from 'path';
 import { showOpenDialog, showSaveDialog } from './dialogs';
-import { allowFile, allowed } from './paths';
-import type { FileResult } from '../src/shared/rpc-schema';
+import { allowFile, allowed, allowedRoot } from './paths';
+import { collectFiles } from './search';
+import type { FileResult, FolderListing } from '../src/shared/rpc-schema';
+
+const MAX_LISTED = 200;
 
 const CANCELED = { ok: false, canceled: true, errorCode: 'CANCELED', message: '' } as const;
 
@@ -73,6 +76,22 @@ export async function readFileAt(raw: string): Promise<FileResult<{ path: string
     return { ok: true, path, content: await withRetry(() => readFile(path, 'utf-8')) };
   } catch (err) {
     return fileError(err);
+  }
+}
+
+export async function listFolder(raw: string): Promise<FolderListing> {
+  const root = allowedRoot(raw);
+  if (!root) return { ok: false, message: 'This app has not been given that folder.' };
+  try {
+    const files = (await collectFiles(root)).filter(path => path.toLowerCase().endsWith('.dsmx'));
+    return {
+      ok: true,
+      root,
+      entries: files.slice(0, MAX_LISTED).map(path => ({ path, name: basename(path) })),
+      truncated: files.length > MAX_LISTED,
+    };
+  } catch (err) {
+    return { ok: false, message: fileError(err).message };
   }
 }
 

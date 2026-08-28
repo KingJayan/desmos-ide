@@ -6,13 +6,11 @@ type SearchOutcome =
   | { ok: false; errorCode: string; message: string };
 
 export interface SearchPanelOptions {
-  /** the paths to search, newest first */
+  /** newest first */
   paths: () => string[];
-  /** the folder to walk, normally the one holding the open file */
   folder: () => string | null;
   search: (paths: string[], query: string, useRegex: boolean) => Promise<SearchOutcome>;
   searchFolder: (root: string, query: string, useRegex: boolean) => Promise<SearchOutcome>;
-  /** puts up a folder picker, so search works before any file is open */
   pickFolder: () => Promise<string | null>;
   onOpen: (hit: SearchHit) => unknown;
 }
@@ -29,7 +27,7 @@ export class SearchPanel {
   private inFolder = false;
   private scopeBtn: HTMLButtonElement;
   private open = false;
-  /** a folder the user picked, which outranks the folder of the open file */
+  private previousFocus: HTMLElement | null = null;
   private chosenFolder: string | null = null;
   private pickBtn: HTMLButtonElement;
   private debounce: ReturnType<typeof setTimeout> | null = null;
@@ -43,6 +41,9 @@ export class SearchPanel {
 
     const modal = document.createElement('div');
     modal.className = 'cmd-modal search-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'search');
 
     const searchWrap = document.createElement('div');
     searchWrap.className = 'cmd-search-wrap';
@@ -150,6 +151,7 @@ export class SearchPanel {
 
   show(): void {
     this.open = true;
+    this.previousFocus = document.activeElement as HTMLElement | null;
     this.scopeBtn.hidden = this.activeFolder() === null;
     if (this.scopeBtn.hidden && this.inFolder) { this.inFolder = false; }
     this.syncScope();
@@ -165,6 +167,8 @@ export class SearchPanel {
     this.overlay.classList.remove('cmd-overlay--visible');
     this.overlay.setAttribute('aria-hidden', 'true');
     this.clearDebounce();
+    this.previousFocus?.focus();
+    this.previousFocus = null;
   }
 
   dispose(): void {

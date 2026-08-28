@@ -11,7 +11,8 @@ const store = new Map<string, string>();
   clear: () => { store.clear(); },
 };
 
-const { loadSettings, settingsFromJson, settingsToJson, UI_SCALES } = await import('../../renderer/settings');
+const { loadSettings, settingsFromJson, settingsToJson, UI_SCALES, GROUPS, DEFAULTS } =
+  await import('../../renderer/settings');
 
 const KEY = 'desmos-ide-settings';
 
@@ -96,7 +97,8 @@ describe('settings.json', () => {
   });
 
   test('a value out of range is clamped, not obeyed', () => {
-    assert.equal(settingsFromJson('{"fontSize": 400}')?.fontSize, 20);
+    assert.equal(settingsFromJson('{"fontSize": 400}')?.fontSize, 24);
+    assert.equal(settingsFromJson('{"fontSize": 1}')?.fontSize, 10);
     assert.equal(settingsFromJson('{"lineNumbers": "sometimes"}')?.lineNumbers, 'on');
   });
 
@@ -104,6 +106,48 @@ describe('settings.json', () => {
     assert.equal(settingsFromJson('{ not json'), null);
     assert.equal(settingsFromJson('[]'), null);
     assert.equal(settingsFromJson('7'), null);
+  });
+
+  test('every field the panel offers is a key of the file', () => {
+    const written = JSON.parse(settingsToJson(loadSettings())) as Record<string, unknown>;
+    for (const group of GROUPS) {
+      for (const field of group.fields) {
+        assert.ok(field.key in written, `${field.key} is not written to settings.json`);
+      }
+    }
+  });
+
+  test('a select takes only what its own options list', () => {
+    for (const group of GROUPS) {
+      for (const field of group.fields) {
+        if (field.kind !== 'select' || 'numeric' in field) continue;
+        const bad = settingsFromJson(JSON.stringify({ [field.key]: 'nonsense-value' }));
+        assert.equal(bad?.[field.key], DEFAULTS[field.key], field.key);
+        for (const option of field.options) {
+          const next = settingsFromJson(JSON.stringify({ [field.key]: option.value }));
+          assert.equal(next?.[field.key], option.value, `${field.key}=${option.value}`);
+        }
+      }
+    }
+  });
+
+  test('a toggle refuses anything that is not a boolean', () => {
+    for (const group of GROUPS) {
+      for (const field of group.fields) {
+        if (field.kind !== 'toggle') continue;
+        for (const bad of ['true', 1, null, {}]) {
+          const next = settingsFromJson(JSON.stringify({ [field.key]: bad }));
+          assert.equal(next?.[field.key], DEFAULTS[field.key], `${field.key} took ${JSON.stringify(bad)}`);
+        }
+        const flipped = settingsFromJson(JSON.stringify({ [field.key]: !DEFAULTS[field.key] }));
+        assert.equal(flipped?.[field.key], !DEFAULTS[field.key], field.key);
+      }
+    }
+  });
+
+  test('simple mode is off until it is asked for', () => {
+    assert.equal(loadSettings().simpleMode, false);
+    assert.equal(settingsFromJson('{"simpleMode": true}')?.simpleMode, true);
   });
 
   test('the tour flag lives in the file, so the tour can be asked for again', () => {

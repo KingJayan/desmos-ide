@@ -2,7 +2,7 @@ import Electrobun, { ApplicationMenu, BrowserView, BrowserWindow, Utils } from '
 import { basename } from 'path';
 import type { DesmosIdeRPC } from '../src/shared/rpc-schema';
 import { platformOf } from '../src/shared/platform';
-import { exportImage, exportJson, exportTex, openFile, openJsonFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
+import { exportImage, exportJson, exportTex, listFolder, openFile, openJsonFile, readFileAt, saveFile, unwatchAll, unwatchFile, watchFile } from './files';
 import { showConfirm, showFolderDialog, showPrompt } from './dialogs';
 import { fetchRegistry, installPlugin, listPlugins, pluginIcon, pluginReadme, setPluginEnabled, uninstallPlugin } from './plugins';
 import {
@@ -41,6 +41,7 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       exportTex: ({ content, defaultName }) => exportTex(content, defaultName),
       exportImage: ({ data, defaultName, format }) => exportImage(data, defaultName, format),
       pickFolder: async () => allowRoot(await showFolderDialog()),
+      listFolder: ({ root }) => listFolder(root),
       platform: () => platformOf(process.platform, process.arch),
       watchFile: ({ path }) => {
         watchFile(path, (changedPath, content) =>

@@ -47,15 +47,11 @@ export function normalizeChord(raw: string): string | null {
   return [...MOD_ORDER.filter(m => mods.has(m)), keys[0]].join('+');
 }
 
-// windows and linux layouts make @ # ~ and the rest with altgr, which the browser reports
-// as ctrl+alt. swallowing those as a chord would stop the user typing the character
 function isAltGraph(e: KeyboardEvent): boolean {
   try {
     if (e.getModifierState('AltGraph')) return true;
   } catch {
   }
-  // older webview2 never sets that state, so a composed character is the only sign left.
-  // ctrl+alt over a plain letter or digit stays a chord, which keeps mod+alt+r working
   return e.ctrlKey && e.altKey && !e.metaKey
     && e.key.length === 1 && !/^[a-z0-9]$/.test(e.key.toLowerCase());
 }
@@ -109,6 +105,18 @@ export const DEFAULT_KEYBINDS: readonly KeybindRule[] = [
   { key: 'mod+6', command: 'tool.optimizer' },
   { key: 'mod+7', command: 'sidebar.plugins' },
   { key: 'mod+,', command: 'preferences.open' },
+  { key: 'mod+w', command: 'file.close' },
+  { key: 'mod+shift+o', command: 'workspace.open-folder' },
+  { key: 'mod+b', command: 'panel.left' },
+  { key: 'mod+j', command: 'panel.bottom' },
+  { key: 'mod+shift+1', command: 'mode.dsl' },
+  { key: 'mod+shift+2', command: 'mode.split' },
+  { key: 'mod+shift+3', command: 'mode.enhanced' },
+  { key: 'mod+shift+m', command: 'layout.maximize-editor' },
+  { key: 'mod+shift+g', command: 'layout.maximize-graph' },
+  { key: 'mod+shift+0', command: 'layout.reset' },
+  { key: 'mod+8', command: 'view.simple' },
+  { key: 'mod+9', command: 'view.start-page' },
 ];
 
 export function parseKeybinds(text: string): KeybindRule[] | null {

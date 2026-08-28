@@ -18,7 +18,7 @@
 * **live graph** — fast updates as you type via expression id diffing
 * **formatter** — ⇧⌥F or format-on-save
 * **export** — PNG, SVG, TeX figure, or a share link that carries the source
-* **plugins** — ⌘7 for the marketplace: generators, DSL libraries, editor themes, panels and commands
+* **plugins** — a marketplace for generators, DSL libraries, editor themes, panels and commands
 * **persistence** — reopens your files exactly where you left off; autosave is opt-in
 * **timeline** — declare a `time` clock for play, pause, speed, and scrub controls
 * **anim presets** — shape the clock with `ease`, `pulse`, `bounce`, `wobble`, and `orbit`
@@ -51,7 +51,7 @@ cli loads desmos api over network on the first time
 brew install --cask KingJayan/dsmx/dsmx-app
 ```
 
-req macOS 14 (Sonoma) or later, apple silicon or intel. no quarentine through brew.
+req macOS 14 (Sonoma) or later, apple silicon or intel. no quarantine through brew.
 
 no apple developer id currently, because i don't have one. meaning if you download the `.app` from the releases page instead, macOS would block it on first launch. the source is all here and the release is built by CI in this repo. to open it, either:
 

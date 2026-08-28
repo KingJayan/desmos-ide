@@ -24,8 +24,6 @@ const TYPES: Record<string, string> = {
   '.wasm': 'application/wasm', '.map': 'application/json',
 };
 
-// node's own http server, not bun's, because playwright cannot drive a browser under bun on
-// windows (oven-sh/bun#27977) and the smoke run there is `node e2e/smoke.ts`
 const server = createServer((req, res) => {
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
   const file = join(DIST, path === '/' ? 'index.html' : path);
@@ -57,15 +55,10 @@ const browser = await engine.launch();
 stage = 'opening a page';
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
 
-// monaco reads the user agent to pick its own chords, so the host the app is told about
-// has to be the one the engine already claims. playwright's linux webkit says macintosh
 const ua = await page.evaluate(() => navigator.userAgent);
 const HOST = platformOf(/Mac|iPhone|iPad/.test(ua) ? 'darwin' : process.platform, process.arch);
 const MOD = HOST.os === 'macos' ? 'Meta' : 'Control';
 
-// there is no bun process behind a browser, so the plugin bridge is stubbed with one
-// real plugin. everything past this point — the sandbox, the macro pass, the panel and
-// the extension page — is the shipping code
 await page.addInitScript((host: { os: string; arch: string }) => {
   const manifest = {
     id: 'starfield', name: 'Starfield', version: '1.0.0',
@@ -164,8 +157,6 @@ await page.addInitScript((host: { os: string; arch: string }) => {
     platform: () => Promise.resolve(host),
   };
 
-  // anything the stub does not answer behaves the way a missing bridge does, so the
-  // rest of the app is tested exactly as it was before
   (window as unknown as { electronAPI: unknown }).electronAPI = new Proxy(stub, {
     get: (target, prop: string) => (prop in target ? target[prop] : () => undefined),
   });
@@ -181,12 +172,23 @@ stage = 'waiting for the editor';
 await page.waitForSelector('#editor-container .monaco-editor', { timeout: 20_000 });
 stage = 'checking the page';
 
-// a first run opens the welcome dialog, and everything after this needs it gone
 await page.waitForSelector('.welcome-overlay:not(.hidden)', { timeout: 10_000 });
 check(await page.locator('.welcome-modal .welcome-mark').count() === 1, 'the welcome dialog wears the app mark');
 await page.keyboard.press('Escape');
 await page.waitForSelector('.welcome-overlay', { state: 'hidden' });
 check(true, 'escape closes the welcome dialog');
+
+await page.waitForSelector('#start-page:not(.hidden)', { timeout: 10_000 });
+check(
+  await page.locator('#start-page .start-action').count() === 3,
+  'the start page offers new file, open file and open folder',
+);
+check(await page.locator('#center-col.hidden').count() === 1, 'no panes are shown beside it');
+check(await page.locator('#rail-left.hidden').count() === 1, 'the rails are put away too');
+
+await page.click('#start-page .start-action');
+await page.waitForSelector('#start-page', { state: 'hidden' });
+check(await page.locator('#center-col:not(.hidden)').count() === 1, 'new file brings the panes back');
 
 check(await page.locator('#status-msg').getAttribute('aria-live') === 'polite', 'status is announced');
 check(await page.locator('#status-msg').getAttribute('role') === 'status', 'status has a role');
@@ -249,7 +251,6 @@ await page.keyboard.type('y=2x');
 await page.keyboard.press('Enter');
 await page.click('#btn-dsl');
 
-// monaco renders its spaces as nbsp, so the text has to be normalised first
 let wroteBack = false;
 for (let i = 0; i < 20 && !wroteBack; i++) {
   const shown = ((await page.locator('#editor-container').textContent()) ?? '').replace(/\u00a0/g, ' ');
@@ -278,6 +279,37 @@ check(hint.includes('7'), `the line carries the optimizer hint (saw "${hint}")`)
 
 await page.click('#btn-tool-optimizer');
 check(await page.locator('#tool-bottom.hidden').count() === 1, 'the optimizer tab closes again');
+
+check(
+  await page.locator('#divider[role="separator"][tabindex="0"]').count() === 1,
+  'a divider can be reached and named by the keyboard',
+);
+
+const editorWidth = async () => (await page.locator('#editor-island').boundingBox())?.width ?? 0;
+const beforeNudge = await editorWidth();
+await page.locator('#divider').focus();
+await page.keyboard.press('ArrowRight');
+await page.keyboard.press('ArrowRight');
+check(await editorWidth() > beforeNudge, 'an arrow key widens the pane the divider holds');
+
+await page.dblclick('#divider');
+check(await editorWidth() < beforeNudge, 'a double click collapses it');
+await page.dblclick('#divider');
+check(await editorWidth() > 0, 'a second double click brings it back');
+
+await page.keyboard.press(`${MOD}+Shift+M`);
+await page.waitForSelector('#graph-island', { state: 'hidden' });
+check(await page.locator('#divider.hidden').count() === 1, 'maximizing the editor puts the graph away');
+await page.keyboard.press(`${MOD}+Shift+0`);
+await page.waitForSelector('#graph-island:not(.hidden)');
+check(true, 'reset layout brings every pane back');
+
+await page.keyboard.press(`${MOD}+8`);
+await page.waitForSelector('html[data-simple]');
+check(await page.locator('#rail-left').isVisible() === false, 'simple mode hides the rails');
+await page.keyboard.press(`${MOD}+8`);
+await page.waitForSelector('html:not([data-simple])');
+check(await page.locator('#rail-left').isVisible(), 'and gives them back');
 
 // plugins
 stage = 'checking the plugin sidebar';

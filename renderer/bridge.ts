@@ -134,6 +134,7 @@ export const electronAPI = {
   searchFolder: (root: string, query: string, useRegex = false) =>
     rpc.request.searchFolder({ root, query, useRegex }),
   pickFolder: () => rpc.request.pickFolder().catch(() => null),
+  listFolder: (root: string) => rpc.request.listFolder({ root }),
   platform: (): Promise<PlatformInfo | null> => rpc.request.platform().catch(() => null),
   secretsAvailable: () => rpc.request.secretsAvailable().catch(() => false),
   secretGet: (account: string) => rpc.request.secretGet({ account }).catch(() => null),

@@ -1,9 +1,9 @@
 // unified icon source for all ui
 
 import {
-  ArrowDown, Check, ChevronDown, ChevronRight, CircleX, Copy, ExternalLink, FileCode, FileText, FolderOpen,
-  Info, Pause, Play, Plus, Puzzle, RefreshCw, Search, Send, Square, SquarePen, Trash2,
-  TriangleAlert, X,
+  ArrowDown, Box, Check, ChevronDown, ChevronRight, CircleX, Copy, ExternalLink, FileCode, FilePlus,
+  FileText, FolderOpen, Info, Maximize2, Minimize2, Pause, Play, Plus, Puzzle, RefreshCw, RotateCcw,
+  Search, Send, Square, SquarePen, Trash2, TriangleAlert, X,
 } from 'lucide';
 import { escapeHtml } from '../src/shared/escape';
 
@@ -82,7 +82,12 @@ const ICONS = {
   puzzle: Puzzle as IconNode,
   'refresh-cw': RefreshCw as IconNode,
   'trash-2': Trash2 as IconNode,
+  box: Box as IconNode,
   'file-code': FileCode as IconNode,
+  'file-plus': FilePlus as IconNode,
+  'maximize-2': Maximize2 as IconNode,
+  'minimize-2': Minimize2 as IconNode,
+  'rotate-ccw': RotateCcw as IconNode,
   'file-text': FileText as IconNode,
   'folder-open': FolderOpen as IconNode,
   pause: Pause as IconNode,

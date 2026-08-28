@@ -1,5 +1,5 @@
 {
-  description = "desmos-ide — an IDE for Desmos with a custom DSL";
+  description = "desmos-ide — code your desmos graphs.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

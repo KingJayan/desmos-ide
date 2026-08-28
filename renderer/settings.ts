@@ -1,50 +1,104 @@
-
-import { iconSvg } from './icons';
-
+import { iconEl } from './icons';
 import { THEMES, isColorTheme, type ColorTheme } from './themes';
 
 export type { ColorTheme };
 export type EditorTheme = ColorTheme;
 
-const THEME_OPTIONS = THEMES.map(t => `<option value="${t.id}">${t.label}</option>`).join('\n                ');
+export type UiScale = 'compact' | 'default' | 'large';
+export const UI_SCALES = ['compact', 'default', 'large'] as const;
+
+export const GIT_AUTOFETCH_PERIODS = [60, 180, 300, 900] as const;
 
 export interface EditorSettings {
   colorTheme:  ColorTheme;
   editorTheme: EditorTheme;
+  uiScale: UiScale;
+  simpleMode: boolean;
+  reduceMotion: 'auto' | 'on' | 'off';
+  showStatusBar: boolean;
+  showBreadcrumbs: boolean;
+  showTabStrip: boolean;
+
   fontSize:    number;
   codeFontFamily: string;
   uiFontFamily:   string;
+
+  lineHeight: number;
+  fontLigatures: boolean;
   minimap:     boolean;
   lineNumbers: 'on' | 'off' | 'relative';
   wordWrap:    'off' | 'on';
+  tabSize: number;
+  insertSpaces: boolean;
+  cursorStyle: 'line' | 'block' | 'underline';
+  cursorBlinking: 'blink' | 'smooth' | 'phase' | 'expand' | 'solid';
+  renderWhitespace: 'none' | 'boundary' | 'selection' | 'all';
+  smoothScrolling: boolean;
+  stickyScroll: boolean;
+  bracketPairColorization: boolean;
+  indentGuides: boolean;
+  inlineSliders: boolean;
+  optimizerHints: boolean;
+  codeLens: boolean;
+
   formatOnSave: boolean;
   autosave: boolean;
-  uiScale: UiScale;
+  autosaveDelay: number;
+  restoreSession: boolean;
+
+  graphZoomButtons: boolean;
+  graphSettingsMenu: boolean;
+  graphKeypad: boolean;
+  graphExpressions: boolean;
+  graphLockViewport: boolean;
+
   gitAutofetch: boolean;
   gitAutofetchPeriod: number;
   tourDone: boolean;
 }
 
-export type UiScale = 'compact' | 'default' | 'large';
-export const UI_SCALES = ['compact', 'default', 'large'] as const;
-
-/** the periods the panel offers, in seconds */
-export const GIT_AUTOFETCH_PERIODS = [60, 180, 300, 900] as const;
-
-const DEFAULTS: EditorSettings = {
+export const DEFAULTS: EditorSettings = {
   colorTheme:  'dsmx',
   editorTheme: 'dsmx',
+  uiScale: 'default',
+  simpleMode: false,
+  reduceMotion: 'auto',
+  showStatusBar: true,
+  showBreadcrumbs: true,
+  showTabStrip: true,
+
   fontSize:    14,
   codeFontFamily: '"JetBrains Mono", "Cascadia Code", Consolas, monospace',
   uiFontFamily:   'Inter, "SF Pro Text", -apple-system, sans-serif',
+  lineHeight: 1.6,
+  fontLigatures: true,
   minimap:     false,
   lineNumbers: 'on',
   wordWrap:    'off',
+  tabSize: 2,
+  insertSpaces: true,
+  cursorStyle: 'line',
+  cursorBlinking: 'smooth',
+  renderWhitespace: 'none',
+  smoothScrolling: true,
+  stickyScroll: false,
+  bracketPairColorization: true,
+  indentGuides: true,
+  inlineSliders: true,
+  optimizerHints: true,
+  codeLens: true,
+
   formatOnSave: false,
-  // off by default: autosave writes the file with no dialog and no undo of the write
   autosave: false,
-  uiScale: 'default',
-  // off by default: a fetch reaches the network, and that is the user's call to make
+  autosaveDelay: 1200,
+  restoreSession: true,
+
+  graphZoomButtons: true,
+  graphSettingsMenu: false,
+  graphKeypad: false,
+  graphExpressions: false,
+  graphLockViewport: false,
+
   gitAutofetch: false,
   gitAutofetchPeriod: 180,
   tourDone: false,
@@ -53,24 +107,168 @@ const DEFAULTS: EditorSettings = {
 const STORAGE_KEY = 'desmos-ide-settings';
 const SETTINGS_VERSION = 3;
 
-const VALID_LINE_NUMBERS = new Set(['on','off','relative']);
-const VALID_WORD_WRAP = new Set(['on','off']);
-const VALID_FONTS_CODE = new Set([
-  '"JetBrains Mono", "Cascadia Code", Consolas, monospace',
-  '"Cascadia Code", Consolas, monospace',
-  '"IBM Plex Mono", Consolas, monospace',
-  '"Fira Code", Consolas, monospace',
-  'Consolas, monospace',
-  '"SF Mono", monospace',
-]);
-const VALID_FONTS_UI = new Set([
-  'Inter, "SF Pro Text", -apple-system, sans-serif',
-  '"Avenir Next", "SF Pro Text", "Segoe UI", sans-serif',
-  '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
-  '"SF Pro Text", "Helvetica Neue", Arial, sans-serif',
-  '"IBM Plex Sans", "Segoe UI", sans-serif',
-  '"Figtree", "Avenir Next", sans-serif',
-]);
+type BoolKey = { [K in keyof EditorSettings]: EditorSettings[K] extends boolean ? K : never }[keyof EditorSettings];
+type NumKey = { [K in keyof EditorSettings]: EditorSettings[K] extends number ? K : never }[keyof EditorSettings];
+type StrKey = { [K in keyof EditorSettings]: EditorSettings[K] extends string ? K : never }[keyof EditorSettings];
+
+type Field =
+  | { key: BoolKey; kind: 'toggle'; label: string; hint?: string }
+  | { key: StrKey; kind: 'select'; label: string; options: readonly { value: string; label: string }[]; hint?: string }
+  | { key: NumKey; kind: 'select'; label: string; numeric: true; options: readonly { value: string; label: string }[]; hint?: string }
+  | { key: NumKey; kind: 'range'; label: string; min: number; max: number; step: number; unit: string; hint?: string };
+
+interface Group {
+  title: string;
+  hint?: string;
+  fields: readonly Field[];
+}
+
+const THEME_OPTIONS = THEMES.map(t => ({ value: t.id, label: t.label }));
+
+const CODE_FONTS = [
+  { value: '"JetBrains Mono", "Cascadia Code", Consolas, monospace', label: 'JetBrains Mono' },
+  { value: '"Cascadia Code", Consolas, monospace', label: 'Cascadia Code' },
+  { value: '"IBM Plex Mono", Consolas, monospace', label: 'IBM Plex Mono' },
+  { value: '"Fira Code", Consolas, monospace', label: 'Fira Code' },
+  { value: 'Consolas, monospace', label: 'Consolas' },
+  { value: '"SF Mono", monospace', label: 'SF Mono' },
+] as const;
+
+const UI_FONTS = [
+  { value: 'Inter, "SF Pro Text", -apple-system, sans-serif', label: 'Inter' },
+  { value: '"Avenir Next", "SF Pro Text", "Segoe UI", sans-serif', label: 'Avenir Next' },
+  { value: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', label: 'Segoe UI' },
+  { value: '"SF Pro Text", "Helvetica Neue", Arial, sans-serif', label: 'SF Pro Text' },
+  { value: '"IBM Plex Sans", "Segoe UI", sans-serif', label: 'IBM Plex Sans' },
+  { value: '"Figtree", "Avenir Next", sans-serif', label: 'Figtree' },
+] as const;
+
+export const GROUPS: readonly Group[] = [
+  {
+    title: 'appearance',
+    fields: [
+      { key: 'colorTheme', kind: 'select', label: 'color theme', options: THEME_OPTIONS },
+      {
+        key: 'uiScale', kind: 'select', label: 'interface size',
+        options: UI_SCALES.map(s => ({ value: s, label: s })),
+        hint: 'Scales the panels, menus and status bar. The editor has its own font size.',
+      },
+      { key: 'uiFontFamily', kind: 'select', label: 'ui font', options: UI_FONTS },
+      {
+        key: 'simpleMode', kind: 'toggle', label: 'simple mode',
+        hint: 'Hides the rails, the bottom panel, the tab strip and the status facts. Every command stays in the palette.',
+      },
+      {
+        key: 'reduceMotion', kind: 'select', label: 'reduce motion',
+        options: [
+          { value: 'auto', label: 'follow the system' },
+          { value: 'on', label: 'always' },
+          { value: 'off', label: 'never' },
+        ],
+      },
+      { key: 'showStatusBar', kind: 'toggle', label: 'status bar' },
+      { key: 'showTabStrip', kind: 'toggle', label: 'tab strip' },
+      { key: 'showBreadcrumbs', kind: 'toggle', label: 'breadcrumbs' },
+    ],
+  },
+  {
+    title: 'editor theme',
+    hint: 'Applies to the DSL editor and the Enhanced view',
+    fields: [
+      { key: 'editorTheme', kind: 'select', label: 'syntax theme', options: THEME_OPTIONS },
+      { key: 'fontSize', kind: 'range', label: 'font size', min: 10, max: 24, step: 1, unit: 'px' },
+      { key: 'codeFontFamily', kind: 'select', label: 'code font', options: CODE_FONTS },
+      { key: 'lineHeight', kind: 'range', label: 'line height', min: 1.1, max: 2.4, step: 0.1, unit: '×' },
+      { key: 'fontLigatures', kind: 'toggle', label: 'ligatures' },
+    ],
+  },
+  {
+    title: 'editor',
+    fields: [
+      {
+        key: 'lineNumbers', kind: 'select', label: 'line numbers',
+        options: [
+          { value: 'on', label: 'on' },
+          { value: 'relative', label: 'relative' },
+          { value: 'off', label: 'off' },
+        ],
+      },
+      { key: 'minimap', kind: 'toggle', label: 'minimap' },
+      { key: 'wordWrap', kind: 'select', label: 'word wrap', options: [{ value: 'off', label: 'off' }, { value: 'on', label: 'on' }] },
+      {
+        key: 'tabSize', kind: 'select', label: 'tab size', numeric: true,
+        options: [{ value: '2', label: '2' }, { value: '4', label: '4' }, { value: '8', label: '8' }],
+      },
+      { key: 'insertSpaces', kind: 'toggle', label: 'insert spaces' },
+      {
+        key: 'cursorStyle', kind: 'select', label: 'cursor',
+        options: [
+          { value: 'line', label: 'line' },
+          { value: 'block', label: 'block' },
+          { value: 'underline', label: 'underline' },
+        ],
+      },
+      {
+        key: 'cursorBlinking', kind: 'select', label: 'cursor blinking',
+        options: ['blink', 'smooth', 'phase', 'expand', 'solid'].map(v => ({ value: v, label: v })),
+      },
+      {
+        key: 'renderWhitespace', kind: 'select', label: 'show whitespace',
+        options: ['none', 'boundary', 'selection', 'all'].map(v => ({ value: v, label: v })),
+      },
+      { key: 'indentGuides', kind: 'toggle', label: 'indent guides' },
+      { key: 'bracketPairColorization', kind: 'toggle', label: 'bracket pair colors' },
+      { key: 'stickyScroll', kind: 'toggle', label: 'sticky scroll' },
+      { key: 'smoothScrolling', kind: 'toggle', label: 'smooth scrolling' },
+      {
+        key: 'inlineSliders', kind: 'toggle', label: 'inline sliders',
+        hint: 'Draws a draggable track beside every slider() the file declares.',
+      },
+      { key: 'optimizerHints', kind: 'toggle', label: 'optimizer hints', hint: 'Notes what the compiler folded, at the end of the line it folded.' },
+      { key: 'codeLens', kind: 'toggle', label: 'fix error lens', hint: 'Offers the AI panel an error to explain, above the line that failed.' },
+    ],
+  },
+  {
+    title: 'files',
+    fields: [
+      { key: 'formatOnSave', kind: 'toggle', label: 'format on save' },
+      {
+        key: 'autosave', kind: 'toggle', label: 'autosave',
+        hint: 'Writes the open file after you stop typing. Untitled buffers are never given a file.',
+      },
+      { key: 'autosaveDelay', kind: 'range', label: 'autosave delay', min: 400, max: 5000, step: 200, unit: 'ms' },
+      { key: 'restoreSession', kind: 'toggle', label: 'reopen the last file', hint: 'Off means every launch starts on the start page.' },
+    ],
+  },
+  {
+    title: 'graph',
+    fields: [
+      { key: 'graphZoomButtons', kind: 'toggle', label: 'zoom buttons' },
+      { key: 'graphSettingsMenu', kind: 'toggle', label: 'desmos settings menu' },
+      { key: 'graphKeypad', kind: 'toggle', label: 'keypad' },
+      { key: 'graphExpressions', kind: 'toggle', label: 'desmos expression list', hint: 'The DSL file stays the source of truth either way.' },
+      { key: 'graphLockViewport', kind: 'toggle', label: 'lock the viewport' },
+    ],
+  },
+  {
+    title: 'git',
+    hint: 'Background fetch keeps the ahead/behind count current. It uses the network.',
+    fields: [
+      { key: 'gitAutofetch', kind: 'toggle', label: 'auto fetch' },
+      {
+        key: 'gitAutofetchPeriod', kind: 'select', label: 'fetch every', numeric: true,
+        options: [
+          { value: '60', label: '1 minute' },
+          { value: '180', label: '3 minutes' },
+          { value: '300', label: '5 minutes' },
+          { value: '900', label: '15 minutes' },
+        ],
+      },
+    ],
+  },
+];
+
+const FIELDS: readonly Field[] = GROUPS.flatMap(g => g.fields);
 
 function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   const v = typeof raw.__v === 'number' ? raw.__v : 1;
@@ -90,36 +288,39 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   return raw;
 }
 
+const round = (value: number, step: number): number =>
+  Math.round(Math.round(value / step) * step * 1000) / 1000;
+
 function validate(raw: Record<string, unknown>): EditorSettings {
-  const d = DEFAULTS;
-  const colorTheme = isColorTheme(raw.colorTheme)
-    ? raw.colorTheme : d.colorTheme;
-  const editorTheme = isColorTheme(raw.editorTheme)
-    ? raw.editorTheme : d.editorTheme;
-  const rawSize = Number(raw.fontSize);
-  const fontSize = Number.isFinite(rawSize) ? Math.min(20, Math.max(12, Math.round(rawSize))) : d.fontSize;
-  const codeFontFamily = VALID_FONTS_CODE.has(raw.codeFontFamily as string)
-    ? (raw.codeFontFamily as string) : d.codeFontFamily;
-  const uiFontFamily = VALID_FONTS_UI.has(raw.uiFontFamily as string)
-    ? (raw.uiFontFamily as string) : d.uiFontFamily;
-  const minimap = typeof raw.minimap === 'boolean' ? raw.minimap : d.minimap;
-  const lineNumbers = VALID_LINE_NUMBERS.has(raw.lineNumbers as string)
-    ? (raw.lineNumbers as EditorSettings['lineNumbers']) : d.lineNumbers;
-  const wordWrap = VALID_WORD_WRAP.has(raw.wordWrap as string)
-    ? (raw.wordWrap as EditorSettings['wordWrap']) : d.wordWrap;
-  const formatOnSave = typeof raw.formatOnSave === 'boolean' ? raw.formatOnSave : d.formatOnSave;
-  const autosave = typeof raw.autosave === 'boolean' ? raw.autosave : d.autosave;
-  const uiScale = (UI_SCALES as readonly string[]).includes(raw.uiScale as string)
-    ? (raw.uiScale as UiScale) : d.uiScale;
-  const gitAutofetch = typeof raw.gitAutofetch === 'boolean' ? raw.gitAutofetch : d.gitAutofetch;
-  const gitAutofetchPeriod = (GIT_AUTOFETCH_PERIODS as readonly number[]).includes(Number(raw.gitAutofetchPeriod))
-    ? Number(raw.gitAutofetchPeriod) : d.gitAutofetchPeriod;
-  const tourDone = typeof raw.tourDone === 'boolean' ? raw.tourDone : d.tourDone;
-  return {
-    colorTheme, editorTheme, fontSize, codeFontFamily, uiFontFamily,
-    minimap, lineNumbers, wordWrap, formatOnSave, autosave, uiScale, gitAutofetch, gitAutofetchPeriod,
-    tourDone,
-  };
+  const out = { ...DEFAULTS };
+  for (const field of FIELDS) {
+    const value = raw[field.key];
+    if (field.kind === 'toggle') {
+      if (typeof value === 'boolean') out[field.key] = value;
+      continue;
+    }
+    if (field.kind === 'range') {
+      const n = Number(value);
+      if (Number.isFinite(n)) {
+        out[field.key] = round(Math.min(field.max, Math.max(field.min, n)), field.step);
+      }
+      continue;
+    }
+    if ('numeric' in field) {
+      if (field.options.some(o => Number(o.value) === Number(value))) out[field.key] = Number(value);
+      continue;
+    }
+    if (field.options.some(o => o.value === value)) out[field.key] = value as never;
+  }
+
+  if (isColorTheme(raw.colorTheme)) out.colorTheme = raw.colorTheme;
+  if (typeof raw.editorTheme === 'string' && raw.editorTheme.startsWith('plugin-')) {
+    out.editorTheme = raw.editorTheme as EditorTheme;
+  } else if (isColorTheme(raw.editorTheme)) {
+    out.editorTheme = raw.editorTheme;
+  }
+  if (typeof raw.tourDone === 'boolean') out.tourDone = raw.tourDone;
+  return out;
 }
 
 /** settings.json storage */
@@ -160,24 +361,28 @@ export interface ExtraTheme { id: string; label: string }
 
 export class SettingsPanel {
   private overlay: HTMLElement;
+  private modal: HTMLElement;
   private extraThemes: ExtraTheme[] = [];
   private settings: EditorSettings;
   private onChange: (s: EditorSettings) => void;
   private previousFocus: HTMLElement | null = null;
-  private syncControls: () => void = () => {};
+  private controls = new Map<keyof EditorSettings, () => void>();
+  private editorThemeEl: HTMLSelectElement | null = null;
   private openJson?: (file: 'settings' | 'keybinds') => void;
 
   constructor(onChange: (s: EditorSettings) => void, openJson?: (file: 'settings' | 'keybinds') => void) {
     this.settings = loadSettings();
     this.onChange = onChange;
     this.openJson = openJson;
-    this.overlay = this.build();
+    const built = this.build();
+    this.overlay = built.overlay;
+    this.modal = built.modal;
     document.body.appendChild(this.overlay);
   }
 
   setExtraThemes(themes: ExtraTheme[]): void {
     this.extraThemes = themes;
-    const select = this.overlay.querySelector('#s-editor-theme') as HTMLSelectElement | null;
+    const select = this.editorThemeEl;
     if (!select) return;
 
     select.querySelector('#s-plugin-themes')?.remove();
@@ -196,308 +401,200 @@ export class SettingsPanel {
     select.value = this.settings.editorTheme;
   }
 
-  private build(): HTMLElement {
+  private emit(): void {
+    saveSettings(this.settings);
+    this.onChange({ ...this.settings });
+  }
+
+  private hintRow(text: string): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'settings-row settings-hint-row';
+    const hint = document.createElement('span');
+    hint.className = 'settings-hint';
+    hint.textContent = text;
+    row.appendChild(hint);
+    return row;
+  }
+
+  private buildField(field: Field): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+    const id = `s-${field.key}`;
+
+    const label = document.createElement('label');
+    label.className = 'settings-label';
+    label.htmlFor = id;
+    label.textContent = field.label;
+    row.appendChild(label);
+
+    if (field.kind === 'toggle') {
+      const wrap = document.createElement('label');
+      wrap.className = 'settings-toggle';
+      wrap.setAttribute('aria-label', field.label);
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.id = id;
+      input.className = 'settings-toggle-input';
+      const track = document.createElement('span');
+      track.className = 'settings-toggle-track';
+      track.setAttribute('aria-hidden', 'true');
+      wrap.append(input, track);
+      row.appendChild(wrap);
+
+      input.addEventListener('change', () => {
+        this.settings[field.key] = input.checked;
+        this.emit();
+      });
+      this.controls.set(field.key, () => { input.checked = this.settings[field.key]; });
+      return row;
+    }
+
+    if (field.kind === 'range') {
+      const wrap = document.createElement('div');
+      wrap.className = 'settings-range-wrap';
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.id = id;
+      input.className = 'settings-range';
+      input.min = String(field.min);
+      input.max = String(field.max);
+      input.step = String(field.step);
+      const value = document.createElement('span');
+      value.className = 'settings-range-val';
+      wrap.append(input, value);
+      row.appendChild(wrap);
+
+      input.addEventListener('input', () => {
+        this.settings[field.key] = Number(input.value);
+        value.textContent = `${this.settings[field.key]}${field.unit}`;
+        this.emit();
+      });
+      this.controls.set(field.key, () => {
+        input.value = String(this.settings[field.key]);
+        value.textContent = `${this.settings[field.key]}${field.unit}`;
+      });
+      return row;
+    }
+
+    const select = document.createElement('select');
+    select.className = 'settings-select';
+    select.id = id;
+    for (const option of field.options) {
+      const el = document.createElement('option');
+      el.value = option.value;
+      el.textContent = option.label;
+      select.appendChild(el);
+    }
+    row.appendChild(select);
+    if (field.key === 'editorTheme') this.editorThemeEl = select;
+
+    const numeric = 'numeric' in field;
+    select.addEventListener('change', () => {
+      if (numeric) (this.settings[field.key] as number) = Number(select.value);
+      else (this.settings[field.key] as string) = select.value;
+      this.emit();
+    });
+    this.controls.set(field.key, () => { select.value = String(this.settings[field.key]); });
+    return row;
+  }
+
+  private build(): { overlay: HTMLElement; modal: HTMLElement } {
     const overlay = document.createElement('div');
     overlay.className = 'settings-overlay hidden';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'settings-dialog-title');
 
-    overlay.innerHTML = `
-      <div class="settings-modal">
-        <div class="settings-header">
-          <span class="settings-title" id="settings-dialog-title">settings</span>
-          <button class="settings-close" aria-label="Close settings">${iconSvg('x', { size: 14 })}</button>
-        </div>
-        <div class="settings-body">
+    const modal = document.createElement('div');
+    modal.className = 'settings-modal';
 
-          <div class="settings-group">
-            <div class="settings-group-title">app theme</div>
+    const header = document.createElement('div');
+    header.className = 'settings-header';
+    const title = document.createElement('span');
+    title.className = 'settings-title';
+    title.id = 'settings-dialog-title';
+    title.textContent = 'settings';
+    const close = document.createElement('button');
+    close.className = 'settings-close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close settings');
+    close.appendChild(iconEl('x', { size: 14 }));
+    close.addEventListener('click', () => this.hide());
+    header.append(title, close);
 
-            <div class="settings-row">
-              <label class="settings-label">color theme</label>
-              <select class="settings-select" id="s-color-theme">
-                ${THEME_OPTIONS}
-              </select>
-            </div>
+    const body = document.createElement('div');
+    body.className = 'settings-body';
 
-            <div class="settings-row">
-              <label class="settings-label" for="s-ui-scale">interface size</label>
-              <select class="settings-select" id="s-ui-scale">
-                <option value="compact">compact</option>
-                <option value="default">default</option>
-                <option value="large">large</option>
-              </select>
-            </div>
-            <div class="settings-row settings-hint-row">
-              <span class="settings-hint">Scales the panels, menus and status bar. The editor has its own font size.</span>
-            </div>
-          </div>
+    for (const group of GROUPS) {
+      const section = document.createElement('div');
+      section.className = 'settings-group';
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'settings-group-title';
+      groupTitle.textContent = group.title;
+      section.appendChild(groupTitle);
+      if (group.hint) section.appendChild(this.hintRow(group.hint));
+      for (const field of group.fields) {
+        section.appendChild(this.buildField(field));
+        if (field.hint) section.appendChild(this.hintRow(field.hint));
+      }
+      body.appendChild(section);
+    }
 
-          <div class="settings-group">
-            <div class="settings-group-title">editor theme</div>
-            <div class="settings-row settings-hint-row">
-              <span class="settings-hint">Applies to DSL editor and Enhanced view</span>
-            </div>
+    const footer = document.createElement('div');
+    footer.className = 'settings-footer';
+    const note = document.createElement('span');
+    note.className = 'settings-hint';
+    note.textContent = 'Every setting is text in settings.json.';
+    const links = document.createElement('span');
+    links.className = 'settings-footer-links';
+    for (const file of ['settings', 'keybinds'] as const) {
+      const link = document.createElement('button');
+      link.className = 'settings-link';
+      link.type = 'button';
+      link.textContent = `${file}.json`;
+      link.addEventListener('click', () => { this.hide(); this.openJson?.(file); });
+      links.appendChild(link);
+    }
+    footer.append(note, links);
 
-            <div class="settings-row">
-              <label class="settings-label">syntax theme</label>
-              <select class="settings-select" id="s-editor-theme">
-                ${THEME_OPTIONS}
-              </select>
-            </div>
+    modal.append(header, body, footer);
+    overlay.appendChild(modal);
 
-            <div class="settings-row">
-              <label class="settings-label">font size</label>
-              <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="s-font-size" min="12" max="20" step="1" />
-                <span class="settings-range-val" id="s-font-size-val"></span>
-              </div>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label">ui font</label>
-              <select class="settings-select" id="s-ui-font-family">
-                <option value='Inter, "SF Pro Text", -apple-system, sans-serif'>Inter</option>
-                <option value='"Avenir Next", "SF Pro Text", "Segoe UI", sans-serif'>Avenir Next</option>
-                <option value='"Segoe UI", "Helvetica Neue", Arial, sans-serif'>Segoe UI</option>
-                <option value='"SF Pro Text", "Helvetica Neue", Arial, sans-serif'>SF Pro Text</option>
-                <option value='"IBM Plex Sans", "Segoe UI", sans-serif'>IBM Plex Sans</option>
-                <option value='"Figtree", "Avenir Next", sans-serif'>Figtree</option>
-              </select>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label">code font</label>
-              <select class="settings-select" id="s-code-font-family">
-                <option value='"JetBrains Mono", "Cascadia Code", Consolas, monospace'>JetBrains Mono</option>
-                <option value='"Cascadia Code", Consolas, monospace'>Cascadia Code</option>
-                <option value='"IBM Plex Mono", Consolas, monospace'>IBM Plex Mono</option>
-                <option value='"Fira Code", Consolas, monospace'>Fira Code</option>
-                <option value='Consolas, monospace'>Consolas</option>
-                <option value='"SF Mono", monospace'>SF Mono</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="settings-group">
-            <div class="settings-group-title">editor</div>
-
-            <div class="settings-row">
-              <label class="settings-label">line numbers</label>
-              <select class="settings-select" id="s-line-numbers">
-                <option value="on">on</option>
-                <option value="relative">relative</option>
-                <option value="off">off</option>
-              </select>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label" for="s-minimap">minimap</label>
-              <label class="settings-toggle" aria-label="Minimap">
-                <input type="checkbox" id="s-minimap" class="settings-toggle-input" />
-                <span class="settings-toggle-track" aria-hidden="true"></span>
-              </label>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label" for="s-word-wrap">word wrap</label>
-              <label class="settings-toggle" aria-label="Word Wrap">
-                <input type="checkbox" id="s-word-wrap" class="settings-toggle-input" />
-                <span class="settings-toggle-track" aria-hidden="true"></span>
-              </label>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label" for="s-format-on-save">format on save</label>
-              <label class="settings-toggle" aria-label="Format On Save">
-                <input type="checkbox" id="s-format-on-save" class="settings-toggle-input" />
-                <span class="settings-toggle-track" aria-hidden="true"></span>
-              </label>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label" for="s-autosave">autosave</label>
-              <label class="settings-toggle" aria-label="Autosave">
-                <input type="checkbox" id="s-autosave" class="settings-toggle-input" />
-                <span class="settings-toggle-track" aria-hidden="true"></span>
-              </label>
-            </div>
-            <div class="settings-row settings-hint-row">
-              <span class="settings-hint">Writes the open file about a second after you stop typing. Untitled buffers are never given a file.</span>
-            </div>
-          </div>
-
-          <div class="settings-group">
-            <div class="settings-group-title">git</div>
-            <div class="settings-row settings-hint-row">
-              <span class="settings-hint">Background fetch keeps the ahead/behind count current. It uses the network.</span>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label" for="s-git-autofetch">auto fetch</label>
-              <label class="settings-toggle" aria-label="Auto Fetch">
-                <input type="checkbox" id="s-git-autofetch" class="settings-toggle-input" />
-                <span class="settings-toggle-track" aria-hidden="true"></span>
-              </label>
-            </div>
-
-            <div class="settings-row">
-              <label class="settings-label" for="s-git-autofetch-period">fetch every</label>
-              <select class="settings-select" id="s-git-autofetch-period">
-                <option value="60">1 minute</option>
-                <option value="180">3 minutes</option>
-                <option value="300">5 minutes</option>
-                <option value="900">15 minutes</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div class="settings-footer">
-          <span class="settings-hint">Every setting is text in settings.json.</span>
-          <span class="settings-footer-links">
-            <button class="settings-link" id="s-open-settings-json" type="button">settings.json</button>
-            <button class="settings-link" id="s-open-keybinds-json" type="button">keybinds.json</button>
-          </span>
-        </div>
-      </div>
-    `;
-
-    const colorThemeEl  = overlay.querySelector('#s-color-theme')  as HTMLSelectElement;
-    const editorThemeEl = overlay.querySelector('#s-editor-theme') as HTMLSelectElement;
-    const fontSizeEl    = overlay.querySelector('#s-font-size')    as HTMLInputElement;
-    const fontSizeValEl = overlay.querySelector('#s-font-size-val') as HTMLElement;
-    const uiFontFamilyEl   = overlay.querySelector('#s-ui-font-family')   as HTMLSelectElement;
-    const codeFontFamilyEl = overlay.querySelector('#s-code-font-family') as HTMLSelectElement;
-    const lineNumEl     = overlay.querySelector('#s-line-numbers') as HTMLSelectElement;
-    const minimapEl     = overlay.querySelector('#s-minimap')      as HTMLInputElement;
-    const wordWrapEl    = overlay.querySelector('#s-word-wrap')    as HTMLInputElement;
-    const formatSaveEl  = overlay.querySelector('#s-format-on-save') as HTMLInputElement;
-    const autosaveEl    = overlay.querySelector('#s-autosave')     as HTMLInputElement;
-    const uiScaleEl     = overlay.querySelector('#s-ui-scale')     as HTMLSelectElement;
-    const autofetchEl   = overlay.querySelector('#s-git-autofetch') as HTMLInputElement;
-    const autofetchPeriodEl = overlay.querySelector('#s-git-autofetch-period') as HTMLSelectElement;
-
-    this.syncControls = () => {
-      const s = this.settings;
-      colorThemeEl.value  = s.colorTheme;
-      editorThemeEl.value = s.editorTheme;
-      fontSizeEl.value    = String(s.fontSize);
-      fontSizeValEl.textContent = `${s.fontSize}px`;
-      uiFontFamilyEl.value   = s.uiFontFamily;
-      codeFontFamilyEl.value = s.codeFontFamily;
-      lineNumEl.value     = s.lineNumbers;
-      minimapEl.checked   = s.minimap;
-      wordWrapEl.checked  = s.wordWrap === 'on';
-      formatSaveEl.checked = s.formatOnSave;
-      autosaveEl.checked   = s.autosave;
-      uiScaleEl.value      = s.uiScale;
-      autofetchEl.checked  = s.gitAutofetch;
-      autofetchPeriodEl.value = String(s.gitAutofetchPeriod);
-      autofetchPeriodEl.disabled = !s.gitAutofetch;
-    };
-    this.syncControls();
-
-    const emit = () => { saveSettings(this.settings); this.onChange({ ...this.settings }); };
-
-    colorThemeEl.addEventListener('change', () => {
-      this.settings.colorTheme = colorThemeEl.value as ColorTheme;
-      emit();
-    });
-    editorThemeEl.addEventListener('change', () => {
-      this.settings.editorTheme = editorThemeEl.value as EditorTheme;
-      emit();
-    });
-    fontSizeEl.addEventListener('input', () => {
-      this.settings.fontSize = Number(fontSizeEl.value);
-      fontSizeValEl.textContent = `${this.settings.fontSize}px`;
-      emit();
-    });
-    uiFontFamilyEl.addEventListener('change', () => {
-      this.settings.uiFontFamily = uiFontFamilyEl.value;
-      emit();
-    });
-    codeFontFamilyEl.addEventListener('change', () => {
-      this.settings.codeFontFamily = codeFontFamilyEl.value;
-      emit();
-    });
-    lineNumEl.addEventListener('change', () => {
-      this.settings.lineNumbers = lineNumEl.value as EditorSettings['lineNumbers'];
-      emit();
-    });
-    minimapEl.addEventListener('change', () => {
-      this.settings.minimap = minimapEl.checked;
-      emit();
-    });
-    wordWrapEl.addEventListener('change', () => {
-      this.settings.wordWrap = wordWrapEl.checked ? 'on' : 'off';
-      emit();
-    });
-    formatSaveEl.addEventListener('change', () => {
-      this.settings.formatOnSave = formatSaveEl.checked;
-      emit();
-    });
-    autosaveEl.addEventListener('change', () => {
-      this.settings.autosave = autosaveEl.checked;
-      emit();
-    });
-    uiScaleEl.addEventListener('change', () => {
-      this.settings.uiScale = uiScaleEl.value as UiScale;
-      emit();
-    });
-    autofetchEl.addEventListener('change', () => {
-      this.settings.gitAutofetch = autofetchEl.checked;
-      // the period says nothing while nothing fetches
-      autofetchPeriodEl.disabled = !autofetchEl.checked;
-      emit();
-    });
-    autofetchPeriodEl.addEventListener('change', () => {
-      this.settings.gitAutofetchPeriod = Number(autofetchPeriodEl.value);
-      emit();
-    });
-
-    overlay.querySelector('#s-open-settings-json')!.addEventListener('click', () => {
-      this.hide();
-      this.openJson?.('settings');
-    });
-    overlay.querySelector('#s-open-keybinds-json')!.addEventListener('click', () => {
-      this.hide();
-      this.openJson?.('keybinds');
-    });
-
-    overlay.querySelector('.settings-close')!.addEventListener('click', () => this.hide());
     overlay.addEventListener('click', e => { if (e.target === overlay) this.hide(); });
     overlay.addEventListener('keydown', e => {
       if (e.key === 'Escape') { e.preventDefault(); this.hide(); return; }
-      if (e.key === 'Tab') this.trapFocus(e);
+      if (e.key === 'Tab') this.trapFocus(e, modal);
     });
 
-    return overlay;
+    this.syncControls();
+    return { overlay, modal };
   }
 
-  private trapFocus(e: KeyboardEvent): void {
-    const modal = this.overlay.querySelector('.settings-modal') as HTMLElement;
+  private syncControls(): void {
+    for (const sync of this.controls.values()) sync();
+    const period = this.overlay?.querySelector<HTMLSelectElement>('#s-gitAutofetchPeriod');
+    if (period) period.disabled = !this.settings.gitAutofetch;
+  }
+
+  private trapFocus(e: KeyboardEvent, modal: HTMLElement): void {
     const focusable = Array.from(
-      modal.querySelectorAll<HTMLElement>(
-        'button, input, select, [tabindex]:not([tabindex="-1"])'
-      )
-    ).filter(el => !el.closest('.sr-only') || el.tagName !== 'INPUT');
+      modal.querySelectorAll<HTMLElement>('button, input, select, [tabindex]:not([tabindex="-1"])'),
+    ).filter(el => !el.hasAttribute('disabled'));
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (e.shiftKey) {
       if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-    } else {
-      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    } else if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
     }
   }
 
   show(): void {
     this.previousFocus = document.activeElement as HTMLElement;
     this.overlay.classList.remove('hidden');
-    const modal = this.overlay.querySelector('.settings-modal') as HTMLElement;
-    const first = modal.querySelector<HTMLElement>('button, input, select');
-    first?.focus();
+    this.modal.querySelector<HTMLElement>('button, input, select')?.focus();
   }
 
   hide(): void {
