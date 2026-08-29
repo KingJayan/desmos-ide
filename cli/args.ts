@@ -1,4 +1,4 @@
-export type Command = 'run' | 'build' | 'fmt' | 'help' | 'version';
+export type Command = 'run' | 'build' | 'fmt' | 'fix' | 'help' | 'version';
 
 export interface Options {
   command: Command;
@@ -26,7 +26,7 @@ const DEFAULTS: Options = {
   theme: 'dark',
 };
 
-const COMMANDS = new Set<Command>(['run', 'build', 'fmt', 'help', 'version']);
+const COMMANDS = new Set<Command>(['run', 'build', 'fmt', 'fix', 'help', 'version']);
 
 function isCommand(word: string): word is Command {
   return COMMANDS.has(word as Command);
@@ -95,6 +95,7 @@ usage
   dsmx run <file.dsmx>      compile, open a graph in the browser, reload on save
   dsmx build <file.dsmx>    write the desmos state as json
   dsmx fmt <file.dsmx>      format the file in place
+  dsmx fix <file.dsmx>      rewrite the file in the current grammar
 
 options
   -o, --out <path>   where build writes its json, or - for stdout

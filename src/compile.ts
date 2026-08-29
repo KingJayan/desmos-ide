@@ -2,6 +2,7 @@
 
 import { tokenize, LexError } from './compiler/lexer';
 import { parse, ParseError, type ParseErrorInfo } from './compiler/parser';
+import { needsMigration } from './compiler/migrate';
 import { optimize, collectAllRefs, OptimizeNote, type OptimizeCache, type RefsCache, type RefSet } from './compiler/optimizer';
 import { codegenWithSourceMap, ClockInfo, DesmosState, DesmosExpr, ExprSource, type CodegenCache } from './compiler/codegen';
 import { analyze, type AnalyzeCache } from './compiler/analyze';
@@ -15,7 +16,7 @@ export type { DesmosState, DesmosExpr, DesmosSlider, ExprSource } from './compil
 export type { OptimizeKind, OptimizeNote } from './compiler/optimizer';
 
 export type SymbolKind =
-  | 'var' | 'fn' | 'alias'
+  | 'var' | 'fn'
   | 'point' | 'circle' | 'line'
   | 'curve' | 'region' | 'polygon' | 'segment'
   | 'text' | 'group'
@@ -85,7 +86,6 @@ function stmtSymbol(stmt: Statement): SymbolInfo | null {
   const p = stmt.pos;
   switch (stmt.type) {
     case 'VarDecl':    return { name: stmt.name, kind: 'var',     line: p.line, col: p.col };
-    case 'AliasDecl':  return { name: stmt.name, kind: 'alias',   line: p.line, col: p.col };
     case 'FnDecl':     return { name: stmt.name, kind: 'fn',      line: p.line, col: p.col };
     case 'PointDecl':  return { name: stmt.name, kind: 'point',   line: p.line, col: p.col };
     case 'CircleDecl': return { name: stmt.name, kind: 'circle',  line: p.line, col: p.col };
@@ -145,7 +145,7 @@ function checkWarnings(ast: Program, refs: RefSet): WarningMarker[] {
       seen.set(name, line);
     }
 
-    if ((kind === 'alias' || kind === 'fn') && !refs.has(name)) {
+    if (kind === 'fn' && !refs.has(name)) {
       markers.push({
         startLineNumber: line, startColumn: col,
         endLineNumber: line,   endColumn: col + kwLen + 1 + name.length,
@@ -179,9 +179,12 @@ export function compile(src: string, opts: CompileOptions = {}, out?: Handoff): 
     const { ast, parseErrors } = opts.front ? opts.front(src) : parse(tokenize(src));
 
     if (parseErrors.length > 0) {
+      const legacy = needsMigration(src)
+        ? 'This file uses the older grammar. Run "Migrate syntax" (dsmx fix) to update it.'
+        : undefined;
       return {
         success: false,
-        errors: parseErrors.map(e => mkError(e.error, 1, e.line, e.col, e.tokenLen)),
+        errors: parseErrors.map(e => mkError(e.error, 1, e.line, e.col, e.tokenLen, legacy)),
       };
     }
 
@@ -210,8 +213,8 @@ export function compile(src: string, opts: CompileOptions = {}, out?: Handoff): 
     if (opts.prelude) {
       const prelude = parsePrelude(opts.prelude);
       const contributed = prelude.ast.body.filter(
-        (s): s is Extract<Statement, { type: 'FnDecl' | 'AliasDecl' }> =>
-          s.type === 'FnDecl' || s.type === 'AliasDecl',
+        (s): s is Extract<Statement, { type: 'FnDecl' | 'VarDecl' }> =>
+          s.type === 'FnDecl' || s.type === 'VarDecl',
       );
       const asProgram: Program = { type: 'Program', body: contributed };
       if (prelude.parseErrors.length === 0 && analyze(asProgram).length === 0) {
@@ -236,7 +239,7 @@ export function compile(src: string, opts: CompileOptions = {}, out?: Handoff): 
 
     const optimizations: OptimizeNote[] = [];
     const usedRefs = collectAllRefs(program, opts.reuse?.refs);
-    const optimized = optimize(program, optimizations, usedRefs, opts.reuse?.optimize);
+    const optimized = optimize(program, optimizations, opts.reuse?.optimize);
     const drawn: Program = fromPlugin.size === 0
       ? optimized
       : { type: 'Program', body: optimized.body.filter(s => !('name' in s && fromPlugin.has(s.name))) };

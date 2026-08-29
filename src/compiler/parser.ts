@@ -13,8 +13,20 @@ export class ParseError extends Error {
   }
 }
 
-// `time` and `camera` are statements, so only `project` is left as a call
-const KW_AS_FN = new Set(['project', 'circle', 'map']);
+/** the type annotations a declaration may carry, each one a constructor as well */
+export const KINDS = [
+  'point', 'circle', 'line', 'curve', 'region', 'polygon', 'segment',
+  'text', 'group', 'time', 'camera', 'spiral', 'wave', 'grid',
+] as const;
+
+export type Kind = (typeof KINDS)[number];
+
+const KIND_SET = new Set<string>(KINDS);
+
+const PROP_ALIASES: Record<string, string> = {
+  xmin: 'xMin', xmax: 'xMax', ymin: 'yMin', ymax: 'yMax',
+  cx: 'cX', cy: 'cY',
+};
 
 export interface ParseErrorInfo {
   error: string;
@@ -22,6 +34,35 @@ export interface ParseErrorInfo {
   col: number;
   tokenLen?: number;
   phase: 1;
+}
+
+/** replaces free identifiers; `expr { }` block inlines without reaching the ast */
+function substitute(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr {
+  const s = (e: T.Expr) => substitute(e, subst);
+  switch (expr.type) {
+    case 'Ident': return subst.get(expr.name) ?? expr;
+    case 'BinOp': return { ...expr, left: s(expr.left), right: s(expr.right) };
+    case 'UnaryOp': return { ...expr, operand: s(expr.operand) };
+    case 'CompareExpr': return { ...expr, left: s(expr.left), right: s(expr.right) };
+    case 'ConditionalExpr': return { ...expr, cond: s(expr.cond), then: s(expr.then), else_: s(expr.else_) };
+    case 'PiecewiseExpr':
+      return { ...expr, branches: expr.branches.map(b => ({ cond: b.cond ? s(b.cond) : null, body: s(b.body) })) };
+    case 'Call':
+      return {
+        ...expr,
+        args: expr.args.map(s),
+        ...(expr.kwargs
+          ? { kwargs: Object.fromEntries(Object.entries(expr.kwargs).map(([k, v]) => [k, s(v)])) }
+          : {}),
+      };
+    case 'Tuple': return { ...expr, x: s(expr.x), y: s(expr.y) };
+    case 'ListLit': return { ...expr, items: expr.items.map(s) };
+    case 'ListRange': return { ...expr, start: s(expr.start), end: s(expr.end), ...(expr.step ? { step: s(expr.step) } : {}) };
+    case 'Lambda': return { ...expr, body: s(expr.body) };
+    case 'ForExpr':
+      return { ...expr, start: s(expr.start), end: s(expr.end), ...(expr.step ? { step: s(expr.step) } : {}), body: s(expr.body) };
+    default: return expr;
+  }
 }
 
 class Parser {
@@ -38,10 +79,14 @@ class Parser {
     return t.type === type && (value === undefined || t.value === value);
   }
 
-  private checkNext(type: TT, value?: string): boolean {
-    const t = this.tokens[this.pos + 1];
+  private at(offset: number, type: TT, value?: string): boolean {
+    const t = this.tokens[this.pos + offset];
     if (!t) return false;
     return t.type === type && (value === undefined || t.value === value);
+  }
+
+  private checkNext(type: TT, value?: string): boolean {
+    return this.at(1, type, value);
   }
 
   private eat(type: TT, value?: string): Token {
@@ -93,16 +138,15 @@ class Parser {
   }
 
   private recoverToNextStatement(): void {
-    const stmtStartKws = new Set([
-      'fn', 'alias', 'debug', 'expr', 'use',
-      'point', 'circle', 'line', 'curve', 'region', 'polygon', 'segment', 'text', 'group',
-      'spiral', 'wave', 'grid',
-    ]);
+    const from = this.pos;
     while (!this.check('eof')) {
-      const t = this.peek();
-      if (t.type === 'nl') { this.advance(); return; }
-      if (t.type === 'kw' && stmtStartKws.has(t.value)) return;
-      if (t.type === 'ident' && this.checkNext('op', '=')) return;
+      if (this.pos > from) {
+        const t = this.peek();
+        if (t.type === 'nl') { this.advance(); return; }
+        if (t.type === 'kw' && (t.value === 'fn' || t.value === 'use' || t.value === 'debug')) return;
+        if (t.type === 'ident' && this.checkNext('op', '=')) return;
+        if (t.type === 'ident' && this.checkNext('ident') && this.at(2, 'op', '=')) return;
+      }
       this.advance();
     }
   }
@@ -112,34 +156,26 @@ class Parser {
 
     if (t.type === 'kw') {
       switch (t.value) {
-        case 'fn':      return this.parseFnDecl();
-        case 'alias':   return this.parseAliasDecl();
-        case 'debug':   return this.parseDebugDecl();
-        case 'use':     return this.parseUseDecl();
-        case 'expr':    return this.parseExprBlockDecl();
-        case 'point':   return this.parsePointStatement();
-        case 'circle':  return this.parseCircleStatement();
-        case 'line':    return this.parseLineStatement();
-        case 'curve':   return this.parseCurveDecl();
-        case 'region':  return this.parseRegionDecl();
-        case 'polygon': return this.parsePolygonDecl();
-        case 'segment': return this.parseSegmentDecl();
-        case 'text':    return this.parseTextDecl();
-        case 'group':   return this.parseGroupDecl();
-        case 'spiral':  return this.parseSpiralDecl();
-        case 'wave':    return this.parseWaveDecl();
-        case 'grid':    return this.parseGridDecl();
-        case 'time':    return this.parseTimeDecl();
-        case 'camera':  return this.parseCameraDecl();
+        case 'fn':    return this.parseFnDecl();
+        case 'debug': return this.parseDebugDecl();
+        case 'use':   return this.parseUseDecl();
       }
     }
 
     if (t.type === 'ident' && this.checkNext('op', '=')) {
-      return this.parseVarDecl();
+      return this.parseDecl(null);
+    }
+
+    if (t.type === 'ident' && this.checkNext('ident') && this.at(2, 'op', '=')) {
+      if (!KIND_SET.has(t.value)) {
+        throw new ParseError(`Unknown type '${t.value}' — expected one of ${KINDS.join(', ')}`, t);
+      }
+      this.advance();
+      return this.parseDecl(t.value as Kind);
     }
 
     throw new ParseError(
-      'Expected statement (use / fn / alias / debug / expr / point / circle / line / curve / region / polygon / segment / text / group / ident = expr)',
+      `Expected a statement: use "id", fn f(a) = ..., debug expr, or [${KINDS.join('|')}] name = expr`,
       t,
     );
   }
@@ -160,15 +196,6 @@ class Parser {
     return { type: 'FnDecl', name, params, body, pos };
   }
 
-  private parseAliasDecl(): T.AliasDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'alias');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    const value = this.parseExpr();
-    return { type: 'AliasDecl', name, value, pos };
-  }
-
   private parseDebugDecl(): T.DebugDecl {
     const pos = this.curPos();
     this.eat('kw', 'debug');
@@ -183,468 +210,218 @@ class Parser {
     return { type: 'UseDecl', plugin, pos };
   }
 
-  private parseExprBlockDecl(): T.ExprBlockDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'expr');
-    this.eat('lbrace');
-    const bindings: Array<{ name: string; value: T.Expr }> = [];
-
-    while (!this.check('rbrace') && !this.check('eof')) {
-      // peek ahead: if `ident =` it's a binding, otherwise it's the result
-      if (this.check('ident') && this.checkNext('op', '=')) {
-        const name = this.advance().value;
-        this.advance(); // eat '='
-        const value = this.parseExpr();
-        bindings.push({ name, value });
-      } else {
-        // final result expression
-        const result = this.parseExpr();
-        this.eat('rbrace');
-        return { type: 'ExprBlockDecl', bindings, result, pos };
-      }
-    }
-
-    throw new ParseError('expr block must end with a result expression', this.peek());
-  }
-
-  private parsePointStatement(): T.PointDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'point');
-    const name = this.eat('ident').value;
-    this.eat('lparen');
-    const x = this.parseExpr();
-    this.eat('comma');
-    const y = this.parseExpr();
-    this.eat('rparen');
-    const style = this.parseStyleBlock();
-    return { type: 'PointDecl', name, x, y, style, pos };
-  }
-
-  private parseCircleStatement(): T.CircleDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'circle');
-    const name = this.eat('ident').value;
-
-    // block form: circle c { center (x,y)  radius r }
-    if (this.check('lbrace')) {
-      this.advance();
-      let cx: T.Expr | undefined, cy: T.Expr | undefined, r: T.Expr | undefined;
-      while (!this.check('rbrace') && !this.check('eof')) {
-        const prop = this.eat('ident').value;
-        if (prop === 'center') {
-          this.eat('lparen');
-          cx = this.parseExpr();
-          this.eat('comma');
-          cy = this.parseExpr();
-          this.eat('rparen');
-        } else if (prop === 'radius') {
-          r = this.parseExpr();
-        } else {
-          throw new ParseError(`Unknown circle property '${prop}'`, this.tokens[this.pos - 1]);
-        }
-      }
-      this.eat('rbrace');
-      if (!cx || !cy) throw new ParseError("circle block requires 'center'", this.peek());
-      if (!r)        throw new ParseError("circle block requires 'radius'", this.peek());
-      const style = this.parseStyleBlock();
-      return { type: 'CircleDecl', name, cx, cy, r, style, pos };
-    }
-
-    // classic form: circle c = circle((cx, cy), r)
-    this.eat('op', '=');
-    if (this.check('kw', 'circle') || (this.check('ident') && this.peek().value === 'circle')) {
-      this.advance();
-    } else {
-      throw new ParseError("Expected 'circle((cx, cy), r)' or '{ center ... radius ... }'", this.peek());
-    }
-    this.eat('lparen');
-    this.eat('lparen');
-    const cx = this.parseExpr();
-    this.eat('comma');
-    const cy = this.parseExpr();
-    this.eat('rparen');
-    this.eat('comma');
-    const r = this.parseExpr();
-    this.eat('rparen');
-    const style = this.parseStyleBlock();
-    return { type: 'CircleDecl', name, cx, cy, r, style, pos };
-  }
-
-  private parseLineStatement(): T.LineDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'line');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-
-    if (this.check('ident') && this.peek().value === 'slope') {
-      this.advance();
-      this.eat('lparen');
-      const slope = this.parseExpr();
-      this.eat('rparen');
-      let intercept: T.Expr | undefined;
-      if (this.check('comma')) {
-        this.advance();
-        if (this.check('ident') && this.peek().value === 'intercept') {
-          this.advance();
-          this.eat('lparen');
-          intercept = this.parseExpr();
-          this.eat('rparen');
-        }
-      }
-      const style = this.parseStyleBlock();
-      return { type: 'LineDecl', name, form: 'slope-intercept', slope, intercept, style, pos };
-    }
-
-    const lhs = this.parseExpr();
-
-    if (this.check('op', '=')) {
-      this.advance();
-      const rhs = this.parseExpr();
-      const style = this.parseStyleBlock();
-      return { type: 'LineDecl', name, form: 'standard', lhs, rhs, style, pos };
-    }
-
-    const style = this.parseStyleBlock();
-    return { type: 'LineDecl', name, form: 'expr', expr: lhs, style, pos };
-  }
-
-  /** time T [= 0..10] [period 2000] [loop|mirror] */
-  private parseTimeDecl(): T.TimeDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'time');
-    const name = this.eat('ident').value;
-
-    let start: T.Expr | undefined;
-    let end: T.Expr | undefined;
-    if (this.check('op', '=')) {
-      this.advance();
-      start = this.parseExpr();
-      this.eat('dotdot');
-      end = this.parseExpr();
-    }
-
-    let period: T.Expr | undefined;
-    if (this.check('kw', 'period')) {
-      this.advance();
-      period = this.parseExpr();
-    }
-
-    let mode: T.TimeMode | undefined;
-    if (this.check('kw', 'loop'))        { this.advance(); mode = 'loop'; }
-    else if (this.check('kw', 'mirror')) { this.advance(); mode = 'mirror'; }
-
-    return { type: 'TimeDecl', name, start, end, period, mode, pos };
-  }
-
-  /** camera cam = azimuth(0.6), elevation(0.4) */
-  private parseCameraDecl(): T.CameraDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'camera');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-
-    this.eat('kw', 'azimuth');
-    this.eat('lparen');
-    const azimuth = this.parseExpr();
-    this.eat('rparen');
-
-    this.eat('comma');
-
-    this.eat('kw', 'elevation');
-    this.eat('lparen');
-    const elevation = this.parseExpr();
-    this.eat('rparen');
-
-    return { type: 'CameraDecl', name, azimuth, elevation, pos };
-  }
-
-  private parseVarDecl(): T.VarDecl | T.CurveDecl {
+  /** the one statement shape: [kind] name = expr [where cond] [as { ... }] */
+  private parseDecl(kind: Kind | null): T.Statement {
+    const nameTok = this.peek();
     const pos = this.curPos();
     const name = this.eat('ident').value;
     this.eat('op', '=');
     const value = this.parseExpr();
 
-    if (this.check('kw', 'for')) {
-      this.advance();
-      const varName = this.eat('ident').value;
-      this.eat('kw', 'in');
-      const start = this.parseExpr();
-      this.eat('dotdot');
-      const end = this.parseExpr();
-      let step: T.Expr | undefined;
-      if (this.check('kw', 'step')) {
-        this.advance();
-        step = this.parseExpr();
-      }
-      const style = this.parseStyleBlock();
-      return { type: 'CurveDecl', name, var: varName, start, end, step, body: value, style, pos };
-    }
-
-    // domain restriction suffix
     let domain: T.Expr | undefined;
-    if (this.check('kw', 'domain')) {
+    if (this.check('kw', 'where')) {
       this.advance();
       domain = this.parseComparison();
     }
 
-    return { type: 'VarDecl', name, value, domain, pos };
+    const style = this.parseStyleBlock();
+    return this.build(kind, name, value, domain, style, pos, nameTok);
   }
 
-  private parseCurveDecl(): T.CurveDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'curve');
-    const name = this.eat('ident').value;
-    this.eat('lparen');
-    const varName = this.eat('ident').value;
-    this.eat('kw', 'in');
-    const start = this.parseExpr();
-    this.eat('dotdot');
-    const end = this.parseExpr();
-    let step: T.Expr | undefined;
-    if (this.check('kw', 'step')) {
-      this.advance();
-      step = this.parseExpr();
+  private build(
+    kind: Kind | null,
+    name: string,
+    value: T.Expr,
+    domain: T.Expr | undefined,
+    style: T.StyleBlock | undefined,
+    pos: T.Pos,
+    tok: Token,
+  ): T.Statement {
+    const ctor = value.type === 'Call' && KIND_SET.has(value.fn) ? (value.fn as Kind) : null;
+
+    if (kind && ctor && kind !== ctor) {
+      throw new ParseError(`'${kind} ${name}' cannot be built by ${ctor}()`, tok);
     }
-    this.eat('rparen');
-    this.eat('lbrace');
-    const body = this.parseExpr();
-    this.eat('rbrace');
-    const style = this.parseStyleBlock();
-    return { type: 'CurveDecl', name, var: varName, start, end, step, body, style, pos };
-  }
 
-  private parseRegionDecl(): T.RegionDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'region');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    const expr = this.parseExpr();
-    const style = this.parseStyleBlock();
-    return { type: 'RegionDecl', name, expr, style, pos };
-  }
-
-  private parsePolygonDecl(): T.PolygonDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'polygon');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    this.eat('lbracket');
-    const points: T.Tuple[] = [];
-    while (!this.check('rbracket')) {
-      const tpos = this.curPos();
-      this.eat('lparen');
-      const x = this.parseExpr();
-      this.eat('comma');
-      const y = this.parseExpr();
-      this.eat('rparen');
-      points.push({ type: 'Tuple', x, y, pos: tpos });
-      if (this.check('comma')) this.advance();
+    const use = kind ?? ctor;
+    if (!use) {
+      if (value.type === 'Lambda') throw new ParseError('A -> function needs a builtin that takes one', tok);
+      return { type: 'VarDecl', name, value, domain, pos };
     }
-    this.eat('rbracket');
-    const style = this.parseStyleBlock();
-    return { type: 'PolygonDecl', name, points, style, pos };
-  }
 
-  private parseSegmentDecl(): T.SegmentDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'segment');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    const p1pos = this.curPos();
-    this.eat('lparen');
-    const x1 = this.parseExpr();
-    this.eat('comma');
-    const y1 = this.parseExpr();
-    this.eat('rparen');
-    const p1: T.Tuple = { type: 'Tuple', x: x1, y: y1, pos: p1pos };
-    this.eat('arrow');
-    const p2pos = this.curPos();
-    this.eat('lparen');
-    const x2 = this.parseExpr();
-    this.eat('comma');
-    const y2 = this.parseExpr();
-    this.eat('rparen');
-    const p2: T.Tuple = { type: 'Tuple', x: x2, y: y2, pos: p2pos };
-    const style = this.parseStyleBlock();
-    return { type: 'SegmentDecl', name, p1, p2, style, pos };
-  }
+    if (domain) throw new ParseError(`'where' restricts a plain binding, not a ${use}`, tok);
 
-  private parseTextDecl(): T.TextDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'text');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    const contentTok = this.eat('str');
-    this.eat('kw', 'at');
-    this.eat('lparen');
-    const x = this.parseExpr();
-    this.eat('comma');
-    const y = this.parseExpr();
-    this.eat('rparen');
-    const style = this.parseStyleBlock();
-    return { type: 'TextDecl', name, content: contentTok.value, x, y, style, pos };
-  }
+    const call = ctor ? (value as T.Call) : null;
+    const arg = (i: number, key: string): T.Expr | undefined => {
+      if (!call) return undefined;
+      const named = call.kwargs?.[key] ?? call.kwargs?.[PROP_ALIASES[key] ?? key];
+      return named ?? call.args[i];
+    };
+    const need = (i: number, key: string): T.Expr => {
+      const found = arg(i, key);
+      if (!found) throw new ParseError(`${use}() needs '${key}'`, tok);
+      return found;
+    };
+    const point = (e: T.Expr, key: string): T.Tuple => {
+      if (e.type !== 'Tuple') throw new ParseError(`${use}() wants a point for '${key}'`, tok);
+      return e;
+    };
 
-  private parseGroupDecl(): T.GroupDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'group');
-    const name = this.eat('ident').value;
-    this.eat('kw', 'as');
-    const labelTok = this.eat('str');
-    return { type: 'GroupDecl', name, label: labelTok.value, pos };
-  }
-
-  private parseGeneratorKwargs(allowed: string[]): Record<string, T.Expr> {
-    const out: Record<string, T.Expr> = {};
-    this.eat('lparen');
-    while (!this.check('rparen') && !this.check('eof')) {
-      if (this.check('ident') && allowed.includes(this.peek().value) && this.checkNext('op', '=')) {
-        const key = this.advance().value;
-        this.advance();
-        out[key] = this.parseExpr();
-      } else {
-        const key = allowed[Object.keys(out).length];
-        if (key) out[key] = this.parseExpr();
-        else throw new ParseError('Unexpected positional argument', this.peek());
+    switch (use) {
+      case 'point': {
+        if (!call) return { type: 'PointDecl', name, x: point(value, 'position').x, y: point(value, 'position').y, style, pos };
+        if (call.args.length === 1) {
+          const p = point(need(0, 'position'), 'position');
+          return { type: 'PointDecl', name, x: p.x, y: p.y, style, pos };
+        }
+        return { type: 'PointDecl', name, x: need(0, 'x'), y: need(1, 'y'), style, pos };
       }
-      if (this.check('comma')) this.advance();
+
+      case 'circle': {
+        const c = point(need(0, 'center'), 'center');
+        return { type: 'CircleDecl', name, cx: c.x, cy: c.y, r: need(1, 'radius'), style, pos };
+      }
+
+      case 'line': {
+        if (!call) {
+          if (value.type === 'CompareExpr' && value.op === '==') {
+            return { type: 'LineDecl', name, form: 'standard', lhs: value.left, rhs: value.right, style, pos };
+          }
+          return { type: 'LineDecl', name, form: 'expr', expr: value, style, pos };
+        }
+        return {
+          type: 'LineDecl', name, form: 'slope-intercept',
+          slope: need(0, 'slope'), intercept: arg(1, 'intercept'), style, pos,
+        };
+      }
+
+      case 'curve': {
+        const fn = need(0, 'fn');
+        if (fn.type !== 'Lambda') throw new ParseError("curve() wants a function, as in 'curve(t -> (cos t, sin t), 0..6.28)'", tok);
+        const range = need(1, 'range');
+        if (range.type !== 'ListRange') throw new ParseError('curve() wants a range, as in 0..6.28', tok);
+        return {
+          type: 'CurveDecl', name, var: fn.param,
+          start: range.start, end: range.end, step: range.step ?? arg(2, 'step'),
+          body: fn.body, style, pos,
+        };
+      }
+
+      case 'region':
+        return { type: 'RegionDecl', name, expr: call ? need(0, 'expr') : value, style, pos };
+
+      case 'polygon': {
+        const items = call
+          ? (call.args.length === 1 && call.args[0].type === 'ListLit' ? call.args[0].items : call.args)
+          : value.type === 'ListLit' ? value.items : [];
+        if (!items.length) throw new ParseError('polygon() wants a list of points', tok);
+        return { type: 'PolygonDecl', name, points: items.map(p => point(p, 'point')), style, pos };
+      }
+
+      case 'segment':
+        return { type: 'SegmentDecl', name, p1: point(need(0, 'from'), 'from'), p2: point(need(1, 'to'), 'to'), style, pos };
+
+      case 'text': {
+        const content = need(0, 'content');
+        if (content.type !== 'StringLit') throw new ParseError('text() wants a string', tok);
+        const where = point(need(1, 'at'), 'at');
+        return { type: 'TextDecl', name, content: content.value, x: where.x, y: where.y, style, pos };
+      }
+
+      case 'group': {
+        const label = need(0, 'label');
+        if (label.type !== 'StringLit') throw new ParseError('group() wants a string', tok);
+        return { type: 'GroupDecl', name, label: label.value, pos };
+      }
+
+      case 'time': {
+        const range = arg(0, 'range');
+        if (range && range.type !== 'ListRange') throw new ParseError('time() wants a range, as in 0..10', tok);
+        const mode = arg(2, 'mode');
+        if (mode && !(mode.type === 'Ident' && (mode.name === 'loop' || mode.name === 'mirror'))) {
+          throw new ParseError("time() mode is 'loop' or 'mirror'", tok);
+        }
+        return {
+          type: 'TimeDecl', name,
+          start: range?.start, end: range?.end,
+          period: arg(1, 'period'),
+          mode: mode ? (mode as T.Ident).name as T.TimeMode : undefined,
+          pos,
+        };
+      }
+
+      case 'camera':
+        return { type: 'CameraDecl', name, azimuth: need(0, 'azimuth'), elevation: need(1, 'elevation'), pos };
+
+      case 'spiral':
+        return {
+          type: 'SpiralDecl', name,
+          turns: need(0, 'turns'), spacing: need(1, 'spacing'),
+          cx: arg(2, 'cX'), cy: arg(3, 'cY'), rotate: arg(4, 'rotate'), style, pos,
+        };
+
+      case 'wave':
+        return {
+          type: 'WaveDecl', name,
+          freq: need(0, 'freq'), amp: need(1, 'amp'), phase: arg(2, 'phase'),
+          cx: arg(3, 'cX'), cy: arg(4, 'cY'), xmin: arg(5, 'xMin'), xmax: arg(6, 'xMax'), style, pos,
+        };
+
+      case 'grid':
+        return {
+          type: 'GridDecl', name,
+          cols: need(0, 'cols'), rows: need(1, 'rows'),
+          xmin: arg(2, 'xMin'), xmax: arg(3, 'xMax'), ymin: arg(4, 'yMin'), ymax: arg(5, 'yMax'), style, pos,
+        };
     }
-    this.eat('rparen');
-    return out;
-  }
-
-  private parseSpiralDecl(): T.SpiralDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'spiral');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    this.eat('kw', 'spiral');
-    const kw = this.parseGeneratorKwargs(['turns', 'spacing', 'cx', 'cy', 'rotate']);
-    if (!kw['turns'])   throw new ParseError("spiral requires 'turns'",   this.peek());
-    if (!kw['spacing']) throw new ParseError("spiral requires 'spacing'", this.peek());
-    const style = this.parseStyleBlock();
-    return { type: 'SpiralDecl', name, turns: kw['turns'], spacing: kw['spacing'], cx: kw['cx'], cy: kw['cy'], rotate: kw['rotate'], style, pos };
-  }
-
-  private parseWaveDecl(): T.WaveDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'wave');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    this.eat('kw', 'wave');
-    const kw = this.parseGeneratorKwargs(['freq', 'amp', 'phase', 'cx', 'cy', 'xmin', 'xmax']);
-    if (!kw['freq']) throw new ParseError("wave requires 'freq'", this.peek());
-    if (!kw['amp'])  throw new ParseError("wave requires 'amp'",  this.peek());
-    const style = this.parseStyleBlock();
-    return { type: 'WaveDecl', name, freq: kw['freq'], amp: kw['amp'], phase: kw['phase'], cx: kw['cx'], cy: kw['cy'], xmin: kw['xmin'], xmax: kw['xmax'], style, pos };
-  }
-
-  private parseGridDecl(): T.GridDecl {
-    const pos = this.curPos();
-    this.eat('kw', 'grid');
-    const name = this.eat('ident').value;
-    this.eat('op', '=');
-    this.eat('kw', 'grid');
-    const kw = this.parseGeneratorKwargs(['cols', 'rows', 'xmin', 'xmax', 'ymin', 'ymax']);
-    if (!kw['cols']) throw new ParseError("grid requires 'cols'", this.peek());
-    if (!kw['rows']) throw new ParseError("grid requires 'rows'", this.peek());
-    const style = this.parseStyleBlock();
-    return { type: 'GridDecl', name, cols: kw['cols'], rows: kw['rows'], xmin: kw['xmin'], xmax: kw['xmax'], ymin: kw['ymin'], ymax: kw['ymax'], style, pos };
-  }
-
-  private parseGradientArgs(): T.StyleBlock['gradient'] {
-    this.eat('lparen');
-    const from = this.parsePrimary();
-    this.eat('comma');
-    const to = this.parsePrimary();
-    this.eat('rparen');
-    return { from, to };
   }
 
   private parseStyleBlock(): T.StyleBlock | undefined {
     if (!this.check('kw', 'as')) return undefined;
     this.advance();
-
-    if (this.check('ident') && this.peek().value === 'gradient') {
-      this.advance();
-      return { gradient: this.parseGradientArgs() };
-    }
-
     this.eat('lbrace');
+
     const style: T.StyleBlock = {};
     while (!this.check('rbrace') && !this.check('eof')) {
-      if (this.check('ident')) {
-        const prop = this.advance();
-        switch (prop.value) {
-          case 'color':
-            style.color = this.parsePrimary();
-            break;
-          case 'gradient':
-            style.gradient = this.parseGradientArgs();
-            break;
-          case 'opacity': {
-            const n = this.eat('num');
-            style.opacity = parseFloat(n.value);
-            break;
-          }
-          case 'fill':
-            style.fill = true;
-            break;
-          case 'pointSize': {
-            const n = this.eat('num');
-            style.pointSize = parseFloat(n.value);
-            break;
-          }
-          case 'lineWidth': {
-            const n = this.eat('num');
-            style.lineWidth = parseFloat(n.value);
-            break;
-          }
-          case 'lineOpacity': {
-            const n = this.eat('num');
-            style.lineOpacity = parseFloat(n.value);
-            break;
-          }
-          default:
-            throw new ParseError(`Unknown style property '${prop.value}'`, prop);
+      const prop = this.eat('ident');
+      this.eat('colon');
+      switch (prop.value) {
+        case 'color':       style.color = this.parseExpr(); break;
+        case 'gradient':    style.gradient = this.parseGradient(); break;
+        case 'opacity':     style.opacity = this.parseExpr(); break;
+        case 'pointSize':   style.pointSize = this.parseExpr(); break;
+        case 'lineWidth':   style.lineWidth = this.parseExpr(); break;
+        case 'lineOpacity': style.lineOpacity = this.parseExpr(); break;
+        case 'fill': {
+          const on = this.parseExpr();
+          style.fill = !(on.type === 'NumLit' && on.value === 0);
+          break;
         }
-      } else {
-        throw new ParseError('Expected style property name', this.peek());
+        default:
+          throw new ParseError(`Unknown style property '${prop.value}'`, prop);
       }
+      if (this.check('comma')) this.advance();
     }
     this.eat('rbrace');
     return style;
   }
 
-  private parseListRange(): T.ListRange {
-    const pos = this.curPos();
-    this.eat('lbracket');
-    const start = this.parseExpr();
-    let step: T.Expr | undefined;
-    if (this.check('comma')) {
-      this.advance();
-      step = this.parseExpr();
+  private parseGradient(): T.StyleBlock['gradient'] {
+    const call = this.parseExpr();
+    if (call.type !== 'Call' || call.fn !== 'gradient' || call.args.length !== 2) {
+      throw new ParseError('gradient wants gradient(from, to)', this.peek());
     }
-    this.eat('ellipsis');
-    const end = this.parseExpr();
-    this.eat('rbracket');
-    return { type: 'ListRange', start, end, step, pos };
-  }
-
-  private parseInlineRange(pos: T.Pos): T.ListRange {
-    const start = this.parseExpr();
-    this.eat('dotdot');
-    const end = this.parseExpr();
-    let step: T.Expr | undefined;
-    if (this.check('kw', 'step')) {
-      this.advance();
-      step = this.parseExpr();
-    }
-    return { type: 'ListRange', start, end, step, pos };
+    return { from: call.args[0], to: call.args[1] };
   }
 
   private parseExpr(): T.Expr {
-    // if/then/else → ConditionalExpr
+    if (this.check('ident') && this.checkNext('arrow')) {
+      const pos = this.curPos();
+      const param = this.advance().value;
+      this.advance();
+      return { type: 'Lambda', param, body: this.parseExpr(), pos };
+    }
+
     if (this.check('kw', 'if')) {
       const pos = this.curPos();
       this.advance();
@@ -658,14 +435,16 @@ class Parser {
 
     const expr = this.parseComparison();
 
-    // where/else → ConditionalExpr
-    if (this.check('kw', 'where')) {
+    if (this.check('dotdot')) {
       const pos = this.curPos();
       this.advance();
-      const cond = this.parseComparison();
-      this.eat('kw', 'else');
-      const else_ = this.parseExpr();
-      return { type: 'ConditionalExpr', cond, then: expr, else_, pos };
+      const end = this.parseComparison();
+      let step: T.Expr | undefined;
+      if (this.check('ident', 'step')) {
+        this.advance();
+        step = this.parseComparison();
+      }
+      return { type: 'ListRange', start: expr, end, step, pos };
     }
 
     return expr;
@@ -715,6 +494,7 @@ class Parser {
 
   private startsImplicitFactor(): boolean {
     if (this.peek().spaceBefore) return false;
+    if (this.check('ident') && this.checkNext('arrow')) return false;
     return this.check('num') || this.check('ident') || this.check('lparen');
   }
 
@@ -753,6 +533,10 @@ class Parser {
       return { type: 'NumLit', value: parseFloat(t.value), pos };
     }
 
+    if (t.type === 'kw' && t.value === 'expr') {
+      return this.parseBlock();
+    }
+
     if (t.type === 'lbrace') {
       return this.parsePiecewiseExpr();
     }
@@ -771,23 +555,16 @@ class Parser {
     }
 
     if (t.type === 'lbracket') {
-      return this.parseListRange();
+      return this.parseBracketed();
     }
 
-    if (t.type === 'ident' || (t.type === 'kw' && KW_AS_FN.has(t.value))) {
-      const name = this.advance().value;
-
-      // new map syntax: map(i -> body, start..end step n)
-      if (name === 'map') {
-        this.eat('lparen');
-        const varName = this.eat('ident').value;
-        this.eat('arrow');
-        const body = this.parseExpr();
-        this.eat('comma');
-        const range = this.parseInlineRange(pos);
-        this.eat('rparen');
-        return { type: 'MapExpr', var: varName, range, body, pos };
+    if (t.type === 'ident') {
+      if (t.value === 'true' || t.value === 'false') {
+        this.advance();
+        return { type: 'NumLit', value: t.value === 'true' ? 1 : 0, pos };
       }
+
+      const name = this.advance().value;
 
       if (this.check('lparen')) {
         this.advance();
@@ -795,24 +572,25 @@ class Parser {
         const kwargs: Record<string, T.Expr> = {};
 
         while (!this.check('rparen') && !this.check('eof')) {
-          // bare 'loop' flag → kwarg loop=1
-          if (this.check('kw', 'loop')) {
-            this.advance();
-            kwargs['loop'] = { type: 'NumLit', value: 1, pos: this.curPos() };
-          // keyword-named kwarg (step=, speed=, etc.)
-          } else if (
-            (this.check('ident') || this.check('kw', 'step')) &&
-            this.checkNext('op', '=')
-          ) {
+          if (this.check('ident') && this.checkNext('op', '=')) {
             const kname = this.advance().value;
             this.advance();
-            kwargs[kname] = this.parseExpr();
+            kwargs[PROP_ALIASES[kname] ?? kname] = this.parseExpr();
           } else {
             args.push(this.parseExpr());
           }
           if (this.check('comma')) this.advance();
         }
         this.eat('rparen');
+
+        if (name === 'map') {
+          const [fn, range] = args;
+          if (fn?.type !== 'Lambda' || range?.type !== 'ListRange') {
+            throw new ParseError("map wants map(t -> expr, 0..1 step 0.1)", t);
+          }
+          return { type: 'ForExpr', body: fn.body, var: fn.param, start: range.start, end: range.end, step: range.step, pos };
+        }
+
         const call: T.Call = { type: 'Call', fn: name, args, pos };
         if (Object.keys(kwargs).length > 0) call.kwargs = kwargs;
         return call;
@@ -822,6 +600,64 @@ class Parser {
     }
 
     throw new ParseError('Unexpected token in expression', t);
+  }
+
+  /** expr { a = ...  b = ...  result } — the bindings are inlined here */
+  private parseBlock(): T.Expr {
+    this.eat('kw', 'expr');
+    this.eat('lbrace');
+    const subst = new Map<string, T.Expr>();
+
+    while (!this.check('rbrace') && !this.check('eof')) {
+      if (this.check('ident') && this.checkNext('op', '=')) {
+        const name = this.advance().value;
+        this.advance();
+        subst.set(name, substitute(this.parseExpr(), subst));
+        continue;
+      }
+      const result = substitute(this.parseExpr(), subst);
+      this.eat('rbrace');
+      return result;
+    }
+
+    throw new ParseError('An expr block must end with a result expression', this.peek());
+  }
+
+  /** [a, b, c] | [a..b step s] | [e for t in a..b step s] */
+  private parseBracketed(): T.Expr {
+    const pos = this.curPos();
+    this.eat('lbracket');
+
+    if (this.check('rbracket')) {
+      this.advance();
+      return { type: 'ListLit', items: [], pos };
+    }
+
+    const first = this.parseExpr();
+
+    if (this.check('kw', 'for')) {
+      this.advance();
+      const varName = this.eat('ident').value;
+      this.eat('kw', 'in');
+      const range = this.parseExpr();
+      if (range.type !== 'ListRange') throw new ParseError('A comprehension wants a range, as in 0..1 step 0.1', this.peek());
+      this.eat('rbracket');
+      return { type: 'ForExpr', body: first, var: varName, start: range.start, end: range.end, step: range.step, pos };
+    }
+
+    if (first.type === 'ListRange' && this.check('rbracket')) {
+      this.advance();
+      return first;
+    }
+
+    const items = [first];
+    while (this.check('comma')) {
+      this.advance();
+      if (this.check('rbracket')) break;
+      items.push(this.parseExpr());
+    }
+    this.eat('rbracket');
+    return { type: 'ListLit', items, pos };
   }
 
   private parsePiecewiseExpr(): T.PiecewiseExpr {

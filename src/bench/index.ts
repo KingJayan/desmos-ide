@@ -36,14 +36,14 @@ function coldPhases(src: string): void {
   const ast = parse(tokens).ast;
   const refs = collectAllRefs(ast);
   const notes: OptimizeNote[] = [];
-  const optimized = optimize(ast, notes, refs);
+  const optimized = optimize(ast, notes);
 
   const phases: [string, () => void][] = [
     ['tokenize', () => tokenize(src)],
     ['parse', () => parse(tokenize(src))],
     ['analyze', () => analyze(ast)],
     ['collectRefs', () => collectAllRefs(ast)],
-    ['optimize', () => optimize(ast, [], refs)],
+    ['optimize', () => optimize(ast, [])],
     ['codegen', () => codegenWithSourceMap(optimized)],
     ['compile (whole)', () => compile(src)],
   ];

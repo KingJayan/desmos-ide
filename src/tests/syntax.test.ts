@@ -3,7 +3,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { KEYWORDS } from '../compiler/lexer';
-import { BUILTINS } from '../compiler/builtins';
+import { BUILTINS, CONSTRUCTOR_NAMES } from '../compiler/builtins';
 import { DESMOS_NAMED } from '../compiler/codegen';
 import { SYNTAX_FORMS, STYLE_PROPS, syntaxReference } from '../compiler/syntax';
 import { compile } from '../index';
@@ -18,8 +18,9 @@ describe('the syntax reference', () => {
     assert.deepEqual(missing, [], `keywords with no syntax form: ${missing.join(', ')}`);
   });
 
-  test('every claimed keyword is one the lexer knows', () => {
-    const unknown = SYNTAX_FORMS.flatMap(f => f.keywords).filter(kw => !KEYWORDS.has(kw));
+  test('every claimed keyword is one the language knows', () => {
+    const known = new Set<string>([...KEYWORDS, ...CONSTRUCTOR_NAMES]);
+    const unknown = SYNTAX_FORMS.flatMap(f => f.keywords).filter(kw => !known.has(kw));
     assert.deepEqual(unknown, []);
   });
 

@@ -159,16 +159,16 @@ export function collectAllRefs(program: T.Program, cache?: RefsCache): RefSet {
       case 'Call': refs.add(e.fn); e.args.forEach(walk); if (e.kwargs) Object.values(e.kwargs).forEach(walk); break;
       case 'Tuple': walk(e.x); walk(e.y); break;
       case 'ListRange': walk(e.start); walk(e.end); if (e.step) walk(e.step); break;
-      case 'MapExpr': walk(e.range); walk(e.body); break;
+      case 'ListLit': e.items.forEach(walk); break;
+      case 'Lambda': walk(e.body); break;
       case 'ForExpr': walk(e.start); walk(e.end); if (e.step) walk(e.step); walk(e.body); break;
     }
   };
   for (const stmt of program.body) {
-    if (stmt.type === 'AliasDecl' || stmt.type === 'FnDecl') continue;
+    if (stmt.type === 'FnDecl') continue;
     switch (stmt.type) {
       case 'VarDecl': walk(stmt.value); if (stmt.domain) walk(stmt.domain); break;
       case 'DebugDecl': walk(stmt.expr); break;
-      case 'ExprBlockDecl': stmt.bindings.forEach(b => walk(b.value)); walk(stmt.result); break;
       case 'PointDecl': walk(stmt.x); walk(stmt.y); break;
       case 'CircleDecl': walk(stmt.cx); walk(stmt.cy); walk(stmt.r); break;
       case 'LineDecl': [stmt.slope, stmt.intercept, stmt.lhs, stmt.rhs, stmt.expr].forEach(e => e && walk(e)); break;
@@ -185,7 +185,6 @@ export function collectAllRefs(program: T.Program, cache?: RefsCache): RefSet {
     }
   }
   for (const stmt of program.body) {
-    if (stmt.type === 'AliasDecl') walk(stmt.value);
     if (stmt.type === 'FnDecl') walk(stmt.body);
   }
   return refs;
@@ -194,7 +193,6 @@ export function collectAllRefs(program: T.Program, cache?: RefsCache): RefSet {
 export function optimize(
   program: T.Program,
   notes: OptimizeNote[] | null = null,
-  usedRefs: RefSet = collectAllRefs(program),
   cache?: OptimizeCache,
 ): T.Program {
   const reuse = notes ? cache : undefined;
@@ -216,11 +214,6 @@ export function optimize(
       continue;
     }
 
-    if (stmt.type === 'AliasDecl' && !usedRefs.has(stmt.name)) {
-      note(env, 'drop', stmt.pos, () => `alias ${stmt.name}`, () => 'never used');
-      continue;
-    }
-
     const hit = reuse?.stmts.get(stmt);
     if (hit && (fnsUnmoved || fnsMatch(hit.fns, env.fns))) {
       reuse!.hits++;
@@ -238,8 +231,6 @@ export function optimize(
     if (stmt.type === 'FnDecl') {
       const fnBody = optimizeExpr(stmt.body, env);
       out = fnBody === stmt.body ? stmt : { ...stmt, body: fnBody };
-    } else if (stmt.type === 'ExprBlockDecl') {
-      out = lowerExprBlock(stmt, env);
     } else {
       out = optimizeStmt(stmt, env);
     }
@@ -251,16 +242,6 @@ export function optimize(
 
   if (reuse) reuse.fns = env.fns;
   return { type: 'Program', body };
-}
-
-function lowerExprBlock(stmt: T.ExprBlockDecl, env: Env): T.VarDecl {
-  const subst = new Map<string, T.Expr>();
-  for (const b of stmt.bindings) {
-    const val = optimizeExpr(substituteExpr(b.value, subst), env);
-    subst.set(b.name, val);
-  }
-  const result = optimizeExpr(substituteExpr(stmt.result, subst), env);
-  return { type: 'VarDecl', name: `__expr_${stmt.pos.line}_${stmt.pos.col}`, value: result, pos: stmt.pos };
 }
 
 function mapKeep<A>(xs: A[], f: (x: A) => A): A[] {
@@ -297,11 +278,6 @@ function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
       const value = ox(stmt.value), domain = oxopt(stmt.domain);
       if (value === stmt.value && domain === stmt.domain) return stmt;
       return { ...stmt, value, domain };
-    }
-
-    case 'AliasDecl': {
-      const value = ox(stmt.value);
-      return value === stmt.value ? stmt : { ...stmt, value };
     }
 
     case 'PointDecl': {
@@ -401,20 +377,6 @@ function optimizeStmt(stmt: T.Statement, env: Env): T.Statement {
     default:
       return stmt;
   }
-}
-
-function optimizeMap(map: T.MapExpr, env: Env): T.MapExpr {
-  const start = optimizeExpr(map.range.start, env);
-  const end   = optimizeExpr(map.range.end,   env);
-  const step  = map.range.step ? optimizeExpr(map.range.step, env) : undefined;
-  const body  = optimizeExpr(map.body, env);
-  if (start === map.range.start && end === map.range.end && step === map.range.step && body === map.body) {
-    return map;
-  }
-  const range = (start === map.range.start && end === map.range.end && step === map.range.step)
-    ? map.range
-    : { ...map.range, start, end, step };
-  return { ...map, range, body };
 }
 
 export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
@@ -548,8 +510,15 @@ export function optimizeExpr(expr: T.Expr, env: Env, depth = 0): T.Expr {
       return { ...expr, start, end, step };
     }
 
-    case 'MapExpr':
-      return optimizeMap(expr, env);
+    case 'ListLit': {
+      const items = mapKeep(expr.items, ox);
+      return items === expr.items ? expr : { ...expr, items };
+    }
+
+    case 'Lambda': {
+      const body = ox(expr.body);
+      return body === expr.body ? expr : { ...expr, body };
+    }
 
     case 'ForExpr': {
       const body  = ox(expr.body);
@@ -630,14 +599,13 @@ export function substituteExpr(expr: T.Expr, subst: Map<string, T.Expr>): T.Expr
       };
     }
 
-    case 'MapExpr': {
+    case 'ListLit':
+      return { ...expr, items: expr.items.map(e => substituteExpr(e, subst)) };
+
+    case 'Lambda': {
       const newSubst = new Map(subst);
-      newSubst.delete(expr.var);
-      return {
-        ...expr,
-        range: substituteExpr(expr.range, newSubst) as T.ListRange,
-        body:  substituteExpr(expr.body,  newSubst),
-      };
+      newSubst.delete(expr.param);
+      return { ...expr, body: substituteExpr(expr.body, newSubst) };
     }
 
     case 'ForExpr': {

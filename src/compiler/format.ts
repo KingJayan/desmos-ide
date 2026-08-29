@@ -29,7 +29,7 @@ function isIdentPart(ch: string): boolean {
 }
 
 /** splits one line into pieces, keeping strings and comments verbatim */
-function scanLine(line: string): Piece[] {
+function scanLine(line: string, opensBlock: { value: boolean }): Piece[] {
   const out: Piece[] = [];
   let i = 0;
   let gap = false;
@@ -42,6 +42,14 @@ function scanLine(line: string): Piece[] {
     if (ch === ' ' || ch === '\t') { i++; gap = true; continue; }
 
     if (ch === '/' && line[i + 1] === '/') { push('comment', line.slice(i)); break; }
+
+    if (ch === '/' && line[i + 1] === '*') {
+      const close = line.indexOf('*/', i + 2);
+      if (close === -1) { push('comment', line.slice(i)); opensBlock.value = true; break; }
+      push('comment', line.slice(i, close + 2));
+      i = close + 2;
+      continue;
+    }
 
     if (ch === '"') {
       let j = i + 1;
@@ -102,7 +110,7 @@ function scanLine(line: string): Piece[] {
 }
 
 // keywords that end with a value still to come, so a `-` right after one negates
-const KEYWORD_OPS = new Set(['else', 'then', 'step', 'in', 'at', 'where', 'domain', 'radius', 'as']);
+const KEYWORD_OPS = new Set(['else', 'then', 'step', 'in', 'where', 'as', 'for', 'if']);
 
 /** true when a `-` at this position negates rather than subtracts */
 function isUnaryMinus(prev: Piece | undefined): boolean {
@@ -187,8 +195,17 @@ export function formatDsl(src: string): string {
   let parenDepth = 0;
   let blanks = 0;
 
+  let inBlockComment = false;
+
   for (const raw of lines) {
-    const pieces = scanLine(raw);
+    if (inBlockComment) {
+      out.push(raw);
+      if (raw.includes('*/')) inBlockComment = false;
+      continue;
+    }
+
+    const opensBlock = { value: false };
+    const pieces = scanLine(raw, opensBlock);
 
     if (pieces.length === 0) {
       // several blank lines in a row collapse to one, and leading blanks are dropped
@@ -201,6 +218,7 @@ export function formatDsl(src: string): string {
     const closes = Math.min(leadingCloses(pieces), depth);
     const indent = INDENT.repeat(Math.max(0, depth - closes));
     out.push(indent + joinPieces(pieces, parenDepth));
+    inBlockComment = opensBlock.value;
     depth = Math.max(0, depth + netDepth(pieces));
     parenDepth = Math.max(0, parenDepth + netDepth(pieces.filter(p => p.text === '(' || p.text === ')')));
   }

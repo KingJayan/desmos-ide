@@ -155,9 +155,6 @@ const GREEK: Record<string, string> = {
 };
 
 export function nameToLatex(name: string): string {
-  // internal expr block names pass through as-is (they'll never reach the graph)
-  if (name.startsWith('__expr_')) return name;
-
   const uscore = name.indexOf('_');
   if (uscore !== -1) {
     const prefix = name.slice(0, uscore);
@@ -319,7 +316,6 @@ export class Codegen {
     this.currentPos = stmt.pos;
     switch (stmt.type) {
       case 'VarDecl':     this.genVarDecl(stmt);     break;
-      case 'AliasDecl':   this.genAliasDecl(stmt);   break;
       case 'PointDecl':   this.genPointDecl(stmt);   break;
       case 'CircleDecl':  this.genCircleDecl(stmt);  break;
       case 'LineDecl':    this.genLineDecl(stmt);    break;
@@ -351,7 +347,7 @@ export class Codegen {
         ? Math.round(1000 / speedExpr.value)
         : undefined;
 
-      const looping = kw['loop'] !== undefined;
+      const looping = kw['loop'] !== undefined && !(kw['loop'].type === 'NumLit' && kw['loop'].value === 0);
 
       const slider: DesmosSlider = {
         min: minArg ? this.toLaTeX(minArg) : undefined,
@@ -373,13 +369,7 @@ export class Codegen {
       return;
     }
 
-    // expr block lowered form
-    if (stmt.name.startsWith('__expr_')) {
-      this.emit({ type: 'expression', latex: this.toLaTeX(stmt.value) }, stmt.name);
-      return;
-    }
-
-    // dom restriction: y = x^2 domain x > 0  →  y=x^{2}\left\{x>0\right\}
+    // dom restriction: y = x^2 where x > 0  →  y=x^{2}\left\{x>0\right\}
     if (stmt.domain) {
       const exprLatex   = this.toLaTeX(stmt.value);
       const domainLatex = this.toLaTeX(stmt.domain);
@@ -429,11 +419,6 @@ export class Codegen {
     return expr?.type === 'NumLit' ? expr.value : fallback;
   }
 
-  private genAliasDecl(stmt: T.AliasDecl): void {
-    const varName = nameToLatex(stmt.name);
-    this.emit({ type: 'expression', latex: `${varName}=${this.toLaTeX(stmt.value)}` }, stmt.name);
-  }
-
   private genPointDecl(stmt: T.PointDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.point;
     const varName = nameToLatex(stmt.name);
@@ -444,7 +429,7 @@ export class Codegen {
       latex: `${varName}=\\left(${tx},${ty}\\right)`,
       color, showLabel: true, label: stmt.name,
     };
-    if (stmt.style?.pointSize) partial.pointSize = String(stmt.style.pointSize);
+    if (stmt.style?.pointSize) partial.pointSize = this.toLaTeX(stmt.style.pointSize);
     this.emit(partial, stmt.name);
   }
 
@@ -453,7 +438,7 @@ export class Codegen {
     const cx = this.toLaTeX(stmt.cx);
     const cy = this.toLaTeX(stmt.cy);
     const r  = this.toLaTeX(stmt.r);
-    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.1';
+    const fillOpacity = stmt.style?.opacity !== undefined ? this.toLaTeX(stmt.style.opacity) : '0.1';
     this.emit({
       type: 'expression',
       latex: this.circleLatex(cx, cy, r),
@@ -488,7 +473,7 @@ export class Codegen {
     const color = grad
       ? (resolveColor(grad.from) ?? COLORS.curve)
       : ((stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.curve);
-    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : undefined;
+    const fillOpacity = stmt.style?.opacity !== undefined ? this.toLaTeX(stmt.style.opacity) : undefined;
 
     const bodyLatex  = this.toLaTeX(stmt.body);
     const startLatex = this.toLaTeX(stmt.start);
@@ -532,7 +517,7 @@ export class Codegen {
 
   private genRegionDecl(stmt: T.RegionDecl): void {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.region;
-    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.4';
+    const fillOpacity = stmt.style?.opacity !== undefined ? this.toLaTeX(stmt.style.opacity) : '0.4';
     this.emit({
       type: 'expression',
       latex: this.toLaTeX(stmt.expr),
@@ -545,7 +530,7 @@ export class Codegen {
     const color = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.polygon;
     const pts = stmt.points.map(p => `\\left(${this.toLaTeX(p.x)},${this.toLaTeX(p.y)}\\right)`).join(',');
     const latex = `\\operatorname{polygon}\\left(${pts}\\right)`;
-    const fillOpacity = stmt.style?.opacity !== undefined ? String(stmt.style.opacity) : '0.2';
+    const fillOpacity = stmt.style?.opacity !== undefined ? this.toLaTeX(stmt.style.opacity) : '0.2';
     this.emit({ type: 'expression', latex, color, fill: true, fillOpacity }, stmt.name);
   }
 
@@ -585,8 +570,8 @@ export class Codegen {
   }
 
   private applyLineStyle(partial: Omit<DesmosExpr, 'id'>, style?: T.StyleBlock): void {
-    if (style?.lineWidth !== undefined) partial.lineWidth = String(style.lineWidth);
-    if (style?.lineOpacity !== undefined) partial.lineOpacity = String(style.lineOpacity);
+    if (style?.lineWidth !== undefined) partial.lineWidth = this.toLaTeX(style.lineWidth);
+    if (style?.lineOpacity !== undefined) partial.lineOpacity = this.toLaTeX(style.lineOpacity);
   }
 
   private genSpiralDecl(stmt: T.SpiralDecl): void {
@@ -645,7 +630,8 @@ export class Codegen {
 
   private genGridDecl(stmt: T.GridDecl): void {
     const color      = (stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? '#888888';
-    const lineOpacity = stmt.style?.lineOpacity ?? stmt.style?.opacity ?? 0.4;
+    const lineOpacityExpr = stmt.style?.lineOpacity ?? stmt.style?.opacity;
+    const lineOpacity = lineOpacityExpr ? this.toLaTeX(lineOpacityExpr) : '0.4';
     const cols = stmt.cols.type === 'NumLit' ? stmt.cols.value : 10;
     const rows = stmt.rows.type === 'NumLit' ? stmt.rows.value : 10;
     const xmin = stmt.xmin?.type === 'NumLit' ? stmt.xmin.value : -(cols / 2);
@@ -659,9 +645,9 @@ export class Codegen {
     };
     const xList = buildList(Math.ceil(xmin), Math.floor(xmax));
     const yList = buildList(Math.ceil(ymin), Math.floor(ymax));
-    const lw = stmt.style?.lineWidth !== undefined ? String(stmt.style.lineWidth) : '1';
-    this.emit({ type: 'expression', latex: `y=${yList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw }, `${stmt.name}_h`);
-    this.emit({ type: 'expression', latex: `x=${xList}`, color, lineOpacity: String(lineOpacity), lineWidth: lw }, `${stmt.name}_v`);
+    const lw = stmt.style?.lineWidth !== undefined ? this.toLaTeX(stmt.style.lineWidth) : '1';
+    this.emit({ type: 'expression', latex: `y=${yList}`, color, lineOpacity, lineWidth: lw }, `${stmt.name}_h`);
+    this.emit({ type: 'expression', latex: `x=${xList}`, color, lineOpacity, lineWidth: lw }, `${stmt.name}_v`);
   }
 
   private circleLatex(cx: string, cy: string, r: string): string {
@@ -669,13 +655,6 @@ export class Codegen {
     const kPart = cy === '0' ? 'y^{2}' : `\\left(y-\\left(${cy}\\right)\\right)^{2}`;
     const rPart = r  === '1' ? '1'     : `\\left(${r}\\right)^{2}`;
     return `${hPart}+${kPart}=${rPart}`;
-  }
-
-  private mapToLatex(map: T.MapExpr): string {
-    const varLtx = nameToLatex(map.var);
-    const body   = this.toLaTeX(map.body);
-    const range  = this.rangeToLatex(map.range);
-    return `\\left[${body}\\operatorname{for}${varLtx}=${range}\\right]`;
   }
 
   private rangeToLatex(range: T.ListRange): string {
@@ -748,8 +727,11 @@ export class Codegen {
       case 'ListRange':
         return this.rangeToLatex(expr);
 
-      case 'MapExpr':
-        return this.mapToLatex(expr);
+      case 'ListLit':
+        return `\\left[${expr.items.map(e => this.toLaTeX(e)).join(',')}\\right]`;
+
+      case 'Lambda':
+        return this.toLaTeX(expr.body);
 
       case 'ForExpr': {
         const body  = this.toLaTeX(expr.body);

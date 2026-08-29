@@ -11,9 +11,9 @@ turns = diff / wheel
 fn px(u) = diff * cos(u) + pen * cos(turns * u)
 fn py(u) = diff * sin(u) - pen * sin(turns * u)
 
-curve trace (u in 0..62.8 step 0.01) { (px(u), py(u)) } as gradient("purple", "blue")
+curve trace = curve(u -> (px(u), py(u)), 0..62.8 step 0.01) as { gradient: gradient("purple", "blue") }
 
-circle bound = circle((0, 0), 8) as { color blue opacity 0.04 lineWidth 1 }
+circle bound = circle(center=(0, 0), radius=8) as { color: blue, opacity: 0.04, lineWidth: 1 }
 
-time T = 0..62.8 period 12000
-point tip (px(T), py(T)) as { color red pointSize 12 }
+time T = time(0..62.8, period=12000)
+point tip = (px(T), py(T)) as { color: red, pointSize: 12 }

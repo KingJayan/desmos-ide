@@ -17,6 +17,7 @@ import { GraphOnly } from './graph-only';
 import { THEMES, monacoTheme } from './themes';
 import { compileToTex } from '../src/index';
 import { shareUrl } from '../src/share';
+import { migrateDsl, needsMigration } from '../src/compiler/migrate';
 import type { CompileResult, SymbolInfo, ExprSource, OptimizeNote } from '../src/index';
 import type { DesmosExpr } from '../src/compiler/codegen';
 import { DesmosGraph } from './desmos';
@@ -1325,6 +1326,13 @@ const baseCommands: PaletteCommand[] = buildAppCommands({
   recompile: () => { void runCompile(); setStatus('Recompiling…', 'info'); },
   editorAction: id => runEditorAction(id),
   findWithRegex: () => runFindWithRegex(),
+  migrateSyntax: () => {
+    const before = model.getValue();
+    if (!needsMigration(before)) { setStatus('This file already uses the current grammar', 'info'); return; }
+    const after = migrateDsl(before);
+    editor.executeEdits('migrate', [{ range: model.getFullModelRange(), text: after }]);
+    setStatus('Syntax migrated', 'info');
+  },
   setMode: mode => showMode(mode),
   toggleSidebar: view => workbench.toggleSidebar(view),
   toggleLeftPanel: () => workbench.setSidebarView(workbench.leftView ? null : 'outline'),

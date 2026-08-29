@@ -1,12 +1,7 @@
-// the one list of callable builtins. the analyzer decides what compiles from it, and
-// the editor's highlighting, completion and hovers all read the same entries, so a
-// function can never be highlighted but rejected, or accepted but undocumented.
 
 export interface BuiltinFn {
   name: string;
-  /** shown on hover */
   signature: string;
-  /** monaco snippet body, without the name */
   snippet?: string;
   doc?: string;
 }
@@ -91,17 +86,71 @@ export const BUILTINS: readonly BuiltinFn[] = [
   { name: 'polygon', signature: 'polygon(p1, p2, ...) → polygon', snippet: '(${1:p})' },
 ];
 
-// callable only in an `as { }` block, so the analyzer must not accept them as expressions
 export const STYLE_FNS: readonly BuiltinFn[] = [
   { name: 'gradient', signature: 'gradient(from, to) → color' },
 ];
+
+export const CONSTRUCTORS: readonly BuiltinFn[] = [
+  {
+    name: 'point',
+    signature: 'point(x, y) → point',
+    snippet: '(${1:0}, ${2:0})',
+    doc: 'A labelled point. `point p = (1, 2)` says the same thing.',
+  },
+  {
+    name: 'circle',
+    signature: 'circle(center, radius) → circle',
+    snippet: '(center=(${1:0}, ${2:0}), radius=${3:1})',
+    doc: 'Compiles to (x-h)²+(y-k)²=r².',
+  },
+  {
+    name: 'line',
+    signature: 'line(slope, intercept?) → line',
+    snippet: '(slope=${1:1}, intercept=${2:0})',
+    doc: 'A line by slope. `line l = 2x + y == 4` gives the standard form instead.',
+  },
+  {
+    name: 'curve',
+    signature: 'curve(fn, range) → curve',
+    snippet: '(${1:t} -> (cos(${1:t}), sin(${1:t})), 0..6.28)',
+    doc: 'A point body draws a parametric curve. A number body makes a list.',
+  },
+  { name: 'region',  signature: 'region(inequality) → region',   snippet: '(${1:y > x^2})' },
+  { name: 'polygon', signature: 'polygon(points) → polygon',     snippet: '([(${1:0},${2:0}), (${3:1},${4:0})])' },
+  { name: 'segment', signature: 'segment(from, to) → segment',   snippet: '((${1:0},${2:0}), (${3:1},${4:1}))' },
+  { name: 'text',    signature: 'text(content, at) → text',      snippet: '("${1:label}", at=(${2:0}, ${3:0}))' },
+  { name: 'group',   signature: 'group(label) → folder',         snippet: '("${1:Folder}")' },
+  {
+    name: 'time',
+    signature: 'time(range, period?, mode?) → number',
+    snippet: '(0..${1:6.28}, period=${2:4000})',
+    doc: 'The one clock of the file. period is milliseconds for one sweep, mode is loop or mirror.',
+  },
+  {
+    name: 'camera',
+    signature: 'camera(azimuth, elevation) → camera',
+    snippet: '(azimuth=${1:0.6}, elevation=${2:0.4})',
+    doc: 'The angles project() reads.',
+  },
+  { name: 'spiral', signature: 'spiral(turns, spacing, cX?, cY?, rotate?) → curve', snippet: '(turns=${1:5}, spacing=${2:0.2})' },
+  { name: 'wave',   signature: 'wave(freq, amp, phase?, cX?, cY?, xMin?, xMax?) → curve', snippet: '(freq=${1:2}, amp=${2:1})' },
+  { name: 'grid',   signature: 'grid(cols, rows, xMin?, xMax?, yMin?, yMax?) → grid', snippet: '(${1:10}, ${2:10})' },
+  {
+    name: 'map',
+    signature: 'map(fn, range) → list',
+    snippet: '(${1:i} -> ${2:i^2}, 0..1 step 0.1)',
+    doc: 'The same list as [expr for i in range].',
+  },
+];
+
+export const CONSTRUCTOR_NAMES: readonly string[] = CONSTRUCTORS.map(c => c.name);
 
 export const ANIMATION_PRESETS = ['ease', 'pulse', 'bounce', 'wobble', 'orbit'] as const;
 
 export const BUILTIN_NAMES: readonly string[] = BUILTINS.map(b => b.name);
 
 const BY_NAME = new Map(BUILTINS.map(b => [b.name, b]));
-const SIGS = new Map([...BUILTINS, ...STYLE_FNS].map(b => [b.name, b.signature]));
+const SIGS = new Map([...BUILTINS, ...STYLE_FNS, ...CONSTRUCTORS].map(b => [b.name, b.signature]));
 
 export function isBuiltin(name: string): boolean {
   return BY_NAME.has(name);

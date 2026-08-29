@@ -1,7 +1,11 @@
 {
   "_generated": "by scripts/build-grammar.ts from the compiler tables — do not edit",
   "comments": {
-    "lineComment": "//"
+    "lineComment": "//",
+    "blockComment": [
+      "/*",
+      "*/"
+    ]
   },
   "brackets": [
     [

@@ -47,7 +47,7 @@ export function printExpr(e: T.Expr): string {
       return `${printExpr(e.left)} ${e.op} ${printExpr(e.right)}`;
 
     case 'ConditionalExpr':
-      return `${printExpr(e.then)} where ${printExpr(e.cond)} else ${printExpr(e.else_)}`;
+      return `if ${printExpr(e.cond)} then ${printExpr(e.then)} else ${printExpr(e.else_)}`;
 
     case 'PiecewiseExpr': {
       const parts = e.branches.map(b =>
@@ -71,14 +71,17 @@ export function printExpr(e: T.Expr): string {
         ? `${printExpr(e.start)}..${printExpr(e.end)} step ${printExpr(e.step)}`
         : `${printExpr(e.start)}..${printExpr(e.end)}`;
 
-    case 'MapExpr':
-      return `map(${e.var} -> ${printExpr(e.body)}, ${printExpr(e.range)})`;
+    case 'ListLit':
+      return `[${e.items.map(printExpr).join(', ')}]`;
+
+    case 'Lambda':
+      return `${e.param} -> ${printExpr(e.body)}`;
 
     case 'ForExpr': {
       const range = e.step
         ? `${printExpr(e.start)}..${printExpr(e.end)} step ${printExpr(e.step)}`
         : `${printExpr(e.start)}..${printExpr(e.end)}`;
-      return `${printExpr(e.body)} for ${e.var} in ${range}`;
+      return `[${printExpr(e.body)} for ${e.var} in ${range}]`;
     }
   }
 }

@@ -3,17 +3,9 @@
 import type { Pos } from './types';
 
 export const KEYWORDS = new Set([
-  'fn', 'in', 'map', 'point', 'circle', 'line',
-  'time', 'project', 'camera',
-
-  'for', 'step', 'where', 'else', 'region', 'polygon', 'segment',
-  'curve', 'group', 'text', 'as', 'at',
-
-  'spiral', 'wave', 'grid',
-
-  'alias', 'debug', 'domain', 'if', 'then', 'expr', 'loop', 'use',
-
-  'period', 'mirror', 'azimuth', 'elevation',
+  'fn', 'use', 'debug', 'expr',
+  'if', 'then', 'else', 'where',
+  'for', 'in', 'as',
 ]);
 
 export type TT =
@@ -123,6 +115,25 @@ export function tokenize(src: string): Token[] {
     if (ch === '/' && src[i + 1] === '/') {
       while (i < src.length && src[i] !== '\n') i++;
       sawGap = true;
+      continue;
+    }
+
+    if (ch === '/' && src[i + 1] === '*') {
+      const openLine = line;
+      const openCol = col();
+      i += 2;
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) {
+        if (src[i] === '\n') { line++; lineStart = i + 1; }
+        i++;
+      }
+      if (i >= src.length) throw new LexError('Unterminated block comment', openLine, openCol);
+      i += 2;
+      sawGap = true;
+      // a comment that crossed a line still ends the statement it followed
+      if (line > openLine) {
+        const prev = tokens[tokens.length - 1];
+        if (depth === 0 && prev && !CONTINUES_LINE.has(prev.type)) push('nl', '\n');
+      }
       continue;
     }
 

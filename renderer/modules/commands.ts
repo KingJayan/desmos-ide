@@ -15,6 +15,7 @@ export interface AppCommandHooks {
   recompile: () => void;
   editorAction: (id: string) => void;
   findWithRegex: () => void;
+  migrateSyntax: () => void;
   setMode: (mode: 'dsl' | 'split' | 'enhanced') => void;
   toggleSidebar: (view: 'git' | 'outline' | 'plugins' | 'ai') => void;
   toggleLeftPanel: () => void;
@@ -80,6 +81,11 @@ export function appCommands(hooks: AppCommandHooks): PaletteCommand[] {
     {
       id: 'editor.format', label: 'format code', description: 'Auto-format the DSL source',
       keybinding: '⇧⌥F', action: () => hooks.editorAction('editor.action.formatDocument'),
+    },
+    {
+      id: 'editor.migrate', label: 'migrate syntax',
+      description: 'Rewrite this file in the current grammar',
+      action: () => hooks.migrateSyntax(),
     },
     { id: 'editor.find', label: 'find', description: 'Open the find widget', action: () => hooks.editorAction('actions.find') },
     {

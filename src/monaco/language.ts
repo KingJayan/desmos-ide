@@ -1,22 +1,14 @@
-import { BUILTINS, BUILTIN_NAMES } from '../compiler/builtins';
+import { BUILTINS, BUILTIN_NAMES, CONSTRUCTORS, CONSTRUCTOR_NAMES } from '../compiler/builtins';
+import { KEYWORDS as LEXER_KEYWORDS } from '../compiler/lexer';
 
 export const LANGUAGE_ID = 'desmos-dsl';
 
-export const KEYWORDS = [
-  'fn', 'alias', 'debug', 'in', 'map', 'use',
-  'point', 'circle', 'line',
-  'curve', 'region', 'polygon', 'segment',
-  'text', 'group', 'as', 'at',
-  'for', 'step', 'where', 'else',
-  'if', 'then', 'domain', 'expr', 'loop',
-  'time', 'camera', 'period', 'mirror', 'azimuth', 'elevation',
-  'spiral', 'wave', 'grid',
-] as const;
+export const KEYWORDS: readonly string[] = [...LEXER_KEYWORDS].sort();
 
-export const BUILTIN_FNS = BUILTIN_NAMES;
+export const BUILTIN_FNS: readonly string[] = [...BUILTIN_NAMES, ...CONSTRUCTOR_NAMES];
 
 export const languageConfig = {
-  comments: { lineComment: '//' },
+  comments: { lineComment: '//', blockComment: ['/*', '*/'] as [string, string] },
   brackets: [
     ['{', '}'],
     ['[', ']'],
@@ -44,13 +36,14 @@ export const languageConfig = {
 
 export const monarchTokens = {
   keywords:  [...KEYWORDS],
-  builtins:  [...BUILTIN_NAMES, 'gradient'],
+  builtins:  [...BUILTIN_NAMES, ...CONSTRUCTOR_NAMES, 'gradient'],
 
   tokenizer: {
     root: [
       [/\s+/, 'white'],
 
       [/\/\/.*$/, 'comment'],
+      [/\/\*/, { token: 'comment', next: '@blockComment' }],
 
       [/"/, { token: 'string.quote', next: '@string' }],
 
@@ -93,6 +86,12 @@ export const monarchTokens = {
       [/[,:]/, 'delimiter'],
     ],
 
+    blockComment: [
+      [/[^*]+/, 'comment'],
+      [/\*\//, { token: 'comment', next: '@pop' }],
+      [/\*/, 'comment'],
+    ],
+
     string: [
       [/[^"]+/, 'string'],
       [/"/, { token: 'string.quote', next: '@pop' }],
@@ -110,11 +109,7 @@ export interface CompletionItem {
   documentation?: string;
 }
 
-const STATEMENT_KEYWORDS = new Set([
-  'fn', 'alias', 'point', 'circle', 'line', 'curve', 'region',
-  'polygon', 'segment', 'text', 'group', 'spiral', 'wave', 'grid', 'debug', 'expr',
-  'time', 'camera',
-]);
+const STATEMENT_KEYWORDS = new Set(['fn', 'use', 'debug']);
 
 export function buildCompletions(kinds: {
   Keyword: number;
@@ -136,7 +131,7 @@ export function buildCompletions(kinds: {
     {
       label: 'point',
       kind: Snippet,
-      insertText: 'point ${1:name} (${2:0}, ${3:0})',
+      insertText: 'point ${1:name} = (${2:0}, ${3:0})',
       insertTextRules: 4,
       detail: 'labelled point',
       documentation: 'A labelled point at (x, y). Supports dynamic coordinates.',
@@ -144,7 +139,7 @@ export function buildCompletions(kinds: {
     {
       label: 'circle',
       kind: Snippet,
-      insertText: 'circle ${1:name} = circle((${2:0}, ${3:0}), ${4:1})',
+      insertText: 'circle ${1:name} = circle(center=(${2:0}, ${3:0}), radius=${4:1})',
       insertTextRules: 4,
       detail: 'circle',
       documentation: 'Compiles to (x-h)²+(y-k)²=r².',
@@ -152,24 +147,24 @@ export function buildCompletions(kinds: {
     {
       label: 'line slope',
       kind: Snippet,
-      insertText: 'line ${1:name} = slope(${2:1}), intercept(${3:0})',
+      insertText: 'line ${1:name} = line(slope=${2:1}, intercept=${3:0})',
       insertTextRules: 4,
       detail: 'line — slope-intercept',
     },
     {
       label: 'line standard',
       kind: Snippet,
-      insertText: 'line ${1:name} = ${2:2*x + y} = ${3:4}',
+      insertText: 'line ${1:name} = ${2:2x + y} == ${3:4}',
       insertTextRules: 4,
-      detail: 'line — standard form (lhs = rhs)',
+      detail: 'line — standard form (lhs == rhs)',
     },
     {
       label: 'curve',
       kind: Snippet,
-      insertText: 'curve ${1:name} (${2:t} in ${3:0}..${4:6.28}) {\n  (cos(${2:t}), sin(${2:t}))\n}',
+      insertText: 'curve ${1:name} = curve(${2:t} -> (cos(${2:t}), sin(${2:t})), ${3:0}..${4:6.28})',
       insertTextRules: 4,
       detail: 'parametric curve / sampled list',
-      documentation: 'Tuple body → parametric curve with domain. Scalar body → list comprehension.',
+      documentation: 'A point body draws a parametric curve. A number body makes a list.',
     },
     {
       label: 'region',
@@ -181,28 +176,28 @@ export function buildCompletions(kinds: {
     {
       label: 'polygon',
       kind: Snippet,
-      insertText: 'polygon ${1:name} = [(${2:0},${3:0}), (${4:1},${5:0}), (${6:0},${7:1})]',
+      insertText: 'polygon ${1:name} = polygon([(${2:0},${3:0}), (${4:1},${5:0}), (${6:0},${7:1})])',
       insertTextRules: 4,
       detail: 'filled polygon',
     },
     {
       label: 'segment',
       kind: Snippet,
-      insertText: 'segment ${1:name} = (${2:0},${3:0}) -> (${4:1},${5:1})',
+      insertText: 'segment ${1:name} = segment((${2:0},${3:0}), (${4:1},${5:1}))',
       insertTextRules: 4,
       detail: 'line segment',
     },
     {
       label: 'text',
       kind: Snippet,
-      insertText: 'text ${1:name} = "${2:label}" at (${3:0}, ${4:0})',
+      insertText: 'text ${1:name} = text("${2:label}", at=(${3:0}, ${4:0}))',
       insertTextRules: 4,
       detail: 'text label at position',
     },
     {
       label: 'group',
       kind: Snippet,
-      insertText: 'group ${1:name} as "${2:Folder label}"',
+      insertText: 'group ${1:name} = group("${2:Folder label}")',
       insertTextRules: 4,
       detail: 'Desmos folder',
     },
@@ -215,17 +210,17 @@ export function buildCompletions(kinds: {
       documentation: 'Add speed=n kwarg to auto-play.',
     },
     {
-      label: 'for-curve',
+      label: 'comprehension',
       kind: Snippet,
-      insertText: '${1:pts} = ${2:(cos(t), sin(t))} for ${3:t} in ${4:0}..${5:6.28}',
+      insertText: '${1:pts} = [${2:(cos(t), sin(t))} for ${3:t} in ${4:0}..${5:6.28} step ${6:0.1}]',
       insertTextRules: 4,
-      detail: 'inline for-comprehension curve',
+      detail: 'list comprehension',
     },
     {
       label: 'where',
       kind: Keyword,
       insertText: 'where',
-      detail: 'conditional — expr where cond else alt',
+      detail: 'domain restriction — y = x^2 where x > 0',
     },
 
     ...KEYWORDS.map(kw => ({
@@ -233,6 +228,15 @@ export function buildCompletions(kinds: {
       kind: Keyword,
       insertText: kw,
       detail: 'keyword',
+    })),
+
+    ...CONSTRUCTORS.map(fn => ({
+      label: fn.name,
+      kind: Function,
+      insertText: `${fn.name}${fn.snippet ?? '(${1:x})'}`,
+      insertTextRules: 4,
+      detail: fn.signature,
+      ...(fn.doc ? { documentation: fn.doc } : {}),
     })),
 
     ...BUILTINS.map(fn => ({
@@ -367,7 +371,7 @@ export function registerLanguage(monaco: {
     curve: Arr, region: Arr, polygon: Arr, segment: Arr,
     text: Constant, group: Module,
   };
-  const DECL_RE = /^(fn|point|circle|line|curve|region|polygon|segment|text|group)\s+([a-zA-Z_]\w*)|^([a-zA-Z_]\w*)\s*=/;
+  const DECL_RE = new RegExp(`^(fn|${CONSTRUCTOR_NAMES.join('|')})\\s+([a-zA-Z_]\\w*)|^([a-zA-Z_]\\w*)\\s*=`);
 
   monaco.languages.registerDocumentSymbolProvider(LANGUAGE_ID, {
     provideDocumentSymbols(model) {

@@ -131,11 +131,6 @@ class TexGen {
           if (value !== null) this.defineConst(stmt.name, value);
           break;
         }
-        case 'AliasDecl': {
-          const value = this.evalConst(stmt.value);
-          if (value !== null) this.defineConst(stmt.name, value);
-          break;
-        }
         case 'TimeDecl':
           this.defineConst(stmt.name, this.evalConst(stmt.start) ?? 0);
           break;
@@ -280,8 +275,9 @@ class TexGen {
       case 'Call': return this.callToPgf(expr);
 
       case 'Tuple':
+      case 'ListLit':
       case 'ListRange':
-      case 'MapExpr':
+      case 'Lambda':
       case 'ForExpr':
         return null;
     }
@@ -445,8 +441,8 @@ class TexGen {
       return;
     }
     const color = this.color(stmt.style?.color, COLORS.point);
-    const size = stmt.style?.pointSize ? stmt.style.pointSize / 4 : 2;
-    this.body.push(`\\addplot[${color}, only marks, mark=*, mark size=${fmt(size)}pt] coordinates {${at}};`);
+    const size = (stmt.style?.pointSize ? this.evalConst(stmt.style.pointSize) : null) ?? 8;
+    this.body.push(`\\addplot[${color}, only marks, mark=*, mark size=${fmt(size / 4)}pt] coordinates {${at}};`);
     this.body.push(`\\node[${color}, anchor=south west] at (axis cs:${at.slice(1, -1)}) {$${nameToLatex(stmt.name)}$};`);
   }
 
@@ -459,7 +455,7 @@ class TexGen {
       return;
     }
     const color = this.color(stmt.style?.color, COLORS.circle);
-    const opacity = stmt.style?.opacity ?? 0.1;
+    const opacity = (stmt.style?.opacity ? this.evalConst(stmt.style.opacity) : null) ?? 0.1;
     this.body.push(
       `\\addplot[${color}, thick, fill=${color}, fill opacity=${fmt(opacity)}, samples=${this.samples}, ` +
       `domain=0:360, variable=\\t] ({${cx}+${r}*cos(\\t)}, {${cy}+${r}*sin(\\t)});`,
@@ -559,8 +555,9 @@ class TexGen {
         this.skip(name, 'the curve body has no pgfmath form');
         return;
       }
-      const fill = style?.opacity !== undefined
-        ? `, fill=${color}, fill opacity=${fmt(style.opacity)}`
+      const fillOpacity = style?.opacity ? this.evalConst(style.opacity) : null;
+      const fill = fillOpacity !== null
+        ? `, fill=${color}, fill opacity=${fmt(fillOpacity)}`
         : '';
       this.body.push(`\\addplot[${color}, thick, smooth, ${domain}${fill}] ({${px}}, {${py}});`);
       return;
@@ -587,7 +584,7 @@ class TexGen {
     }
     if (pts.length === 0) return;
     const color = this.color(stmt.style?.color, COLORS.polygon);
-    const opacity = stmt.style?.opacity ?? 0.2;
+    const opacity = (stmt.style?.opacity ? this.evalConst(stmt.style.opacity) : null) ?? 0.2;
     this.body.push(
       `\\addplot[${color}, thick, fill=${color}, fill opacity=${fmt(opacity)}] ` +
       `coordinates {${[...pts, pts[0]].join(' ')}};`,
@@ -671,8 +668,9 @@ class TexGen {
     const ymax = this.evalConst(stmt.ymax) ?? rows / 2;
 
     const color = this.color(stmt.style?.color, COLORS.grid);
-    const opacity = stmt.style?.lineOpacity ?? stmt.style?.opacity ?? 0.4;
-    const width = stmt.style?.lineWidth ?? 1;
+    const opacityExpr = stmt.style?.lineOpacity ?? stmt.style?.opacity;
+    const opacity = (opacityExpr ? this.evalConst(opacityExpr) : null) ?? 0.4;
+    const width = (stmt.style?.lineWidth ? this.evalConst(stmt.style.lineWidth) : null) ?? 1;
     const pen = `${color}, opacity=${fmt(opacity)}, line width=${fmt(width * 0.4)}pt, no marks`;
 
     for (let y = Math.ceil(ymin); y <= Math.floor(ymax); y++) {

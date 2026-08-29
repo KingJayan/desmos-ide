@@ -383,33 +383,33 @@ export function decompile(expr: DesmosExpr, name: string): string | null {
     return `${node.l.v} = slider(${print(node.r)}, ${min}, ${max})`;
   }
 
-  // curve name (t in min..max) { body }
+  // curve name = curve(t -> body, min..max)
   if (expr.parametricDomain && node.k === 'tuple') {
     const { min, max } = expr.parametricDomain;
-    return `curve ${name} (t in ${min}..${max}) { ${print(node)} }`;
+    return `curve ${name} = curve(t -> ${print(node)}, ${min}..${max})`;
   }
 
   // text name = "label" at (x, y)
   if (expr.label && node.k === 'cmp' && node.op === '=' && node.r.k === 'tuple') {
     if (isPlainName(node.l) && expr.label !== node.l.v) {
-      return `text ${node.l.v} = ${quote(expr.label)} at ${print(node.r)}`;
+      return `text ${node.l.v} = text(${quote(expr.label)}, at=${print(node.r)})`;
     }
-    if (isPlainName(node.l)) return `point ${node.l.v} (${node.r.items.map(a => print(a)).join(', ')})`;
+    if (isPlainName(node.l)) return `point ${node.l.v} = ${print(node.r)}`;
   }
 
   // point name (x, y)
   if (node.k === 'cmp' && node.op === '=' && isPlainName(node.l) && node.r.k === 'tuple') {
-    return `point ${node.l.v} (${node.r.items.map(a => print(a)).join(', ')})`;
+    return `point ${node.l.v} = ${print(node.r)}`;
   }
 
   // segment name = a -> b
   if (node.k === 'list' && node.items.length === 2 && node.items.every(p => p.k === 'tuple')) {
-    return `segment ${name} = ${print(node.items[0])} -> ${print(node.items[1])}`;
+    return `segment ${name} = segment(${print(node.items[0])}, ${print(node.items[1])})`;
   }
 
   // polygon name = [points]
   if (node.k === 'call' && node.fn === 'polygon') {
-    return `polygon ${name} = [${node.args.map(a => print(a)).join(', ')}]`;
+    return `polygon ${name} = polygon([${node.args.map(a => print(a)).join(', ')}])`;
   }
 
   // region name = inequality

@@ -4,13 +4,13 @@
 a = slider(3, 1, 9, step=1)
 b = slider(2, 1, 9, step=1)
 
-time T = 0..6.28 period 8000
+time T = time(0..6.28, period=8000)
 
 // the phase drifts through a full cycle, so the figure folds and opens again
 d = wobble(T, 3.14159)
 
-curve figure (t in 0..6.28 step 0.01) { (sin(a * t + d), sin(b * t)) } as gradient("blue", "red")
+curve figure = curve(t -> (sin(a * t + d), sin(b * t)), 0..6.28 step 0.01) as { gradient: gradient("blue", "red") }
 
-point head (sin(a * T + d), sin(b * T)) as { color red pointSize 14 }
+point head = (sin(a * T + d), sin(b * T)) as { color: red, pointSize: 14 }
 
-text ratio = "a:b" at (0, 1.25)
+text ratio = text("a:b", at=(0, 1.25))

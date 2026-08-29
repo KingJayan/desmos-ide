@@ -12,9 +12,7 @@ export interface Program {
 
 export type Statement =
   | VarDecl
-  | AliasDecl
   | DebugDecl
-  | ExprBlockDecl
   | PointDecl
   | CircleDecl
   | LineDecl
@@ -32,20 +30,12 @@ export type Statement =
   | CameraDecl
   | UseDecl;
 
-/** a = expr [domain cond] */
+/** [kind] a = expr [where cond] */
 export interface VarDecl {
   type: 'VarDecl';
   name: string;
   value: Expr;
   domain?: Expr;
-  pos: Pos;
-}
-
-/** alias r = expr: named binding, identical semantics to VarDecl */
-export interface AliasDecl {
-  type: 'AliasDecl';
-  name: string;
-  value: Expr;
   pos: Pos;
 }
 
@@ -63,15 +53,7 @@ export interface DebugDecl {
   pos: Pos;
 }
 
-/** expr { x = cos(t)  y = sin(t)  (x, y) } */
-export interface ExprBlockDecl {
-  type: 'ExprBlockDecl';
-  bindings: Array<{ name: string; value: Expr }>;
-  result: Expr;
-  pos: Pos;
-}
-
-/** point p (1, 2) [as { ... }] */
+/** point p = (1, 2) [as { ... }] */
 export interface PointDecl {
   type: 'PointDecl';
   name: string;
@@ -81,8 +63,7 @@ export interface PointDecl {
   pos: Pos;
 }
 
-/** circle c = circle((cx, cy), r) [as { ... }]
- *  OR  circle c { center (cx, cy)  radius r } [as { ... }] */
+/** circle c = circle(center=(cx, cy), radius=r) [as { ... }] */
 export interface CircleDecl {
   type: 'CircleDecl';
   name: string;
@@ -95,7 +76,7 @@ export interface CircleDecl {
 
 export type LineForm = 'slope-intercept' | 'standard' | 'expr';
 
-/** line l = slope(m), intercept(b)  |  line l = lhs = rhs  |  line l = expr */
+/** line l = line(slope=m, intercept=b)  |  line l = lhs == rhs  |  line l = expr */
 export interface LineDecl {
   type: 'LineDecl';
   name: string;
@@ -109,7 +90,7 @@ export interface LineDecl {
   pos: Pos;
 }
 
-/** curve ring (t in 0..6.28 step 0.1) { (cos(t), sin(t)) } [as { ... }] */
+/** curve ring = curve(t -> (cos(t), sin(t)), 0..6.28 step 0.1) [as { ... }] */
 export interface CurveDecl {
   type: 'CurveDecl';
   name: string;
@@ -131,7 +112,7 @@ export interface RegionDecl {
   pos: Pos;
 }
 
-/** polygon p = [(0,0), (2,0), (1,2)] [as { ... }] */
+/** polygon p = polygon([(0,0), (2,0), (1,2)]) [as { ... }] */
 export interface PolygonDecl {
   type: 'PolygonDecl';
   name: string;
@@ -140,7 +121,7 @@ export interface PolygonDecl {
   pos: Pos;
 }
 
-/** segment s = (0,0) -> (2,3) [as { ... }] */
+/** segment s = segment((0,0), (2,3)) [as { ... }] */
 export interface SegmentDecl {
   type: 'SegmentDecl';
   name: string;
@@ -150,7 +131,7 @@ export interface SegmentDecl {
   pos: Pos;
 }
 
-/** text t = "hello" at (x, y) */
+/** text t = text("hello", at=(x, y)) */
 export interface TextDecl {
   type: 'TextDecl';
   name: string;
@@ -161,7 +142,7 @@ export interface TextDecl {
   pos: Pos;
 }
 
-/** group orbit as "Motion" */
+/** group orbit = group("Motion") */
 export interface GroupDecl {
   type: 'GroupDecl';
   name: string;
@@ -172,11 +153,11 @@ export interface GroupDecl {
 export interface StyleBlock {
   color?: Expr;
   gradient?: { from: Expr; to: Expr };
-  opacity?: number;
+  opacity?: Expr;
   fill?: boolean;
-  pointSize?: number;
-  lineWidth?: number;
-  lineOpacity?: number;
+  pointSize?: Expr;
+  lineWidth?: Expr;
+  lineOpacity?: Expr;
 }
 
 /** spiral s = spiral(turns=5, spacing=0.2) [as { ... }] */
@@ -224,7 +205,7 @@ export interface GridDecl {
 /** how the clock behaves when it reaches the end of its range */
 export type TimeMode = 'loop' | 'mirror';
 
-/** time T [= 0..10] [period 2000] [loop|mirror] — the one clock the graph animates on */
+/** time T = time(0..10, period=2000, mode=loop) — the one clock the graph animates on */
 export interface TimeDecl {
   type: 'TimeDecl';
   name: string;
@@ -236,7 +217,7 @@ export interface TimeDecl {
   pos: Pos;
 }
 
-/** camera cam = azimuth(0.6), elevation(0.4) — the angles project() reads */
+/** camera cam = camera(azimuth=0.6, elevation=0.4) — the angles project() reads */
 export interface CameraDecl {
   type: 'CameraDecl';
   name: string;
@@ -264,8 +245,9 @@ export type Expr =
   | PiecewiseExpr
   | Call
   | Tuple
+  | ListLit
   | ListRange
-  | MapExpr
+  | Lambda
   | ForExpr;
 
 export interface NumLit {
@@ -343,20 +325,26 @@ export interface Tuple {
   pos: Pos;
 }
 
+/** [a, b, c] */
+export interface ListLit {
+  type: 'ListLit';
+  items: Expr[];
+  pos: Pos;
+}
+
+/** t -> expr, only legal where a builtin takes a function */
+export interface Lambda {
+  type: 'Lambda';
+  param: string;
+  body: Expr;
+  pos: Pos;
+}
+
 export interface ListRange {
   type: 'ListRange';
   start: Expr;
   end: Expr;
   step?: Expr;
-  pos: Pos;
-}
-
-/** map(i -> expr, start..end step n) */
-export interface MapExpr {
-  type: 'MapExpr';
-  var: string;
-  range: ListRange;
-  body: Expr;
   pos: Pos;
 }
 

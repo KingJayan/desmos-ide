@@ -185,7 +185,8 @@
       <p>then:</p>
       <pre class="no-highlight"><code>dsmx run graph.dsmx      # open it in the browser, and redraw on every save
 dsmx build graph.dsmx    # write the desmos state as json
-dsmx fmt graph.dsmx      # format in place</code></pre>
+dsmx fmt graph.dsmx      # format in place
+dsmx fix graph.dsmx      # migrate older syntax</code></pre>
       <p>
         <code>run</code> loads desmos api, requires an internet connection. <code>build</code> and <code>fmt</code> do not. the formula also installs the
         example files, viewable with <code>brew --prefix dsmx</code>.

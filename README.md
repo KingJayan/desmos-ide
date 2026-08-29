@@ -38,6 +38,7 @@ brew install KingJayan/dsmx/dsmx
 dsmx run example/orbit.dsmx      # serves a graph with hmr
 dsmx build a.dsmx -o a.json      # desmos state as json
 dsmx fmt a.dsmx                  # format in place
+dsmx fix a.dsmx                  # migrate older syntax
 ```
 
 macOS and Linux, req `node`.

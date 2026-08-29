@@ -3,7 +3,7 @@ import { describe, it, expect } from 'bun:test';
 import { tokenize } from '../compiler/lexer';
 import { parse } from '../compiler/parser';
 import { analyze } from '../compiler/analyze';
-import { optimize, collectAllRefs, substituteExpr } from '../compiler/optimizer';
+import { optimize, substituteExpr } from '../compiler/optimizer';
 import { codegenWithSourceMap } from '../compiler/codegen';
 import { toTex } from '../compiler/tex';
 import type { Program } from '../compiler/types';
@@ -78,9 +78,8 @@ describe('ast is not mutated after parsing', () => {
 
       expect(analyze(ast)).toEqual([]);
 
-      const refs = collectAllRefs(ast);
       const notes: Parameters<typeof optimize>[1] = [];
-      const optimized = optimize(ast, notes, refs);
+      const optimized = optimize(ast, notes);
 
       // the optimizer's own output is reused too, so it must not be written to either
       deepFreeze(optimized);
@@ -95,7 +94,7 @@ describe('ast is not mutated after parsing', () => {
       const pristine: Program = parse(tokenize(src)).ast;
 
       analyze(ast);
-      const optimized = optimize(ast, [], collectAllRefs(ast));
+      const optimized = optimize(ast, []);
       codegenWithSourceMap(optimized);
 
       expect(ast).toEqual(pristine);
@@ -112,7 +111,7 @@ describe('ast is not mutated after parsing', () => {
 
   it('an optimized statement that moved nothing is the identical node', () => {
     const ast = parse(tokenize('point p (1, 2)\ntext lbl = "hi" at (0, 0)\n')).ast;
-    const optimized = optimize(ast, [], collectAllRefs(ast));
+    const optimized = optimize(ast, []);
     expect(optimized.body[0]).toBe(ast.body[0]);
     expect(optimized.body[1]).toBe(ast.body[1]);
   });

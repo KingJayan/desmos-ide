@@ -3,6 +3,7 @@ import { access, writeFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { compile } from '../src/compile';
 import { formatDsl } from '../src/compiler/format';
+import { migrateDsl, needsMigration } from '../src/compiler/migrate';
 import { ArgError, HELP, parseArgs, type Options } from './args';
 import { openBrowser } from './open';
 import { errorText, read, serve } from './serve';
@@ -54,6 +55,20 @@ async function cmdFmt(opts: Options, path: string): Promise<void> {
   console.log(`formatted ${path}`);
 }
 
+async function cmdFix(opts: Options, path: string): Promise<void> {
+  const src = await readSource(path);
+  if (!needsMigration(src)) {
+    if (!opts.check) console.log(`${path} already uses the current grammar`);
+    return;
+  }
+  if (opts.check) {
+    console.error(`${path} uses the older grammar`);
+    process.exit(1);
+  }
+  await writeFile(path, migrateDsl(src));
+  console.log(`migrated ${path}`);
+}
+
 async function cmdRun(opts: Options, path: string): Promise<void> {
   await readSource(path);
 
@@ -92,6 +107,7 @@ async function main(): Promise<void> {
   const path = resolve(opts.file as string);
   if (opts.command === 'build') return cmdBuild(opts, path);
   if (opts.command === 'fmt')   return cmdFmt(opts, path);
+  if (opts.command === 'fix')   return cmdFix(opts, path);
   return cmdRun(opts, path);
 }
 

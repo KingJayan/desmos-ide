@@ -53,7 +53,6 @@ export function analyze(program: T.Program, cache?: AnalyzeCache): SemanticError
         declaredFns.set(stmt.name, { params: stmt.params, pos: stmt.pos });
         break;
       case 'VarDecl':
-      case 'AliasDecl':
         declaredVars.add(stmt.name);
         break;
       case 'PointDecl':   declaredVars.add(stmt.name); break;
@@ -120,25 +119,9 @@ function checkStmt(
       cx(stmt.value);
       if (stmt.domain) cx(stmt.domain);
       break;
-    case 'AliasDecl':
-      cx(stmt.value);
-      break;
     case 'DebugDecl':
       cx(stmt.expr);
       break;
-    case 'ExprBlockDecl': {
-      const added: string[] = [];
-      try {
-        for (const b of stmt.bindings) {
-          cx(b.value);
-          if (!vars.has(b.name)) { vars.add(b.name); added.push(b.name); }
-        }
-        cx(stmt.result);
-      } finally {
-        for (const n of added) vars.delete(n);
-      }
-      break;
-    }
     case 'FnDecl': {
       withScope(vars, stmt.params, () => cx(stmt.body));
       break;
@@ -309,11 +292,18 @@ function checkExpr(
       }
       break;
 
-    case 'MapExpr': {
-      cx(expr.range);
-      withScope(vars, [expr.var], () => cx(expr.body));
+    case 'ListLit':
+      expr.items.forEach(cx);
       break;
-    }
+
+    case 'Lambda':
+      errors.push({
+        error: `[${expr.pos.line}:${expr.pos.col}] Semantic error: a -> function is only allowed where a builtin takes one`,
+        line: expr.pos.line,
+        col: expr.pos.col,
+        phase: 2,
+      });
+      break;
 
     case 'ForExpr': {
       cx(expr.start); cx(expr.end);
