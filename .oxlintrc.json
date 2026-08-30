@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc"],
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "build/**",
+    "node_modules/**",
+    "registry/**",
+    "docs/**",
+    "renderer/public/vendor/**",
+    "src/monaco/grammar.ts",
+    "src/bench/**"
+  ],
+  "rules": {
+    "typescript/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "typescript/no-floating-promises": "error",
+    "typescript/no-non-null-assertion": "off",
+    "typescript/no-explicit-any": "error",
+    "typescript/restrict-template-expressions": "off",
+    "typescript/no-base-to-string": "off",
+    "no-console": ["error", { "allow": ["error", "warn"] }],
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "eqeqeq": ["error", "smart"],
+    "prefer-const": "error",
+    "no-var": "error"
+  },
+  "overrides": [
+    {
+      "files": ["scripts/**", "cli/**", "src/demo.ts"],
+      "rules": { "no-console": "off" }
+    },
+    {
+      "files": ["src/tests/**"],
+      "rules": { "typescript/no-floating-promises": "off" }
+    }
+  ]
+}

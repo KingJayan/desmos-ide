@@ -139,14 +139,12 @@ jobs:
         run: bunx playwright install ${{ env.SMOKE_BROWSER }}
         timeout-minutes: 8
 
-      # playwright cannot launch a browser under bun on windows (oven-sh/bun#27977), so the
-      # smoke runs on node there. the script uses no bun api
       - if: runner.os != 'Windows'
-        run: bun run e2e/smoke.ts
+        run: bun run scripts/smoke.ts
         timeout-minutes: 8
 
       - if: runner.os == 'Windows'
-        run: node --experimental-strip-types e2e/smoke.ts
+        run: node --experimental-strip-types scripts/smoke.ts
         timeout-minutes: 8
 
   native:

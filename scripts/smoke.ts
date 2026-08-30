@@ -69,7 +69,7 @@ await page.addInitScript((host: { os: string; arch: string }) => {
     manifest,
     main: `dsmx.macro('stars', (n) => {
       const out = [];
-      for (let i = 0; i < n; i++) out.push('point star_' + i + ' (' + i + ', ' + i + ')');
+      for (let i = 0; i < n; i++) out.push('point star_' + i + ' = (' + i + ', ' + i + ')');
       return out.join('\\n');
     });
     dsmx.command('insert', 'starfield: insert stars', () => ({ insert: '@stars(3)\\n' }));
