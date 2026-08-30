@@ -18,7 +18,7 @@
     "windows": "bun run scripts/gen-windows.ts",
     "build": "bun build:view && electrobun build",
     "build:release": "bun build:view && electrobun build --env=stable",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit --pretty false | grep 'error TS' | grep -v '^node_modules/' && exit 1 || exit 0",
     "lint": "oxlint --type-aware",
     "lint:fix": "oxlint --type-aware --fix",
     "demo": "bun run src/demo.ts",
