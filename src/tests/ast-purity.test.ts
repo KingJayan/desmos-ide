@@ -35,39 +35,39 @@ w0 = 2
 `,
   'geometry and styling': `
 n = 4
-point p (n, 2) as { color red pointSize 12 }
-circle c = circle((0, 0), n + 1)
-line l = slope(2), intercept(1)
-line l2 = 2*x + y = 4
-segment s = (0,0) -> (1, n)
-polygon tri = [(0,0), (1,0), (0,1)]
-text lbl = "hello" at (1, 2)
-group g as "My Folder"
+point p = (n, 2) as { color: red, pointSize: 12 }
+circle c = circle(center=(0, 0), radius=n + 1)
+line l = line(slope=2, intercept=1)
+line l2 = 2*x + y == 4
+segment s = segment((0,0), (1, n))
+polygon tri = polygon([(0,0), (1,0), (0,1)])
+text lbl = text("hello", at=(1, 2))
+group g = group("My Folder")
 `,
   'curves, ranges and comprehensions': `
 k = 2
-curve ring (t in 0..6.28) { (cos(t)*k, sin(t)) }
-pts = (cos(t), sin(t)) for t in 0..6.28
-region r = y > x^2 as { color blue opacity 0.3 }
+curve ring = curve(t -> (cos(t)*k, sin(t)), 0..6.28)
+pts = [(cos(t), sin(t)) for t in 0..6.28]
+region r = y > x^2 as { color: blue, opacity: 0.3 }
 lst = [0..10]
 `,
   'conditionals and blocks': `
-q = x^2 where x > 0 else -x^2
+q = if x > 0 then x^2 else -x^2
 z = { x > 0: x^2, x < 0: -x, else: 0 }
 `,
-  'unused alias and debug': `
-alias unused = 1 + 1
-alias used = 3 * 3
+  'unused bindings and debug': `
+unused = 1 + 1
+used = 3 * 3
 m = used
 debug m + 1
 `,
   'animation and 3d': `
 s = slider(1, 0, 10)
-time tt = 0..10 every 2
-camera cam = (30 + 15, 45)
-wave wv = freq(2), amp(1 + 1)
-spiral sp = turns(3), spacing(0.5)
-grid gr = cols(2 + 1), rows(4)
+time tt = time(0..10, period=2000)
+camera cam = camera(azimuth=30 + 15, elevation=45)
+wave wv = wave(freq=2, amp=1 + 1)
+spiral sp = spiral(turns=3, spacing=0.5)
+grid gr = grid(2 + 1, 4)
 `,
 };
 
@@ -81,7 +81,6 @@ describe('ast is not mutated after parsing', () => {
       const notes: Parameters<typeof optimize>[1] = [];
       const optimized = optimize(ast, notes);
 
-      // the optimizer's own output is reused too, so it must not be written to either
       deepFreeze(optimized);
       expect(() => codegenWithSourceMap(optimized)).not.toThrow();
       expect(() => toTex(optimized)).not.toThrow();
@@ -110,7 +109,7 @@ describe('ast is not mutated after parsing', () => {
   });
 
   it('an optimized statement that moved nothing is the identical node', () => {
-    const ast = parse(tokenize('point p (1, 2)\ntext lbl = "hi" at (0, 0)\n')).ast;
+    const ast = parse(tokenize('point p = (1, 2)\ntext lbl = text("hi", at=(0, 0))\n')).ast;
     const optimized = optimize(ast, []);
     expect(optimized.body[0]).toBe(ast.body[0]);
     expect(optimized.body[1]).toBe(ast.body[1]);

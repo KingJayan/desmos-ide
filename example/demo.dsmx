@@ -1,35 +1,33 @@
-// variables, sliders, aliases
+// variables, sliders, functions
 x = 3
 b = 4
-a = slider(3, 0, 10, step=0.1, speed=1, loop=true)  // step=, speed= kwargs; loop flag auto-plays
-fn hyp(x, y) = sqrt(x^2 + y^2)  // inlined at every call site
-hyp_r = hyp(a, b)  // named alias — identical to assignment
+a = slider(3, 0, 10, step=0.1, speed=1, loop=true) // step=, speed= kwargs; loop flag auto-plays
+fn hyp(x, y) = sqrt(x^2 + y^2) // inlined at every call site
+hyp_r = hyp(a, b)
 
 // geometry
 point p = (1, 2)
-circle c = circle(center=(0, 0), radius=3)  // block form
-circle c2 = circle(center=(0, 0), radius=3)  // classic form
+circle c = circle(center=(0, 0), radius=3)
 line l = line(slope=2, intercept=1)
-line l2 = 2*x + y == 4  // standard form
-segment s = segment((0,0), (1,1))
-polygon tri = polygon([(0,0),(1,0),(0,1)])
+line l2 = 2 * x + y == 4 // standard form
+segment s = segment((0, 0), (1, 1))
+polygon tri = polygon([(0, 0), (1, 0), (0, 1)])
 
 // generators and curves
-pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)  // list comprehension
-curve ring = curve(t -> (cos(t), sin(t)), 0..6.28)  // parametric
-pts2 = [(cos(t), sin(t)) for t in 0..6.28]  // for-comprehension
+pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1) // list comprehension
+curve ring = curve(t -> (cos(t), sin(t)), 0..6.28) // parametric
+pts2 = [(cos(t), sin(t)) for t in 0..6.28] // for-comprehension
 region above = y > x^2
 
 // conditionals
-v = if x > 0 then x^2 else -x  // where/else
-v2 = if x > 0 then x^2 else -x  // if/then/else (identical output)
-z = { x > 0: x^2, x < 0: -x, else: 0 }  // piecewise block
+v = if x > 0 then x^2 else -x // if/then/else
+z = { x > 0: x^2, x < 0: -x, else: 0 } // piecewise block
 
-// domain restriction
-y = x^2 where x > 0  // adds {x>0} filter in Desmos
+// where — domain restriction
+y = x^2 where x > 0 // adds {x>0} filter in Desmos
 
 // expr block — local bindings, inlined at compile time
-block1 = expr { cx = cos(t) cy = sin(t) (2*cx, cy) }
+block1 = expr { cx = cos(t) cy = sin(t) (2 * cx, cy) }
 
 // debug — compile-time only, no output emitted
 debug hyp_r
@@ -45,20 +43,20 @@ wave w = wave(freq=2, amp=1, phase=0)
 grid mesh = grid(10, 10)
 
 // the clock — one per file, and the timeline bar under the graph drives it
-time T = time(0..6.28, period=4000)  // period is ms for one sweep
-// time T2 = 0..1 mirror                        // mirror turns around instead of jumping back
+time T = time(0..6.28, period=4000) // period is ms for one sweep
+// time T2 = time(0..1, mode=mirror)          // mirror turns around instead of jumping back
 
 // animation presets — each shapes a 0-1 sweep
-e = ease(T)  // smoothstep, starts and ends at rest
-pu = pulse(T)  // 0 -> 1 -> 0
-bo = bounce(T)  // a bounce off zero
-wo = wobble(T, 2)  // one sine cycle, amplitude 2
-orb = orbit(T, 3)  // a point going round a circle
+e = ease(T) // smoothstep, starts and ends at rest
+pu = pulse(T) // 0 -> 1 -> 0
+bo = bounce(T) // a bounce off zero
+wo = wobble(T, 2) // one sine cycle, amplitude 2
+orb = orbit(T, 3) // a point going round a circle
 
 // 3d — the camera angles are ordinary variables, so animating one turns the scene
 camera cam = camera(azimuth=T, elevation=0.5)
 h = 1
-corner = project(1, 1, h)  // project(x, y, z); z defaults to 0
+corner = project(1, 1, h) // project(x, y, z); z defaults to 0
 
 // optional styling
 point p2 = (0, 0) as { color: red, pointSize: 12 }

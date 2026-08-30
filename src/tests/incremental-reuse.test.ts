@@ -9,15 +9,13 @@ fn area(r) = 3.14159 * sq(r)
 n = slider(2, 0, 10)
 a = area(n) + 0
 b = sq(n) * 1
-point p (a, b)
-circle c = circle((0, 0), a + 1)
-curve ring (t in 0..6.28) {
-  (cos(t)*a, sin(t)*b)
-}
+point p = (a, b)
+circle c = circle(center=(0, 0), radius=a + 1)
+curve ring = curve(t -> (cos(t)*a, sin(t)*b), 0..6.28)
 region r2 = y > x^2
-polygon tri = [(0,0), (1,0), (0,1)]
-text lbl = "hi" at (a, b)
-group g as "Folder"
+polygon tri = polygon([(0,0), (1,0), (0,1)])
+text lbl = text("hi", at=(a, b))
+group g = group("Folder")
 `;
 
 function lcg(seed: number): () => number {
@@ -48,7 +46,7 @@ describe('createIncrementalCompiler', () => {
     const edits = [
       BASE,
       BASE.replace('fn sq(x) = x^2', 'fn sq(x) = x^3'),
-      BASE.replace('point p (a, b)\n', ''),
+      BASE.replace('point p = (a, b)\n', ''),
       `${BASE}d = a + b\n`,
       BASE.replace('  (cos(t)*a, sin(t)*b)\n', '  (cos(t), sin(t)*a)\n  '),
       BASE.replace('b = sq(n) * 1', 'b = sq(n) + undeclared'),
@@ -63,7 +61,7 @@ describe('createIncrementalCompiler', () => {
 
   it('agrees with a full compile when a prelude is in play', () => {
     const inc = createIncrementalCompiler();
-    const opts = { prelude: 'fn double(x) = 2x\nalias two = 2\n', available: ['demo'] };
+    const opts = { prelude: 'fn double(x) = 2x\ntwo = 2\n', available: ['demo'] };
     for (const src of [BASE, `${BASE}d = double(4)\n`, `use "demo"\n${BASE}`, BASE]) {
       expect(inc(src, opts)).toEqual(compile(src, opts));
     }

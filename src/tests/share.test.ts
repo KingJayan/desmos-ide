@@ -3,7 +3,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeShare, encodeShare, shareToken, shareUrl, MAX_SHARE_CHARS } from '../share';
 
-const SAMPLE = 'a = slider(0, 0, 10)\ncurve ring (t in 0..6.28) { (cos(t), sin(t)) }\n';
+const SAMPLE = 'a = slider(0, 0, 10)\ncurve ring = curve(t -> (cos(t), sin(t)), 0..6.28)\n';
 
 describe('a share link carries the source', () => {
   test('a round trip returns the file byte for byte', async () => {

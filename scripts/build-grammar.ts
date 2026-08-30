@@ -7,7 +7,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { KEYWORDS } from '../src/compiler/lexer';
-import { BUILTIN_NAMES, STYLE_FNS } from '../src/compiler/builtins';
+import { BUILTIN_NAMES, CONSTRUCTOR_NAMES, STYLE_FNS } from '../src/compiler/builtins';
 import { languageConfig } from '../src/monaco/language';
 
 const ROOT = join(import.meta.dir, '..');
@@ -23,7 +23,7 @@ const alternation = (names: readonly string[]) =>
   [...new Set(names)].sort((a, b) => b.length - a.length || a.localeCompare(b)).join('|');
 
 const KEYWORD_RE = `\\b(?:${alternation([...KEYWORDS])})\\b`;
-const BUILTIN_RE = `\\b(?:${alternation([...BUILTIN_NAMES, ...STYLE_FNS.map(f => f.name)])})\\b`;
+const BUILTIN_RE = `\\b(?:${alternation([...BUILTIN_NAMES, ...CONSTRUCTOR_NAMES, ...STYLE_FNS.map(f => f.name)])})\\b`;
 
 const grammar = {
   $schema: 'https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json',

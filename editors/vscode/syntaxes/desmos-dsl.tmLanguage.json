@@ -65,7 +65,7 @@
     },
     "builtin": {
       "name": "support.function.dsmx",
-      "match": "\\b(?:gradient|polygon|project|arccos|arcsin|arctan|bounce|slider|wobble|floor|orbit|pulse|round|ceil|ease|sign|sqrt|abs|cos|exp|hsv|log|max|min|mod|rgb|sin|tan|ln)\\b"
+      "match": "\\b(?:gradient|polygon|project|segment|arccos|arcsin|arctan|bounce|camera|circle|region|slider|spiral|wobble|curve|floor|group|orbit|point|pulse|round|ceil|ease|grid|line|sign|sqrt|text|time|wave|abs|cos|exp|hsv|log|map|max|min|mod|rgb|sin|tan|ln)\\b"
     },
     "call": {
       "name": "entity.name.function.dsmx",

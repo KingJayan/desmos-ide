@@ -150,14 +150,14 @@ describe('the page the cli serves', () => {
 
 describe('reading a file for the graph', () => {
   test('a compile gives back the state', async () => {
-    const path = fixture('ok.dsmx', 'point p (1, 2)\n');
+    const path = fixture('ok.dsmx', 'point p = (1, 2)\n');
     const out = await compileFile(path);
     assert.ok(out.ok);
     assert.equal(out.state.expressions.list.length, 1);
   });
 
   test('a failure gives back one line for each error', async () => {
-    const path = fixture('bad.dsmx', 'point p (1, 2)\nnot the dsl\n');
+    const path = fixture('bad.dsmx', 'point p = (1, 2)\nnot the dsl\n');
     const out = await compileFile(path);
     assert.ok(!out.ok);
     assert.match(out.errors, /^2:1 {2}/);
@@ -170,7 +170,7 @@ describe('reading a file for the graph', () => {
 
 describe('the server', () => {
   test('the root serves the graph and anything else is a miss', async () => {
-    const path = fixture('served.dsmx', 'circle c = circle((0, 0), 3)\n');
+    const path = fixture('served.dsmx', 'circle c = circle(center=(0, 0), radius=3)\n');
     const server = await serve({ file: path, port: 7791, host: '127.0.0.1', theme: 'dark', watch: false });
     try {
       const page = await fetch(`${server.url}/`);
@@ -190,7 +190,7 @@ describe('the server', () => {
     try {
       const page = await fetch(`${server.url}/`);
       assert.equal(page.status, 200);
-      assert.match(await page.text(), /Expected statement/);
+      assert.match(await page.text(), /Expected a statement/);
     } finally {
       server.stop();
     }

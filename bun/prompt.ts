@@ -21,13 +21,13 @@ ${syntaxReference()}
 \`\`\`dsmx
 // Animated parametric curve
 a = slider(1, 0, 5)
-curve lissajous (t in 0..6.28) { (sin(3*t + a), sin(2*t)) }
+curve lissajous = curve(t -> (sin(3*t + a), sin(2*t)), 0..6.28)
 \`\`\`
 
 \`\`\`dsmx
 // A clock driving a preset and a 3D camera
-time T = 0..1 period 3000
-camera cam = azimuth(6.28 * T), elevation(0.5)
+time T = time(0..1, period=3000)
+camera cam = camera(azimuth=6.28 * T, elevation=0.5)
 lift = ease(T)
 corner = project(1, 1, lift)
 \`\`\`
@@ -36,13 +36,13 @@ corner = project(1, 1, lift)
 // Rose curve via point comprehension
 fn rx(t) = cos(t) * (1 + 0.5 * cos(5*t))
 fn ry(t) = sin(t) * (1 + 0.5 * cos(5*t))
-pts = (rx(t), ry(t)) for t in 0..6.28
+pts = [(rx(t), ry(t)) for t in 0..6.28]
 \`\`\`
 
 \`\`\`dsmx
 // Piecewise function and conditional styling
 fn f(x) = { x > 0: x^2, x < 0: -x, else: 0 }
-region upper = y > f(x) as { color purple opacity 0.2 }
+region upper = y > f(x) as { color: purple, opacity: 0.2 }
 \`\`\`
 
 ---

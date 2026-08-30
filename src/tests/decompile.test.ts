@@ -48,14 +48,14 @@ describe('a whole statement', () => {
   test('a point', () => {
     assert.equal(
       decompile({ type: 'expression', id: 'p', latex: 'p=\\left(1,2\\right)', label: 'p' }, 'p'),
-      'point p (1, 2)',
+      'point p = (1, 2)',
     );
   });
 
   test('a label that is not the name is text', () => {
     assert.equal(
       decompile({ type: 'expression', id: 'l', latex: 'l=\\left(1,2\\right)', label: 'hi' }, 'l'),
-      'text l = "hi" at (1, 2)',
+      'text l = text("hi", at=(1, 2))',
     );
   });
 
@@ -80,7 +80,7 @@ describe('a whole statement', () => {
         latex: '\\left(\\cos\\left(t\\right),\\sin\\left(t\\right)\\right)',
         parametricDomain: { min: '0', max: '6.28' },
       }, 'c'),
-      'curve c (t in 0..6.28) { (cos(t), sin(t)) }',
+      'curve c = curve(t -> (cos(t), sin(t)), 0..6.28)',
     );
   });
 
@@ -90,7 +90,7 @@ describe('a whole statement', () => {
         type: 'expression', id: 't',
         latex: '\\operatorname{polygon}\\left(\\left(0,0\\right),\\left(1,0\\right)\\right)',
       }, 't'),
-      'polygon t = [(0, 0), (1, 0)]',
+      'polygon t = polygon([(0, 0), (1, 0)])',
     );
   });
 
@@ -100,13 +100,13 @@ describe('a whole statement', () => {
         type: 'expression', id: 's',
         latex: '\\left[\\left(0,0\\right),\\left(1,1\\right)\\right]',
       }, 's'),
-      'segment s = (0, 0) -> (1, 1)',
+      'segment s = segment((0, 0), (1, 1))',
     );
   });
 
   test('a folder', () => {
     assert.equal(decompile({ type: 'folder', id: 'g', title: 'My Folder' }, 'g'),
-      'group g as "My Folder"');
+      'group g = group("My Folder")');
   });
 
   test('leaves an expression it cannot express alone', () => {
@@ -126,12 +126,12 @@ describe('round trip', () => {
     'alpha = 1',
     'longname = 5',
     'fn f(x, y) = x * y + 1',
-    'point p (1, 2)',
-    'segment s = (0,0) -> (1,1)',
-    'polygon tri = [(0,0), (1,0), (0,1)]',
+    'point p = (1, 2)',
+    'segment s = segment((0,0), (1,1))',
+    'polygon tri = polygon([(0,0), (1,0), (0,1)])',
     'region r = y > x ^ 2',
-    'curve cu (t in 0..6.28) { (cos(t), sin(t)) }',
-    'text lbl = "hi" at (1, 2)',
+    'curve cu = curve(t -> (cos(t), sin(t)), 0..6.28)',
+    'text lbl = text("hi", at=(1, 2))',
     'sl = slider(1, 0, 10)',
   ];
 

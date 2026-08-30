@@ -1,7 +1,4 @@
-// rewrites a file written in the older grammar into the one statement shape.
-//
-// this works on text, not on the ast, so comments and blank lines survive. a line the
-// rewriter does not recognise is left exactly as it was found.
+// rewrites a file written in the older grammar into the one statement shape
 
 const LEGACY_MARKS = [
   /(^|\s)alias\s+[A-Za-z_]\w*\s*=/,
@@ -13,12 +10,13 @@ const LEGACY_MARKS = [
   /=\s*azimuth\s*\(/,
   /^\s*segment\s+[A-Za-z_]\w*\s*=(?![^]*segment\s*\()/m,
   /^\s*polygon\s+[A-Za-z_]\w*\s*=\s*\[/m,
+  /^\s*line\s+[A-Za-z_]\w*\s*=(?!\s*line\s*\()[^=\n]+=(?!=)/m,
   /\s+at\s+\(/,
   /^\s*group\s+[A-Za-z_]\w*\s+as\s+"/m,
-  /^\s*time\s+[A-Za-z_]\w*(\s|$)/m,
+  /^\s*time\s+[A-Za-z_]\w*(?!\s*=\s*time\s*\()(\s|$)/m,
   /\s+domain\s+/,
   /\s+where\s+.+\s+else\s+/,
-  /^\s*[A-Za-z_]\w*\s*=\s*.+\s+for\s+[A-Za-z_]\w*\s+in\s+/m,
+  /^\s*[A-Za-z_]\w*\s*=\s*(?![\s[]).+\s+for\s+[A-Za-z_]\w*\s+in\s+/m,
   /\[[^\]]*\.\.\.[^\]]*\]/,
   /^\s*expr\s*\{/m,
   /\sas\s+gradient\s*\(/,
@@ -27,12 +25,11 @@ const LEGACY_MARKS = [
   /,\s*loop\s*\)/,
 ];
 
-/** true when the source still holds a form the current grammar does not accept */
 export function needsMigration(src: string): boolean {
   return LEGACY_MARKS.some(re => re.test(src));
 }
 
-/** splits a line into code and the trailing `//` comment, ignoring `//` inside a string */
+/** ignore comments */
 function splitComment(line: string): [string, string] {
   let inString = false;
   for (let i = 0; i < line.length; i++) {

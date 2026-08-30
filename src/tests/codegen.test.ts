@@ -30,11 +30,11 @@ describe('stable expression IDs', () => {
   });
 
   test('point decl gets name-based id', () => {
-    assert.equal(ids('point p (1, 2)')[0], 'p');
+    assert.equal(ids('point p = (1, 2)')[0], 'p');
   });
 
   test('circle decl gets name-based id', () => {
-    assert.equal(ids('circle c = circle((0,0), 1)')[0], 'c');
+    assert.equal(ids('circle c = circle(center=(0,0), radius=1)')[0], 'c');
   });
 
   test('grid emits two exprs with _h/_v suffix', () => {
@@ -64,8 +64,8 @@ describe('codegen — latex output', () => {
     assert.deepEqual(latex('x = 3'), ['x=3']);
   });
 
-  test('alias decl referenced', () => {
-    assert.deepEqual(latex('alias k = 2\nx = k + 1'), ['k=2', 'x=k+1']);
+  test('a variable another expression reads', () => {
+    assert.deepEqual(latex('k = 2\nx = k + 1'), ['k=2', 'x=k+1']);
   });
 
   test('fn inlined at call site', () => {
@@ -81,22 +81,22 @@ describe('codegen — latex output', () => {
   });
 
   test('domain restriction', () => {
-    const l = latex('y = x^2 domain x > 0');
+    const l = latex('y = x^2 where x > 0');
     assert.ok(l[0].includes('\\left\\{'));
   });
 
   test('circle latex form', () => {
-    const l = latex('circle c = circle((0,0), 2)');
+    const l = latex('circle c = circle(center=(0,0), radius=2)');
     assert.ok(l[0].includes('^{2}'));
   });
 
   test('segment latex', () => {
-    const l = latex('segment s = (0,0) -> (1,1)');
+    const l = latex('segment s = segment((0,0), (1,1))');
     assert.ok(l[0].startsWith('\\left['));
   });
 
   test('curve parametric', () => {
-    const l = latex('curve r (t in 0..6.28) { (cos(t), sin(t)) }');
+    const l = latex('curve r = curve(t -> (cos(t), sin(t)), 0..6.28)');
     assert.ok(l[0].includes('\\cos'));
   });
 
@@ -106,7 +106,7 @@ describe('codegen — latex output', () => {
   });
 
   test('group emits folder', () => {
-    const list = compileToList('group g as "Motion"');
+    const list = compileToList('group g = group("Motion")');
     if (!list) throw new Error('compile failed');
     assert.equal(list[0].type, 'folder');
     assert.equal(list[0].title, 'Motion');
@@ -122,12 +122,7 @@ describe('codegen — nameToLatex', () => {
 
 describe('dead code warnings', () => {
   test('unused fn warns', () => {
-    const r = success('fn helper(a) = a * 2\npoint p (1, 2)');
-    assert.ok(r.warnings.some(w => w.message.includes('never used')));
-  });
-
-  test('unused alias warns', () => {
-    const r = success('alias k = 42\npoint p (1, 2)');
+    const r = success('fn helper(a) = a * 2\npoint p = (1, 2)');
     assert.ok(r.warnings.some(w => w.message.includes('never used')));
   });
 
@@ -138,33 +133,27 @@ describe('dead code warnings', () => {
 });
 
 describe('dead code elimination — optimizer', () => {
-  test('unused alias is stripped from output', () => {
-    const list = compileToList('alias k = 42\npoint p (1, 2)');
+  test('a variable nothing reads is still an expression of the graph', () => {
+    const list = compileToList('k = 42\npoint p = (1, 2)');
     if (!list) throw new Error('compile failed');
-    assert.ok(!list.some(e => e.id === 'k'), 'unused alias should be eliminated');
+    assert.ok(list.some(e => e.id === 'k'));
   });
 
-  test('used alias is kept in output', () => {
-    const list = compileToList('alias k = 42\nx = k + 1');
+  test('a variable something reads is kept', () => {
+    const list = compileToList('k = 42\nx = k + 1');
     if (!list) throw new Error('compile failed');
-    assert.ok(list.some(e => e.id === 'k'), 'used alias should be retained');
-  });
-
-  test('unused alias elimination does not affect other exprs', () => {
-    const list = compileToList('alias unused = 1\nx = 5');
-    if (!list) throw new Error('compile failed');
-    assert.ok(list.some(e => e.id === 'x'));
+    assert.ok(list.some(e => e.id === 'k'));
   });
 });
 
 describe('codegen — snapshot', () => {
   test('point with style', () => {
-    const l = latex('point p (3, 4) as { color red pointSize 10 }');
+    const l = latex('point p = (3, 4) as { color: red, pointSize: 10 }');
     assert.ok(l[0].includes('3') && l[0].includes('4'));
   });
 
   test('polygon latex', () => {
-    const l = latex('polygon tri = [(0,0), (1,0), (0,1)]');
+    const l = latex('polygon tri = polygon([(0,0), (1,0), (0,1)])');
     assert.ok(l[0].includes('\\operatorname{polygon}'));
   });
 
@@ -191,22 +180,22 @@ describe('codegen — snapshot', () => {
   });
 
   test('domain restriction includes brace', () => {
-    const l = latex('y = x^2 domain x > 0');
+    const l = latex('y = x^2 where x > 0');
     assert.match(l[0], /\\left\\{x>0\\right\\}/);
   });
 
   test('conditional where/else', () => {
-    const l = latex('v = x^2 where x > 0 else -x');
+    const l = latex('v = if x > 0 then x^2 else -x');
     assert.ok(l[0].includes('\\left\\{'));
   });
 
   test('for-expr list comprehension', () => {
-    const l = latex('pts = (cos(t), sin(t)) for t in 0..6.28');
+    const l = latex('pts = [(cos(t), sin(t)) for t in 0..6.28]');
     assert.ok(l[0].includes('\\cos') || l[0].includes('\\left['));
   });
 
   test('text decl emits label', () => {
-    const list = compileToList('text lbl = "hello" at (1, 2)');
+    const list = compileToList('text lbl = text("hello", at=(1, 2))');
     if (!list) throw new Error('compile failed');
     assert.equal(list[0].label, 'hello');
     assert.equal(list[0].showLabel, true);
@@ -220,12 +209,12 @@ describe('codegen — snapshot', () => {
   });
 
   test('line slope-intercept latex', () => {
-    const l = latex('line l = slope(2), intercept(3)');
+    const l = latex('line l = line(slope=2, intercept=3)');
     assert.ok(l[0].startsWith('y='));
   });
 
   test('segment endpoint coords', () => {
-    const l = latex('segment s = (1,2) -> (3,4)');
+    const l = latex('segment s = segment((1,2), (3,4))');
     assert.ok(l[0].includes('1') && l[0].includes('2') && l[0].includes('3') && l[0].includes('4'));
   });
 });

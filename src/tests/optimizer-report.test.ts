@@ -31,17 +31,12 @@ describe('the optimizer reports what it changed', () => {
     assert.equal(inlines[0]!.line, 2);
   });
 
-  test('an alias nothing reads is dropped', () => {
-    const drops = notes('alias k = 5\nd = 1\n').filter(n => n.kind === 'drop');
-    assert.deepEqual(drops.map(n => n.before), ['alias k']);
-  });
-
-  test('an alias something reads is kept quiet', () => {
-    assert.deepEqual(notes('alias k = 5\nd = k\n').filter(n => n.kind === 'drop'), []);
+  test('a variable is never dropped, read or not', () => {
+    assert.deepEqual(notes('k = 5\nd = 1\n').filter(n => n.kind === 'drop'), []);
   });
 
   test('a source with nothing to change reports nothing', () => {
-    assert.deepEqual(notes('point p (1, 2)\n'), []);
+    assert.deepEqual(notes('point p = (1, 2)\n'), []);
   });
 
   test('one transform is reported once, however many call sites inline it', () => {
@@ -75,7 +70,7 @@ describe('the report groups by line', () => {
   });
 
   test('a drop hint says why, with no count', () => {
-    const dropped: OptimizeNote[] = [{ kind: 'drop', line: 3, col: 1, before: 'alias k', after: 'never used' }];
+    const dropped: OptimizeNote[] = [{ kind: 'drop', line: 3, col: 1, before: 'fn k', after: 'never used' }];
     assert.equal(lineHint(groupByLine(dropped)[0]!), '⟶ never used');
   });
 });

@@ -6,21 +6,13 @@ const BASE = `// a demo file
 a = slider(0, 0, 10)
 fn f(x, y) = x^2 + y
 
-point p (1, 2)
-curve ring (t in 0..6.28) {
-  (cos(t), sin(t))
-}
+point p = (1, 2)
+curve ring = curve(t -> (cos(t), sin(t)), 0..6.28)
 
-polygon tri = [
-  (0,0),
-  (1,0),
-  (0,1)
-]
-text lbl = "hello" at (1, 2)
-z = { x > 0: x^2,
-      x < 0: -x,
-      else: 0 }
-r = y > x^2 as { color blue opacity 0.3 }
+polygon tri = polygon([ (0,0), (1,0), (0,1) ])
+text lbl = text("hello", at=(1, 2))
+z = { x > 0: x^2, x < 0: -x, else: 0 }
+r = y > x^2 as { color: blue, opacity: 0.3 }
 `;
 
 function expectSameAsFull(from: string, to: string): void {
@@ -43,11 +35,11 @@ describe('tokenizeIncremental', () => {
   });
 
   it('handles an inserted line', () => {
-    expectSameAsFull(BASE, BASE.replace('point p (1, 2)', 'point p (1, 2)\npoint q (3, 4)'));
+    expectSameAsFull(BASE, BASE.replace('point p = (1, 2)', 'point p = (1, 2)\npoint q = (3, 4)'));
   });
 
   it('handles a deleted line', () => {
-    expectSameAsFull(BASE, BASE.replace('point p (1, 2)\n', ''));
+    expectSameAsFull(BASE, BASE.replace('point p = (1, 2)\n', ''));
   });
 
   it('handles an edit inside a multi-line block', () => {
@@ -92,7 +84,7 @@ describe('tokenizeIncremental', () => {
     const edits: ((s: string) => string)[] = [
       s => s.replace('a = slider(0, 0, 10)', 'a = slider(1, 0, 20)'),
       s => `${s}extra = 1\n`,
-      s => s.replace('point p (1, 2)\n', ''),
+      s => s.replace('point p = (1, 2)\n', ''),
       s => s.replace('  (cos(t), sin(t))\n', ''),
       s => s.replace('text lbl', '// text lbl'),
       s => s.replace('polygon tri = [', 'polygon tri2 = ['),
@@ -138,7 +130,7 @@ describe('tokenizeIncremental', () => {
   it('reuses the cache across a crlf document', () => {
     const crlf = BASE.replace(/\r?\n/g, '\r\n');
     const cache = lexCacheOf(crlf);
-    const edited = crlf.replace('point p (1, 2)', 'point p (3, 4)');
+    const edited = crlf.replace('point p = (1, 2)', 'point p = (3, 4)');
     const step = tokenizeIncremental(edited, cache);
     expect(step.tokens).toEqual(tokenize(edited));
     expect(step.cache.chunks.length).toBeGreaterThan(1);

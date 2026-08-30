@@ -1,9 +1,8 @@
-// decompiles a desmos expression back into a DSL statement (inverse of codegen)
+// decompiles a desmos expr back into dsmx (inverse of codegen)
 
 import type { DesmosExpr } from './codegen';
 
 // latex tokens
-// ====
 
 type Tok =
   | { k: 'num'; v: string }
@@ -88,7 +87,6 @@ function lex(src: string): Tok[] {
 }
 
 // latex ast
-// ====
 
 type Node =
   | { k: 'num'; v: string }
@@ -312,7 +310,6 @@ class Parser {
 }
 
 // dsl output
-// ====
 
 const PREC: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2, '^': 3 };
 
@@ -353,8 +350,7 @@ function parseLatex(latex: string): Node | null {
   }
 }
 
-// whole statement
-// ====
+// any whole statement
 
 function isPlainName(n: Node): n is { k: 'name'; v: string } {
   return n.k === 'name';
@@ -368,7 +364,7 @@ function quote(s: string): string {
  * a DSL statement for a desmos expression or null
  */
 export function decompile(expr: DesmosExpr, name: string): string | null {
-  if (expr.type === 'folder') return expr.title ? `group ${name} as ${quote(expr.title)}` : null;
+  if (expr.type === 'folder') return expr.title ? `group ${name} = group(${quote(expr.title)})` : null;
   if (expr.type === 'text') return null;
   if (!expr.latex) return null;
 
@@ -389,7 +385,7 @@ export function decompile(expr: DesmosExpr, name: string): string | null {
     return `curve ${name} = curve(t -> ${print(node)}, ${min}..${max})`;
   }
 
-  // text name = "label" at (x, y)
+  // text name = text("label", at=(x, y))
   if (expr.label && node.k === 'cmp' && node.op === '=' && node.r.k === 'tuple') {
     if (isPlainName(node.l) && expr.label !== node.l.v) {
       return `text ${node.l.v} = text(${quote(expr.label)}, at=${print(node.r)})`;

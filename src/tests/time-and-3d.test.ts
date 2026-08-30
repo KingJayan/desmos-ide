@@ -19,26 +19,26 @@ function latexOf(src: string, id: string): string {
 
 describe('the clock', () => {
   test('is a slider that plays', () => {
-    const T = ok('time T').state.expressions.list[0];
+    const T = ok('time T = time(0..1)').state.expressions.list[0];
     assert.equal(T.latex, 'T=0');
     assert.equal(T.slider?.isPlaying, true);
     assert.equal(T.slider?.loopMode, 'LOOP_FORWARD');
   });
 
   test('sweeps 0 to 1 over four seconds unless told otherwise', () => {
-    const clock = ok('time T').clock;
+    const clock = ok('time T = time(0..1)').clock;
     assert.deepEqual(clock, { id: 'T', name: 'T', min: 0, max: 1, period: 4000, mode: 'loop' });
   });
 
   test('takes a range and a period', () => {
-    const clock = ok('time T = 0..6.28 period 6000').clock;
+    const clock = ok('time T = time(0..6.28, period=6000)').clock;
     assert.equal(clock?.min, 0);
     assert.equal(clock?.max, 6.28);
     assert.equal(clock?.period, 6000);
   });
 
   test('the bounds are hard, so the value cannot leave the range', () => {
-    const T = ok('time T = 2..5').state.expressions.list[0];
+    const T = ok('time T = time(2..5)').state.expressions.list[0];
     assert.equal(T.slider?.min, '2');
     assert.equal(T.slider?.max, '5');
     assert.equal(T.slider?.hardMin, true);
@@ -48,9 +48,9 @@ describe('the clock', () => {
   });
 
   test('mirror turns around at the end instead of jumping back', () => {
-    const T = ok('time T = 0..1 mirror').state.expressions.list[0];
+    const T = ok('time T = time(0..1, mode=mirror)').state.expressions.list[0];
     assert.equal(T.slider?.loopMode, 'LOOP_FORWARD_REVERSE');
-    assert.equal(ok('time T = 0..1 mirror').clock?.mode, 'mirror');
+    assert.equal(ok('time T = time(0..1, mode=mirror)').clock?.mode, 'mirror');
   });
 
   test('source with no clock reports none', () => {
@@ -58,17 +58,17 @@ describe('the clock', () => {
   });
 
   test('the clock is a name other statements can use', () => {
-    assert.match(latexOf('time T\nb = 2T', 'b'), /T/);
+    assert.match(latexOf('time T = time(0..1)\nb = 2T', 'b'), /T/);
   });
 
   test('a second clock is a compile error', () => {
-    const r = compile('time T\ntime U');
+    const r = compile('time T = time(0..1)\ntime U = time(0..1)');
     assert.ok(!r.success);
     assert.match(r.errors[0].message, /[Oo]nly one 'time'/);
   });
 
   test('a graph edit never rewrites a playing slider, which would stop it', () => {
-    const T = ok('time T = 0..5 period 2000').state.expressions.list[0];
+    const T = ok('time T = time(0..5, period=2000)').state.expressions.list[0];
     assert.equal(decompile(T, 'T'), null);
   });
 
@@ -80,18 +80,18 @@ describe('the clock', () => {
 
 describe('the camera and project()', () => {
   test('the angles go out as their own variables', () => {
-    const list = ok('camera cam = azimuth(0.6), elevation(0.4)').state.expressions.list;
+    const list = ok('camera cam = camera(azimuth=0.6, elevation=0.4)').state.expressions.list;
     assert.deepEqual(list.map(e => e.latex), ['c_{az}=0.6', 'c_{el}=0.4']);
   });
 
   test('project reads the declared camera, so animating it turns the scene', () => {
-    const latex = latexOf('time T\ncamera cam = azimuth(T), elevation(0.4)\np = project(1, 2, 3)', 'p');
+    const latex = latexOf('time T = time(0..1)\ncamera cam = camera(azimuth=T, elevation=0.4)\np = project(1, 2, 3)', 'p');
     assert.ok(latex.includes('c_{az}'), latex);
     assert.ok(latex.includes('c_{el}'), latex);
   });
 
   test('a camera below the project line is still found', () => {
-    const latex = latexOf('p = project(1, 2, 3)\ncamera cam = azimuth(0.6), elevation(0.4)', 'p');
+    const latex = latexOf('p = project(1, 2, 3)\ncamera cam = camera(azimuth=0.6, elevation=0.4)', 'p');
     assert.ok(latex.includes('c_{az}'), latex);
   });
 
@@ -120,13 +120,13 @@ describe('the camera and project()', () => {
   });
 
   test('a second camera is a compile error', () => {
-    const r = compile('camera a = azimuth(0), elevation(0)\ncamera b = azimuth(1), elevation(1)');
+    const r = compile('camera a = camera(azimuth=0, elevation=0)\ncamera b = camera(azimuth=1, elevation=1)');
     assert.ok(!r.success);
     assert.match(r.errors[0].message, /[Oo]nly one 'camera'/);
   });
 
   test('the projection is the standard one: no turn and no tilt shows the y-z plane', () => {
-    const latex = latexOf('h = 1\ncamera c = azimuth(0), elevation(0)\np = project(x, y, h)', 'p');
+    const latex = latexOf('h = 1\ncamera c = camera(azimuth=0, elevation=0)\np = project(x, y, h)', 'p');
     assert.ok(latex.includes('\\sin\\left(c_{az}\\right)'), latex);
     assert.ok(latex.includes('\\cos\\left(c_{el}\\right)'), latex);
   });
@@ -156,7 +156,7 @@ describe('the animation presets', () => {
   });
 
   test('a preset reads the clock', () => {
-    assert.match(latexOf('time T\np = ease(T)', 'p'), /T/);
+    assert.match(latexOf('time T = time(0..1)\np = ease(T)', 'p'), /T/);
   });
 
   test('a preset is not treated as an undeclared name', () => {

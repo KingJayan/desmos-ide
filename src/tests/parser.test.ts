@@ -22,26 +22,26 @@ function fail(src: string): string {
 
 describe('parser — happy path', () => {
   test('var decl',           () => { ok('x = 3'); });
-  test('alias decl',         () => { ok('alias k = 2'); });
+  test('plain binding',      () => { ok('k = 2'); });
   test('fn decl',            () => { ok('fn f(a, b) = a + b'); });
-  test('point',              () => { ok('point p (1, 2)'); });
-  test('circle call form',   () => { ok('circle c = circle((0,0), 1)'); });
-  test('line slope-intercept', () => { ok('line l = slope(2), intercept(1)'); });
-  test('line standard form', () => { ok('line l = 2*x + y = 4'); });
-  test('curve parametric',   () => { ok('curve r (t in 0..6.28) { (cos(t), sin(t)) }'); });
+  test('point',              () => { ok('point p = (1, 2)'); });
+  test('circle call form',   () => { ok('circle c = circle(center=(0,0), radius=1)'); });
+  test('line slope-intercept', () => { ok('line l = line(slope=2, intercept=1)'); });
+  test('line standard form', () => { ok('line l = 2*x + y == 4'); });
+  test('curve parametric',   () => { ok('curve r = curve(t -> (cos(t), sin(t)), 0..6.28)'); });
   test('region',             () => { ok('region r = y > x^2'); });
-  test('polygon',            () => { ok('polygon tri = [(0,0), (1,0), (0,1)]'); });
-  test('segment',            () => { ok('segment s = (0,0) -> (1,1)'); });
-  test('text',               () => { ok('text lbl = "hello" at (1, 2)'); });
-  test('group',              () => { ok('group g as "Folder"'); });
+  test('polygon',            () => { ok('polygon tri = polygon([(0,0), (1,0), (0,1)])'); });
+  test('segment',            () => { ok('segment s = segment((0,0), (1,1))'); });
+  test('text',               () => { ok('text lbl = text("hello", at=(1, 2))'); });
+  test('group',              () => { ok('group g = group("Folder")'); });
   test('spiral',             () => { ok('spiral s = spiral(turns=5, spacing=0.2)'); });
   test('wave',               () => { ok('wave w = wave(freq=2, amp=1)'); });
   test('grid',               () => { ok('grid g = grid(10, 10)'); });
   test('slider',             () => { ok('a = slider(0, 0, 10)'); });
-  test('conditional where/else', () => { ok('v = x^2 where x > 0 else -x'); });
+  test('conditional if/then/else', () => { ok('v = if x > 0 then x^2 else -x'); });
   test('piecewise',          () => { ok('z = { x > 0: x^2, else: 0 }'); });
-  test('for-expr',           () => { ok('pts = (cos(t), sin(t)) for t in 0..6.28'); });
-  test('domain restriction', () => { ok('y = x^2 domain x > 0'); });
+  test('for-expr',           () => { ok('pts = [(cos(t), sin(t)) for t in 0..6.28]'); });
+  test('domain restriction', () => { ok('y = x^2 where x > 0'); });
   test('debug stripped',     () => { ok('debug 3 + 4'); });
 });
 
@@ -71,7 +71,7 @@ describe('semantic errors', () => {
   });
 
   test('fn params and loop vars are in scope', () => {
-    ok('fn f(a, b) = a + b\npts = (cos(i), sin(i)) for i in 0..6');
+    ok('fn f(a, b) = a + b\npts = [(cos(i), sin(i)) for i in 0..6]');
   });
 });
 
@@ -90,9 +90,9 @@ describe('statement terminators', () => {
   });
 
   test('blocks and lists still span lines', () => {
-    ok('curve ring (t in 0..6.28) {\n  (cos(t), sin(t))\n}');
+    ok('curve ring = curve(\n  t -> (cos(t), sin(t)),\n  0..6.28\n)');
     ok('z = { x > 0: x^2,\n  else: 0 }');
-    ok('polygon tri = [\n  (0,0),\n  (1,0)\n]');
+    ok('polygon tri = polygon([\n  (0,0),\n  (1,0)\n])');
   });
 });
 
@@ -108,12 +108,7 @@ describe('warnings', () => {
   });
 
   test('unused fn warning', () => {
-    const r = ok('fn helper(a) = a * 2\npoint p (1, 2)');
-    assert.ok(r.warnings.some(w => w.message.includes('never used')));
-  });
-
-  test('unused alias warning', () => {
-    const r = ok('alias k = 42\npoint p (1, 2)');
+    const r = ok('fn helper(a) = a * 2\npoint p = (1, 2)');
     assert.ok(r.warnings.some(w => w.message.includes('never used')));
   });
 
@@ -192,11 +187,11 @@ describe('math table stakes', () => {
   });
 
   test('text accepts a style block', () => {
-    assert.equal(ok('text l = "hi" at (0, 0) as { color red }').state.expressions.list[0].color, '#c74440');
+    assert.equal(ok('text l = text("hi", at=(0, 0)) as { color: red }').state.expressions.list[0].color, '#c74440');
   });
 
   test('expr blocks still parse', () => {
-    ok('r = 0\nexpr {\n  a = 1\n  b = 2\n  a + b\n}');
+    ok('r = 0\nblock1 = expr { a = 1 b = 2 a + b }');
   });
 });
 
@@ -241,7 +236,7 @@ describe('formatter', () => {
   });
 
   test('keeps unary minus tight', () => {
-    assert.equal(formatDsl('v = x where x>0 else -x'), 'v = x where x > 0 else -x\n');
+    assert.equal(formatDsl('v = if x>0 then x else -x'), 'v = if x > 0 then x else -x\n');
   });
 
   test('kwargs stay tight, assignments do not', () => {
@@ -249,7 +244,7 @@ describe('formatter', () => {
   });
 
   test('indents block bodies', () => {
-    assert.equal(formatDsl('expr {\na = 1\na\n}'), 'expr {\n  a = 1\n  a\n}\n');
+    assert.equal(formatDsl('block1 = expr { a = 1 a }'), 'block1 = expr { a = 1 a }\n');
   });
 
   test('collapses repeated blank lines', () => {
@@ -257,7 +252,7 @@ describe('formatter', () => {
   });
 
   test('preserves comments and strings verbatim', () => {
-    const src = 'text l = "a  b // not a comment" at (0, 0) // real comment\n';
+    const src = 'text l = text("a  b // not a comment", at=(0, 0)) // real comment\n';
     assert.equal(formatDsl(src), src);
   });
 

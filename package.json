@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "bun build:view && electrobun dev",
-    "dev:hmr": "bun run build:native && DESMOS_IDE_DEV=1 concurrently -k \"vite\" \"electrobun dev\"",
+    "dev:hmr": "bun run build:native && DESMOS_IDE_DEV=1 bun run --parallel vite \"electrobun dev\"",
     "build:view": "vite build && bun run build:native",
     "build:native": "bun run scripts/build-native.ts",
     "build:grammar": "bun run scripts/build-grammar.ts",
@@ -43,7 +43,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "concurrently": "^10.0.4",
     "eslint": "^9",
     "linkedom": "^0.18.13",
     "playwright": "^1.62.1",

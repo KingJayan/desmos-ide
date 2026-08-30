@@ -114,7 +114,7 @@ describe('following the cursor', () => {
 });
 
 describe('linked to a real compile', () => {
-  const src = 'a = slider(1, 0, 10)\npoint p (0, 0)\nregion r = y > x';
+  const src = 'a = slider(1, 0, 10)\npoint p = (0, 0)\nregion r = y > x';
 
   test('every graph expression jumps to the line that wrote it', () => {
     const r = compile(src);

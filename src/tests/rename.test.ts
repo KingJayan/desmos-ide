@@ -22,8 +22,8 @@ describe('renaming a symbol', () => {
 
   test('leaves a string literal alone', () => {
     assert.equal(
-      rename('a = 3\ntext lbl = "plot a here" at (0, 0)', 'a', 'b'),
-      'b = 3\ntext lbl = "plot a here" at (0, 0)',
+      rename('a = 3\ntext lbl = text("plot a here", at=(0, 0))', 'a', 'b'),
+      'b = 3\ntext lbl = text("plot a here", at=(0, 0))',
     );
   });
 
@@ -32,9 +32,9 @@ describe('renaming a symbol', () => {
   });
 
   test('the reported failure: a string and a comment together', () => {
-    const src = 'a = 3\ntext lbl = "plot a here" at (0, 0) // tune a';
+    const src = 'a = 3\ntext lbl = text("plot a here", at=(0, 0))  // tune a';
     const out = rename(src, 'a', 'b');
-    assert.equal(out, 'b = 3\ntext lbl = "plot a here" at (0, 0) // tune a');
+    assert.equal(out, 'b = 3\ntext lbl = text("plot a here", at=(0, 0))  // tune a');
   });
 
   test('does not touch a name that only contains the target', () => {
@@ -43,8 +43,8 @@ describe('renaming a symbol', () => {
 
   test('renames across a statement that spans lines', () => {
     assert.equal(
-      rename('a = 1\ncurve c (t in 0..1) {\n  (t, a)\n}', 'a', 'z'),
-      'z = 1\ncurve c (t in 0..1) {\n  (t, z)\n}',
+      rename('a = 1\ncurve c = curve(t -> (t, a), 0..1)', 'a', 'z'),
+      'z = 1\ncurve c = curve(t -> (t, z), 0..1)',
     );
   });
 

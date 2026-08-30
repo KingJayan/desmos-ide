@@ -4,42 +4,35 @@
 import { compile } from './index';
 
 const GEOMETRY = `
-point origin (0, 0) as { color blue pointSize 10 }
-point p (3, 4) as { color red }
-circle c {
-  center (0, 0)
-  radius 5
-}
-segment s = (0,0) -> (3,4) as { color green lineWidth 2 }
-polygon tri = [(0,0),(3,0),(0,4)] as { color orange opacity 0.3 }
+point origin = (0, 0) as { color: blue, pointSize: 10 }
+point p = (3, 4) as { color: red }
+circle c = circle(center=(0, 0), radius=5)
+segment s = segment((0,0), (3,4) as { color: green, lineWidth: 2 })
+polygon tri = polygon([(0,0),(3,0),(0,4)]) as { color: orange, opacity: 0.3 }
 `;
 
 const FUNCTIONS = `
 fn hyp(x, y) = sqrt(x^2 + y^2)
-alias dist = hyp(3, 4)
-a = slider(3, 0, 10, step=0.1, speed=1, loop)
+dist = hyp(3, 4)
+a = slider(3, 0, 10, step=0.1, speed=1, loop=true)
 b = 4
-alias r = hyp(a, b)
+r = hyp(a, b)
 `;
 
 const GENERATORS = `
 pts = map(i -> (cos(i), sin(i)), 0..6.28 step 0.1)
-curve orbit (t in 0..6.28) { (2*cos(t), sin(t)) }
+curve orbit = curve(t -> (2*cos(t), sin(t)), 0..6.28)
 `;
 
 const CONDITIONALS = `
-y = x^2 where x > 0 else -x
+y = if x > 0 then x^2 else -x
 v = if x > 0 then x^2 else -x
 z = { x > 0: x^2, x < 0: -x, else: 0 }
-w = x^2 domain x > -3
+w = x^2 where x > -3
 `;
 
 const EXPR_BLOCK = `
-expr {
-  cx = cos(t)
-  cy = sin(t)
-  (2*cx, cy)
-}
+block1 = expr { cx = cos(t) cy = sin(t) (2*cx, cy) }
 `;
 
 const EXAMPLES: Array<[string, string]> = [

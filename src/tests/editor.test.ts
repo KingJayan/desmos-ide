@@ -30,7 +30,7 @@ describe('inline sliders', () => {
   });
 
   test('reads an explicit step kwarg', () => {
-    const [s] = parseSliderVars('a = slider(3, 0, 10, step=0.1, speed=1, loop)');
+    const [s] = parseSliderVars('a = slider(3, 0, 10, step=0.1, speed=1, loop=true)');
     assert.equal(sliderRange(s).step, 0.1);
   });
 
@@ -51,7 +51,7 @@ describe('inline sliders', () => {
   });
 
   test('ignores non-slider statements', () => {
-    assert.equal(parseSliderVars('x = 3\nfn f(a) = a\npoint p (1, 2)').length, 0);
+    assert.equal(parseSliderVars('x = 3\nfn f(a) = a\npoint p = (1, 2)').length, 0);
   });
 
   test('reports one-based line numbers', () => {

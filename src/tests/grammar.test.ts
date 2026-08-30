@@ -6,7 +6,7 @@ import { join } from 'path';
 import * as oniguruma from 'vscode-oniguruma';
 import * as textmate from 'vscode-textmate';
 import { KEYWORDS } from '../compiler/lexer';
-import { BUILTIN_NAMES, STYLE_FNS } from '../compiler/builtins';
+import { BUILTIN_NAMES, CONSTRUCTOR_NAMES, STYLE_FNS } from '../compiler/builtins';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const GRAMMAR = join(ROOT, 'editors', 'vscode', 'syntaxes', 'desmos-dsl.tmLanguage.json');
@@ -31,7 +31,6 @@ before(async () => {
   grammar = loaded;
 });
 
-/** the innermost scope the grammar gives to the first token that matches `text` */
 function scopeOf(line: string, text: string): string {
   const at = line.indexOf(text);
   assert.ok(at !== -1, `"${text}" is not in "${line}"`);
@@ -43,20 +42,19 @@ function scopeOf(line: string, text: string): string {
 
 describe('the grammar loads', () => {
   test('every pattern is valid oniguruma', () => {
-    // tokenizing exercises every rule in the repository at least once
     const source = [
       '// a comment',
       'x = 3',
       'a = slider(0, 0, 10)',
       'fn f(a, b) = a + b',
-      'point p (1, 2)',
-      'curve ring (t in 0..6.28) { (cos(t), sin(t)) }',
-      'text lbl = "hello" at (1, 2)',
-      'v = x^2 where x > 0 else -x^2',
+      'point p = (1, 2)',
+      'curve ring = curve(t -> (cos(t), sin(t)), 0..6.28)',
+      'text lbl = text("hello", at=(1, 2))',
+      'v = if x > 0 then x^2 else -x^2',
       'z = { x > 0: x^2, else: 0 }',
-      'polygon tri = [(0,0), (1,0), (0,1)]',
-      'segment s = (0,0) -> (1,1)',
-      'point p2 (0, 0) as { color red pointSize 12 }',
+      'polygon tri = polygon([(0,0), (1,0), (0,1)])',
+      'segment s = segment((0,0), (1,1))',
+      'point p2 = (0, 0) as { color: red, pointSize: 12 }',
       'alpha = 1',
     ];
     let state = textmate.INITIAL;
@@ -74,7 +72,7 @@ describe('token classes', () => {
   });
 
   test('strings', () => {
-    assert.equal(scopeOf('text l = "hi" at (0,0)', 'hi'), 'string.quoted.double.dsmx');
+    assert.equal(scopeOf('text l = text("hi", at=(0,0))', 'hi'), 'string.quoted.double.dsmx');
   });
 
   test('numbers, including scientific notation', () => {
@@ -83,8 +81,13 @@ describe('token classes', () => {
   });
 
   test('keywords', () => {
-    assert.equal(scopeOf('point p (0, 0)', 'point'), 'keyword.control.dsmx');
-    assert.equal(scopeOf('curve c (t in 0..1) { t }', 'curve'), 'keyword.control.dsmx');
+    assert.equal(scopeOf('v = if a then b else c', 'if'), 'keyword.control.dsmx');
+    assert.equal(scopeOf('y = x^2 where x > 0', 'where'), 'keyword.control.dsmx');
+  });
+
+  test('a type annotation reads as the constructor it names', () => {
+    assert.equal(scopeOf('point p = (0, 0)', 'point'), 'support.function.dsmx');
+    assert.equal(scopeOf('curve c = curve(t -> t, 0..1)', 'curve'), 'support.function.dsmx');
   });
 
   test('builtins', () => {
@@ -107,12 +110,8 @@ describe('token classes', () => {
   test('operators and ranges', () => {
     assert.equal(scopeOf('y = a + b', '+'), 'keyword.operator.dsmx');
     assert.equal(scopeOf('y = a >= b', '>='), 'keyword.operator.comparison.dsmx');
-    assert.equal(scopeOf('curve c (t in 0..1) { t }', '..'), 'keyword.operator.range.dsmx');
-    assert.equal(scopeOf('segment s = (0,0) -> (1,1)', '->'), 'keyword.operator.arrow.dsmx');
-  });
-
-  test('a keyword that is also a builtin stays a keyword, the way the lexer reads it', () => {
-    assert.equal(scopeOf('polygon tri = [(0,0)]', 'polygon'), 'keyword.control.dsmx');
+    assert.equal(scopeOf('curve c = curve(t -> t, 0..1)', '..'), 'keyword.operator.range.dsmx');
+    assert.equal(scopeOf('l = map(t -> t, 0..1)', '->'), 'keyword.operator.arrow.dsmx');
   });
 });
 
@@ -124,7 +123,7 @@ describe('the grammar tracks the compiler tables', () => {
   });
 
   test('every builtin the lexer does not claim is highlighted as a function', () => {
-    const names = [...BUILTIN_NAMES, ...STYLE_FNS.map(f => f.name)];
+    const names = [...BUILTIN_NAMES, ...CONSTRUCTOR_NAMES, ...STYLE_FNS.map(f => f.name)];
     for (const name of names) {
       if (KEYWORDS.has(name)) continue;
       assert.equal(scopeOf(`y = ${name}(x)`, name), 'support.function.dsmx', name);

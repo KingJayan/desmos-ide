@@ -118,9 +118,9 @@ describe('macro calls are found on their own lines', () => {
 describe('expansion keeps a way back to the source line', () => {
   test('one line becomes many, and all of them point back', () => {
     const src = 'a = 1\n@stars(2)\nb = 2\n';
-    const { src: out, lineMap } = applyMacros(src, new Map([[2, 'point p (0,0)\npoint q (1,1)']]));
+    const { src: out, lineMap } = applyMacros(src, new Map([[2, 'point p = (0,0)\npoint q = (1,1)']]));
 
-    assert.deepEqual(out.split('\n'), ['a = 1', 'point p (0,0)', 'point q (1,1)', 'b = 2', '']);
+    assert.deepEqual(out.split('\n'), ['a = 1', 'point p = (0,0)', 'point q = (1,1)', 'b = 2', '']);
     assert.deepEqual(lineMap, [1, 2, 2, 3, 4]);
     assert.equal(toSourceLine(lineMap, 3), 2);
     assert.equal(toSourceLine(lineMap, 4), 3);
@@ -146,7 +146,7 @@ describe('expansion keeps a way back to the source line', () => {
   });
 
   test('a warning under a macro moves back too', () => {
-    const { src, lineMap } = applyMacros('@gen()\nalias k = 1\n', new Map([[1, 'a = 1\nb = 2']]));
+    const { src, lineMap } = applyMacros('@gen()\nfn unread(x) = x\n', new Map([[1, 'a = 1\nb = 2']]));
     const result = remapResult(compile(src), lineMap);
     assert.equal(result.success, true);
     const warned = (result as { warnings: { startLineNumber: number }[] }).warnings;
@@ -194,7 +194,7 @@ describe('a plugin library reaches the compiler as a prelude', () => {
   });
 
   test('a prelude may not draw anything', () => {
-    const r = compile('a = 1\n', { prelude: 'point sneaky (9, 9)\n' });
+    const r = compile('a = 1\n', { prelude: 'point sneaky = (9, 9)\n' });
     assert.equal(r.success, true);
     const ids = (r as Extract<typeof r, { success: true }>).state.expressions.list.map(e => e.id);
     assert.equal(ids.includes('sneaky'), false);

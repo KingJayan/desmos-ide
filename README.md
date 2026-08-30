@@ -117,6 +117,8 @@ see the [examples](example/), or the [full demo](example/demo.dsmx)
 
 ## dev
 
+requires `bun v1.4.0+`
+
 ```bash
 bun i
 bun dev        # build then launch
