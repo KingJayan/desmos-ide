@@ -424,7 +424,7 @@ export class AISidebar {
 
     this.resizeObserver = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width ?? this.el.offsetWidth;
-      this.el.classList.toggle('ai-sidebar--compact', w < 260);
+      this.el.classList.toggle('ai-sidebar--compact', w < 320);
     });
     this.resizeObserver.observe(this.el);
   }
@@ -516,6 +516,7 @@ export class AISidebar {
 
   private syncProviderUi(): void {
     const cfg = this.getProviderConfig();
+    localStorage.setItem('ai-ready', this.provider === 'ollama' || cfg.apiKey ? '1' : '');
     const p = PROVIDERS.find(x => x.id === this.provider);
 
     const providerChip = this.ui.providerChip;

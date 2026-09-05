@@ -20,7 +20,8 @@
 
 .settings-modal {
   @include panel;
-  width: 440px;
+  width: 560px;
+  max-width: calc(100vw - 32px);
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -64,7 +65,7 @@
 .settings-close {
   background: none;
   border: none;
-  color: var(--overlay0);
+  color: var(--overlay1);
   cursor: pointer;
   width: 24px;
   height: 24px;
@@ -141,7 +142,7 @@
 }
 .settings-hint {
   font-size: var(--fs-small);
-  color: var(--overlay0);
+  color: var(--overlay1);
 }
 
 .settings-row {
@@ -159,6 +160,8 @@
   color: var(--subtext1);
   flex-shrink: 0;
 }
+.settings-row.hidden { display: none; }
+.settings-group.hidden { display: none; }
 
 .settings-select {
   background-color: var(--panel-sunken);
@@ -206,12 +209,68 @@
 .settings-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 2px; }
 
 .settings-range-val {
+  width: 52px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--panel-sunken);
   font-size: var(--fs-micro);
-  color: var(--overlay2);
+  color: var(--text);
   font-family: var(--font-mono);
-  min-width: 28px;
   text-align: right;
 }
+.settings-range-unit {
+  font-size: var(--fs-micro);
+  color: var(--overlay1);
+  min-width: 14px;
+}
+
+.settings-search {
+  flex: 1;
+  min-width: 0;
+  margin: 0 12px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel-sunken);
+  color: var(--text);
+  font-size: var(--fs-small);
+
+  &::placeholder { color: var(--overlay1); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+}
+
+.settings-modified {
+  width: 6px;
+  height: 6px;
+  margin-right: auto;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  flex-shrink: 0;
+}
+.settings-row--modified .settings-modified { opacity: 1; }
+
+.settings-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--overlay1);
+  cursor: pointer;
+  visibility: hidden;
+  flex-shrink: 0;
+
+  &:hover { background: var(--surface0); color: var(--text); }
+}
+.settings-row--modified:hover .settings-reset,
+.settings-row--modified .settings-reset:focus-visible { visibility: visible; }
 
 .settings-toggle { display: flex; align-items: center; cursor: pointer; }
 .settings-toggle-input {
@@ -259,7 +318,7 @@
   #editor-island { min-width: 220px; }
   #ai-panel      { min-width: 220px; }
   #tool-left     { min-width: 160px; }
-  .tb-search     { min-width: 140px; }
+  .tb-doc        { max-width: 220px; }
 
   .rail { width: 34px; }
   .rail-btn { width: 28px; height: 28px; }

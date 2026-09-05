@@ -64,7 +64,6 @@ export class DesmosGraph {
 
   constructor(container: HTMLElement) {
     this.calc = Desmos.GraphingCalculator(container, {
-      expressionsList: false,
       expressions: false,
       settingsMenu: false,
       keypad: false,
@@ -110,6 +109,10 @@ export class DesmosGraph {
     });
   }
 
+  resetViewport(): void {
+    this.calc.setMathBounds?.({ left: -10, right: 10, bottom: -10, top: 10 });
+  }
+
   viewport(): { xmin: number; xmax: number; ymin: number; ymax: number } | null {
     const m = this.calc.graphpaperBounds?.mathCoordinates;
     if (!m) return null;
@@ -123,7 +126,7 @@ export class DesmosGraph {
     expressions: boolean;
     lockViewport: boolean;
   }): void {
-    this.calc.updateSettings({ ...options, expressionsList: options.expressions });
+    this.calc.updateSettings(options);
   }
 
   setTheme(theme: ColorTheme): void {

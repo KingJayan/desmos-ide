@@ -102,7 +102,8 @@ class SliderWidget implements monaco.editor.IContentWidget {
   getId(): string { return this._id; }
   getDomNode(): HTMLElement { return this.dom; }
 
-  getPosition(): monaco.editor.IContentWidgetPosition {
+  getPosition(): monaco.editor.IContentWidgetPosition | null {
+    if (this.editor.getLayoutInfo().contentWidth < 420) return null;
     const model = this.editor.getModel();
     const lineLen = model ? model.getLineLength(this.line) : 1;
     return {

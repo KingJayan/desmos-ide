@@ -120,7 +120,7 @@ $light-themes: 'dsmx-light', 'catppuccin-latte', 'github-light', 'vs-light';
   font-weight: 600;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: var(--overlay0);
+  color: var(--overlay1);
 }
 
 @mixin panel($radius: var(--radius-lg)) {
@@ -153,6 +153,12 @@ $light-themes: 'dsmx-light', 'catppuccin-latte', 'github-light', 'vs-light';
   } @else {
     height: var(--gap);
     cursor: row-resize;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    @if $axis == 'v' { inset: 0 -4px; } @else { inset: -4px 0; }
   }
 
   &::after {
@@ -189,8 +195,8 @@ $light-themes: 'dsmx-light', 'catppuccin-latte', 'github-light', 'vs-light';
   --font-mono:    'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
   --font-ui:      'Inter', 'SF Pro Text', -apple-system, 'Segoe UI', sans-serif;
 
-  --fs-micro: 0.8rem;
-  --fs-small: 0.9rem;
+  --fs-micro: max(11px, 0.85rem);
+  --fs-small: max(12px, 0.92rem);
   --fs-base:  1rem;
   --fs-large: 1.1rem;
 

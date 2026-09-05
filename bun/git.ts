@@ -116,16 +116,23 @@ export async function getGitStatus(): Promise<GitStatusResult> {
       runGit(repoPath, ['status', '--porcelain', '--untracked-files=all'], 1800),
     ]);
     const lines = statusRaw.split(/\r?\n/).map(line => line.trimEnd()).filter(Boolean);
-    const modifiedFiles = lines.map(line => {
+    const pathOf = (line: string): string => {
       const rawPath = line.slice(3).trim();
       const renameParts = rawPath.split(' -> ');
       return (renameParts[renameParts.length - 1] || rawPath).replace(/^"|"$/g, '');
-    });
+    };
+    const modifiedFiles = lines.map(pathOf);
+    // porcelain reports the index in column one and the working tree in column two,
+    // so a file can be in both lists at once
+    const staged = lines.filter(l => l[0] && l[0] !== ' ' && l[0] !== '?').map(pathOf);
+    const unstaged = lines.filter(l => l[1] && l[1] !== ' ').map(pathOf);
     return {
       ok: true as const,
       branch: branchRaw.trim() || 'detached',
       modifiedCount: modifiedFiles.length,
       modifiedFiles,
+      staged,
+      unstaged,
     };
   });
 }
@@ -193,6 +200,45 @@ export async function gitCreateBranch(name: string): Promise<GitActionResult> {
   return inRepo(async repoPath => {
     await runGit(repoPath, ['checkout', '-b', name.trim()], 4200);
     return { ok: true as const, message: `Created and switched to ${name.trim()}` };
+  });
+}
+
+function badPaths(paths: string[]): GitErr | null {
+  if (paths.length === 0) return { ok: false, errorCode: 'BAD_INPUT', message: 'No file was named.' };
+  if (paths.some(p => typeof p !== 'string' || !p.trim() || p.startsWith('-'))) {
+    return { ok: false, errorCode: 'BAD_INPUT', message: 'That file name cannot be used.' };
+  }
+  return null;
+}
+
+export async function gitStage(paths: string[]): Promise<GitActionResult> {
+  const bad = badPaths(paths);
+  if (bad) return bad;
+  return inRepo(async repoPath => {
+    await runGit(repoPath, ['add', '--', ...paths], 4200);
+    return { ok: true as const, message: `Staged ${paths.length} file${paths.length === 1 ? '' : 's'}` };
+  });
+}
+
+export async function gitUnstage(paths: string[]): Promise<GitActionResult> {
+  const bad = badPaths(paths);
+  if (bad) return bad;
+  return inRepo(async repoPath => {
+    await runGit(repoPath, ['restore', '--staged', '--', ...paths], 4200);
+    return { ok: true as const, message: `Unstaged ${paths.length} file${paths.length === 1 ? '' : 's'}` };
+  });
+}
+
+export async function gitCommit(message: string): Promise<GitActionResult> {
+  const text = message.trim();
+  if (!text) return { ok: false, errorCode: 'BAD_INPUT', message: 'A commit needs a message.' };
+  return inRepo(async repoPath => {
+    const staged = await runGit(repoPath, ['diff', '--cached', '--name-only'], 2400);
+    if (!staged.trim()) {
+      return { ok: false as const, errorCode: 'BAD_INPUT', message: 'Nothing is staged to commit.' };
+    }
+    const out = await runGit(repoPath, ['commit', '-m', text], 6000);
+    return { ok: true as const, message: out.split(/\r?\n/)[0]?.trim() || 'Committed' };
   });
 }
 

@@ -4,7 +4,7 @@
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   overflow-y: auto;
   @include scrollbar;
@@ -13,11 +13,49 @@
 #start-page.hidden { display: none; }
 
 .start-page {
-  width: min(520px, 100%);
-  padding: 32px 24px;
+  width: min(900px, 100%);
+  padding: 48px 32px 32px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.start-head { display: flex; flex-direction: column; }
+
+.start-cols {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.start-col { display: flex; flex-direction: column; min-width: 0; }
+.start-col--recent .start-section-title:first-child { margin-top: 0; }
+
+.start-action--quiet {
+  color: var(--overlay1);
+  font-size: var(--fs-small);
+
+  &:hover { color: var(--subtext1); }
+}
+
+.start-recent-group {
+  margin: 10px 0 2px;
+  padding: 0 10px;
+  color: var(--overlay1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.04em;
+}
+.start-recent-list > .start-recent-group:first-child { margin-top: 0; }
+
+.start-recent-when {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--overlay1);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
 }
 
 .start-mark {
@@ -76,7 +114,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel-sunken);
-  color: var(--overlay0);
+  color: var(--overlay1);
   font-family: var(--font-ui);
   font-size: var(--fs-micro);
 }
@@ -123,9 +161,9 @@
 .start-recent-name { color: var(--accent); flex-shrink: 0; }
 
 .start-recent-hint {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
-  color: var(--overlay0);
+  color: var(--overlay1);
   font-size: var(--fs-micro);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -142,7 +180,7 @@
   margin-right: 6px;
   padding: 0;
   border-radius: var(--radius-xs);
-  color: var(--overlay0);
+  color: var(--overlay1);
   opacity: 0;
   transition: opacity 0.12s, color 0.12s;
 
@@ -152,29 +190,12 @@
 
 .start-empty {
   padding: 5px 10px;
-  color: var(--overlay0);
+  color: var(--overlay1);
   font-size: var(--fs-small);
 }
 
 .start-folder { display: flex; flex-direction: column; }
 .start-folder.hidden { display: none; }
-
-.start-hint {
-  align-self: flex-start;
-  background: transparent;
-  border: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 22px;
-  padding: 4px 10px 4px 0;
-  color: var(--overlay0);
-  font-family: var(--font-ui);
-  font-size: var(--fs-small);
-  cursor: pointer;
-
-  &:hover { color: var(--subtext1); }
-}
 
 :root[data-empty] {
   .mode-toggle,

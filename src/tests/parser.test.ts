@@ -211,7 +211,7 @@ describe('builtins stay in sync', () => {
   });
 
   test('every builtin is offered as a completion', () => {
-    const labels = new Set(buildCompletions({ Keyword: 1, Snippet: 2, Function: 3 }).map(c => c.label));
+    const labels = new Set(buildCompletions({ Keyword: 1, Snippet: 2, Function: 3, Class: 4 }).map(c => c.label));
     for (const name of BUILTIN_FNS) assert.ok(labels.has(name), `${name} is missing from completions`);
   });
 });

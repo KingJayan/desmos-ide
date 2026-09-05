@@ -63,7 +63,7 @@
   font-size: var(--fs-large);
   caret-color: var(--accent);
 }
-.cmd-input::placeholder { color: var(--overlay0); }
+.cmd-input::placeholder { color: var(--overlay1); }
 
 .cmd-list {
   list-style: none;
@@ -113,7 +113,7 @@
 }
 
 .cmd-item-kb {
-  font-size: var(--fs-micro);
+  font-size: var(--fs-small);
   font-family: var(--font-mono);
   color: var(--overlay1);
   background: var(--panel-sunken);
@@ -128,6 +128,6 @@
 .cmd-empty {
   padding: 24px 16px;
   text-align: center;
-  color: var(--overlay0);
+  color: var(--overlay1);
   font-size: var(--fs-small);
 }

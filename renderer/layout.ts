@@ -2,6 +2,7 @@ import type { DividerName } from './modules/layout-store';
 
 export interface Panes {
   editorIsland: HTMLElement;
+  graphIsland: HTMLElement;
   workspace: HTMLElement;
   centerCol: HTMLElement;
   dslPane: HTMLElement;
@@ -83,10 +84,14 @@ export class Layout {
         read: () => panes.editorIsland.getBoundingClientRect().width,
         write: px => {
           const rect = panes.editorIsland.getBoundingClientRect();
-          const room = panes.workspace.getBoundingClientRect().right - rect.left;
-          panes.editorIsland.style.width = `${clamp(px, LIMITS.editorMin, Math.max(LIMITS.editorMin, room - LIMITS.graphMin))}px`;
+          const room = panes.graphIsland.getBoundingClientRect().right - rect.left;
+          const gap = handles.editor.getBoundingClientRect().width;
+          const width = clamp(px, LIMITS.editorMin, Math.max(LIMITS.editorMin, room - gap - LIMITS.graphMin));
+          panes.editorIsland.style.width = `${width}px`;
+          // both panes are pinned, so neither can be shrunk back out of the width just asked for
+          panes.graphIsland.style.width = `${Math.max(LIMITS.graphMin, room - gap - width)}px`;
         },
-        clear: () => { panes.editorIsland.style.width = ''; },
+        clear: () => { panes.editorIsland.style.width = ''; panes.graphIsland.style.width = ''; },
         fromPointer: e => e.clientX - panes.editorIsland.getBoundingClientRect().left,
       },
       {

@@ -77,15 +77,17 @@
   padding: 5px 14px;
 }
 .welcome-btn--primary { --btn-accent: var(--mauve); border-color: var(--mauve); color: var(--text); }
-.welcome-btn--quiet { border-color: transparent; color: var(--overlay0); }
+.welcome-btn--quiet { border-color: transparent; color: var(--overlay1); }
 
 .tour-ring {
   position: fixed;
   z-index: 9998;
   pointer-events: none;
-  border: 1px solid var(--mauve);
-  border-radius: var(--radius);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mauve) 18%, transparent);
+  border: 2px solid var(--mauve);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--mauve) 45%, transparent),
+    0 0 0 9999px color-mix(in srgb, var(--crust) 72%, transparent);
   transition: left 0.16s, top 0.16s, width 0.16s, height 0.16s;
 }
 .tour-ring.hidden { display: none; }
@@ -134,7 +136,7 @@
   padding: 3px 12px;
 }
 .tour-btn--primary { --btn-accent: var(--mauve); border-color: var(--mauve); color: var(--text); }
-.tour-btn--quiet { border-color: transparent; color: var(--overlay0); }
+.tour-btn--quiet { border-color: transparent; color: var(--overlay1); }
 
 @media (prefers-reduced-motion: reduce) {
   .welcome-modal { animation: none; }

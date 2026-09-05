@@ -19,7 +19,10 @@ export type SearchResult =
   | { ok: false; errorCode: string; message: string };
 
 export type GitStatusResult =
-  | { ok: true; branch: string; modifiedCount: number; modifiedFiles: string[] }
+  | {
+      ok: true; branch: string; modifiedCount: number; modifiedFiles: string[];
+      staged: string[]; unstaged: string[];
+    }
   | { ok: false; errorCode: string; message: string };
 
 export type GitBranchInfo = {
@@ -112,6 +115,9 @@ export type DesmosIdeRPC = {
       gitRemotes: { params: void; response: GitRemotesResult };
       gitCheckoutBranch: { params: { name: string }; response: GitActionResult };
       gitCreateBranch: { params: { name: string }; response: GitActionResult };
+      gitStage: { params: { paths: string[] }; response: GitActionResult };
+      gitUnstage: { params: { paths: string[] }; response: GitActionResult };
+      gitCommit: { params: { message: string }; response: GitActionResult };
       gitRemoteAdd: { params: { name: string; url: string }; response: GitActionResult };
       gitRemoteRemove: { params: { name: string }; response: GitActionResult };
       gitFetch: { params: { remote?: string }; response: GitActionResult };

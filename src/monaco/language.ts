@@ -115,8 +115,9 @@ export function buildCompletions(kinds: {
   Keyword: number;
   Snippet: number;
   Function: number;
+  Class: number;
 }): CompletionItem[] {
-  const { Keyword, Snippet, Function } = kinds;
+  const { Keyword, Snippet, Function, Class } = kinds;
 
   return [
 
@@ -232,11 +233,11 @@ export function buildCompletions(kinds: {
 
     ...CONSTRUCTORS.map(fn => ({
       label: fn.name,
-      kind: Function,
+      kind: Class,
       insertText: `${fn.name}${fn.snippet ?? '(${1:x})'}`,
       insertTextRules: 4,
       detail: fn.signature,
-      ...(fn.doc ? { documentation: fn.doc } : {}),
+      documentation: fn.doc ? `${fn.signature}\n\n${fn.doc}` : fn.signature,
     })),
 
     ...BUILTINS.map(fn => ({
@@ -245,7 +246,7 @@ export function buildCompletions(kinds: {
       insertText: `${fn.name}${fn.snippet ?? '(${1:x})'}`,
       insertTextRules: 4,
       detail: fn.signature,
-      ...(fn.doc ? { documentation: fn.doc } : {}),
+      documentation: fn.doc ? `${fn.signature}\n\n${fn.doc}` : fn.signature,
     })),
 
     {
@@ -309,6 +310,7 @@ export function registerLanguage(monaco: {
       Keyword: number;
       Snippet: number;
       Function: number;
+      Class: number;
     };
     CompletionItemInsertTextRule: {
       InsertAsSnippet: number;
@@ -331,7 +333,7 @@ export function registerLanguage(monaco: {
   monaco.languages.setLanguageConfiguration(LANGUAGE_ID, languageConfig);
   monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, monarchTokens);
 
-  const { Keyword, Snippet, Function } = monaco.languages.CompletionItemKind;
+  const { Keyword, Snippet, Function, Class: CtorKind } = monaco.languages.CompletionItemKind;
   const { InsertAsSnippet } = monaco.languages.CompletionItemInsertTextRule;
 
   monaco.languages.registerCompletionItemProvider(LANGUAGE_ID, {
@@ -344,17 +346,17 @@ export function registerLanguage(monaco: {
         endColumn:       word.endColumn,
       };
 
-      // determine context: statement-start = nothing non-whitespace before word on line
       const linePrefix = (model as unknown as { getValueInRange(r: unknown): string }).getValueInRange({
         startLineNumber: position.lineNumber, startColumn: 1,
         endLineNumber: position.lineNumber, endColumn: word.startColumn,
       });
       const atStatementStart = /^\s*$/.test(linePrefix);
 
-      const completions = buildCompletions({ Keyword, Snippet, Function });
+      const completions = buildCompletions({ Keyword, Snippet, Function, Class: CtorKind });
       const filtered = atStatementStart
-        ? completions  // show everything at statement start
-        : completions.filter(c => c.kind === Function || (c.kind === Keyword && !STATEMENT_KEYWORDS.has(c.label)));
+        ? completions
+        : completions.filter(c =>
+            c.kind === Function || c.kind === CtorKind || (c.kind === Keyword && !STATEMENT_KEYWORDS.has(c.label)));
 
       const suggestions = filtered.map(item => ({
         ...item,

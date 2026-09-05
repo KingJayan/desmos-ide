@@ -9,7 +9,7 @@ export interface TourStep {
 export interface OnboardingOptions {
   steps: TourStep[];
   onFinish: () => void;
-  openExample: () => void;
+  openExample: () => Promise<void> | void;
 }
 
 const GAP = 12;
@@ -83,12 +83,18 @@ export class Onboarding {
     const tour = document.createElement('button');
     tour.className = 'btn welcome-btn welcome-btn--primary';
     tour.textContent = 'take the tour';
-    tour.addEventListener('click', () => { this.hideWelcome(); this.start(); });
+    tour.addEventListener('click', () => {
+      this.hideWelcome();
+      void Promise.resolve(this.opts.openExample()).then(() => this.start());
+    });
 
     const example = document.createElement('button');
     example.className = 'btn welcome-btn';
     example.textContent = 'open an example';
-    example.addEventListener('click', () => { this.hideWelcome(); this.opts.openExample(); this.opts.onFinish(); });
+    example.addEventListener('click', () => {
+      this.hideWelcome();
+      void Promise.resolve(this.opts.openExample()).then(() => this.opts.onFinish());
+    });
 
     const skip = document.createElement('button');
     skip.className = 'btn welcome-btn welcome-btn--quiet';

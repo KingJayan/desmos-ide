@@ -71,7 +71,8 @@ export class PluginPage {
 
     const facts = document.createElement('div');
     facts.className = 'plugin-page-facts';
-    for (const text of [manifest.author, `v${manifest.version}`, manifest.license ?? 'no license']) {
+    const shown = [manifest.author, `v${manifest.version}`, manifest.license].filter((t): t is string => !!t);
+    for (const text of shown) {
       const fact = document.createElement('span');
       fact.className = 'plugin-page-fact';
       fact.textContent = text;

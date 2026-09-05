@@ -15,7 +15,7 @@ import { deleteSecret, getSecret, probeSecrets, secretsAvailable, setSecret } fr
 import {
   getGitBranches, getGitHistory, getGitRemotes, getGitStatus,
   gitCheckoutBranch, gitCreateBranch, gitFetch, gitPull, gitPush,
-  gitRemoteAdd, gitRemoteRemove, setGitContext,
+  gitRemoteAdd, gitRemoteRemove, gitStage, gitUnstage, gitCommit, setGitContext,
 } from './git';
 import {
   buildSystemText, compactConversation, copilotGetModels, copilotPollDeviceFlow,
@@ -69,6 +69,9 @@ const rpc = BrowserView.defineRPC<DesmosIdeRPC>({
       gitRemotes: () => getGitRemotes(),
       gitCheckoutBranch: ({ name }) => gitCheckoutBranch(name),
       gitCreateBranch: ({ name }) => gitCreateBranch(name),
+      gitStage: ({ paths }) => gitStage(paths),
+      gitUnstage: ({ paths }) => gitUnstage(paths),
+      gitCommit: ({ message }) => gitCommit(message),
       gitRemoteAdd: ({ name, url }) => gitRemoteAdd(name, url),
       gitRemoteRemove: ({ name }) => gitRemoteRemove(name),
       gitFetch: ({ remote }) => gitFetch(remote),

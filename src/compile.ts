@@ -233,7 +233,7 @@ export function compile(src: string, opts: CompileOptions = {}, out?: Handoff): 
     if (semanticErrors.length > 0) {
       return {
         success: false,
-        errors: semanticErrors.map(e => mkError(e.error, 2, e.line, e.col)),
+        errors: semanticErrors.map(e => mkError(e.error, 2, e.line, e.col, e.len)),
       };
     }
 

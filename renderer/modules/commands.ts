@@ -33,6 +33,7 @@ export interface AppCommandHooks {
   exportSettings: () => void;
   importSettings: () => void;
   tour: () => void;
+  focusPane: (pane: 'editor' | 'sidebar' | 'graph' | 'next') => void;
 }
 
 export function appCommands(hooks: AppCommandHooks): PaletteCommand[] {
@@ -89,6 +90,10 @@ export function appCommands(hooks: AppCommandHooks): PaletteCommand[] {
     },
     { id: 'editor.find', label: 'find', description: 'Open the find widget', action: () => hooks.editorAction('actions.find') },
     {
+      id: 'editor.goto-line', label: 'go to line…',
+      description: 'Jump to a line number', action: () => hooks.editorAction('editor.action.gotoLine'),
+    },
+    {
       id: 'editor.replace', label: 'find & replace', description: 'Open find & replace widget',
       action: () => hooks.editorAction('editor.action.startFindReplaceAction'),
     },
@@ -143,6 +148,28 @@ export function appCommands(hooks: AppCommandHooks): PaletteCommand[] {
     { id: 'view.start-page', label: 'show the start page', description: 'The page the app opens on', action: () => hooks.showStartPage() },
     { id: 'compile.run', label: 'recompile', description: 'Manually trigger a DSL recompile', action: () => hooks.recompile() },
     { id: 'file.search', label: 'search in recent files', description: 'Find text across the files you have opened', action: () => hooks.search() },
+    {
+      id: 'focus.editor', label: 'focus the editor',
+      description: 'Put the caret back in the DSL editor', action: () => hooks.focusPane('editor'),
+    },
+    {
+      id: 'focus.sidebar', label: 'focus the left tool window',
+      description: 'Move the keyboard to the sidebar that is open', action: () => hooks.focusPane('sidebar'),
+    },
+    {
+      id: 'focus.graph', label: 'focus the graph',
+      description: 'Move the keyboard to the Desmos graph', action: () => hooks.focusPane('graph'),
+    },
+    {
+      id: 'focus.next', label: 'focus the next pane',
+      description: 'Cycle the keyboard through the editor, the graph and the open tool windows',
+      action: () => hooks.focusPane('next'),
+    },
+    {
+      id: 'editor.tab-focus', label: 'toggle tab moves focus in the editor',
+      description: 'When on, Tab leaves the editor instead of inserting a tab',
+      action: () => hooks.editorAction('editor.action.toggleTabFocusMode'),
+    },
     { id: 'palette.toggle', label: 'show all commands', description: 'Open or close this palette', action: () => hooks.palette() },
     { id: 'preferences.open', label: 'preferences: open settings', description: 'The settings dialog', action: () => hooks.settings() },
     {

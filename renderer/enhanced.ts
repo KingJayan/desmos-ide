@@ -1,14 +1,12 @@
 import type { DesmosExpr } from '../src/compiler/codegen';
+import { nameToLatex } from '../src/compiler/codegen';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { iconEl } from './icons';
 
 const PALETTE = ['#2d70b3', '#c74440', '#388c46', '#6042a6', '#fa7e19', '#000000'];
-// typing and dragging change the list many times a second, and every change redraws
-// the graph. the wait collects them into one redraw
+
 const NOTIFY_DELAY = 120;
-// katex is the cost in a row, and a generated file can fill the pane with
-// hundreds. past this many, a row waits until it is close to the viewport
 const EAGER_ROWS = 40;
 
 function renderLatex(latex: string, container: HTMLElement): void {
@@ -144,10 +142,29 @@ export class EnhancedPane {
     this.rows.set(id, next);
   }
 
+  private dslLatex(latex: string): string {
+    let out = latex;
+    for (const [mangled, name] of this.names) out = out.split(mangled).join(`\\operatorname{${name}}`);
+    return out;
+  }
+
+  private names: [string, string][] = [];
+
+  private indexDslNames(): void {
+    const pairs: [string, string][] = [];
+    for (const expr of this.list) {
+      if (expr.id.startsWith('__anon')) continue;
+      const mangled = nameToLatex(expr.id);
+      if (mangled !== expr.id) pairs.push([mangled, expr.id]);
+    }
+    this.names = pairs.sort((a, b) => b[0].length - a[0].length);
+  }
+
   private render(): void {
+    this.indexDslNames();
     this.listEl.replaceChildren();
     this.rows.clear();
-    // every row is rebuilt, so nothing the observer still holds is on screen
+
     this.lazyMath?.disconnect();
     this.lazyMath = null;
     const frag = document.createDocumentFragment();
@@ -164,7 +181,6 @@ export class EnhancedPane {
     row.className = 'expr-row';
     row.dataset.id = expr.id;
 
-    // a real button, so the color is reachable by tab and carries its own focus ring
     const dot = document.createElement('button');
     dot.type = 'button';
     dot.className = 'expr-color-dot';
@@ -199,8 +215,9 @@ export class EnhancedPane {
     } else {
       const mathEl = document.createElement('div');
       mathEl.className = 'expr-math';
-      if (this.list.length > EAGER_ROWS) this.observeMath(mathEl, expr.latex ?? '');
-      else renderLatex(expr.latex ?? '', mathEl);
+      const shown = this.dslLatex(expr.latex ?? '');
+      if (this.list.length > EAGER_ROWS) this.observeMath(mathEl, shown);
+      else renderLatex(shown, mathEl);
       mathEl.title = expr.latex ? `LaTeX: ${expr.latex}` : 'click to edit';
       mathEl.tabIndex = 0;
       mathEl.setAttribute('role', 'button');
@@ -215,7 +232,7 @@ export class EnhancedPane {
       mathEl.addEventListener('click', edit);
       mathEl.addEventListener('keydown', e => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
-        // space would otherwise scroll the list away from the row being edited
+
         e.preventDefault();
         edit();
       });
@@ -284,7 +301,7 @@ export class EnhancedPane {
     const idx = PALETTE.indexOf(expr.color ?? PALETTE[0]);
     expr.color = PALETTE[(idx + 1) % PALETTE.length];
     this.dirty = true;
-    // only the dot changed, so the rest of the list keeps the dom it already has
+
     const dot = this.rows.get(id)?.querySelector<HTMLElement>('.expr-color-dot');
     if (dot) dot.style.background = expr.color;
     else this.render();

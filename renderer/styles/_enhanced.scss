@@ -71,7 +71,7 @@
 
 .expr-id {
   font-size: var(--fs-micro);
-  color: var(--overlay0);
+  color: var(--overlay1);
   font-family: var(--font-mono);
   min-width: 18px;
   text-align: right;
@@ -79,6 +79,7 @@
 }
 
 .expr-color-dot {
+  position: relative;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -86,6 +87,8 @@
   padding: 0;
   border: none;
   cursor: pointer;
+
+  &::after { content: ''; position: absolute; inset: -7px; }
 }
 
 .expr-input {
@@ -99,12 +102,12 @@
   min-width: 0;
   user-select: text;
 }
-.expr-input::placeholder { color: var(--overlay0); }
+.expr-input::placeholder { color: var(--overlay1); }
 
 .expr-delete {
   background: none;
   border: none;
-  color: var(--overlay0);
+  color: var(--overlay1);
   cursor: pointer;
   font-size: 1.4rem;
   line-height: 1;

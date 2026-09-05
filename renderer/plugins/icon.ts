@@ -1,3 +1,4 @@
+import { iconEl } from '../icons';
 import { iconIsImage } from '../../src/plugin/manifest';
 import type { PluginManifest } from '../../src/plugin/manifest';
 
@@ -24,7 +25,8 @@ export function pluginIcon(manifest: PluginManifest, className: string): HTMLEle
   el.className = className;
 
   if (!iconIsImage(manifest.icon)) {
-    el.textContent = manifest.icon ?? '◆';
+    if (manifest.icon) el.textContent = manifest.icon;
+    else el.appendChild(iconEl('puzzle', { size: 26 }));
     return el;
   }
 
@@ -34,10 +36,10 @@ export function pluginIcon(manifest: PluginManifest, className: string): HTMLEle
     return el;
   }
 
-  el.textContent = '◆';
+  el.appendChild(iconEl('puzzle', { size: 26 }));
   void load(manifest.id).then(uri => {
     if (!uri) return;
-    el.textContent = '';
+    el.replaceChildren();
     el.appendChild(image(uri, manifest.name));
   });
   return el;

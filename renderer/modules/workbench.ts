@@ -18,6 +18,8 @@ export interface WorkbenchOptions {
   onBottomTab: (tab: BottomTab) => void;
 }
 
+const FIT = { editor: 280, graph: 204, left: 180, ai: 260, divider: 6 };
+
 const BOTTOM_PARTS: Record<BottomTab, { body: HTMLElement; tab: HTMLButtonElement; rail: HTMLButtonElement }> = {
   problems:  { body: DOM.problemsBody,  tab: DOM.btnTabProblems,  rail: DOM.btnToolProblems },
   timeline:  { body: DOM.timelineBody,  tab: DOM.btnTabTimeline,  rail: DOM.btnToolTimeline },
@@ -30,6 +32,8 @@ export class Workbench {
   private activeTab: 'file' | 'plugin' = 'file';
   private empty = false;
   private simple = false;
+  private narrow = { left: false, ai: false };
+  private lastOpened: 'left' | 'ai' | null = null;
 
   constructor(private readonly opts: WorkbenchOptions) {}
 
@@ -99,31 +103,67 @@ export class Workbench {
   setSidebarView(next: SidebarView): void {
     if (next === 'ai') {
       this.state.aiOpen = true;
+      this.lastOpened = 'ai';
     } else {
       this.state.aiOpen = false;
       this.state.leftView = next;
+      if (next !== null) this.lastOpened = 'left';
     }
 
-    const leftOpen = this.state.leftView !== null;
+    this.narrow = { left: false, ai: false };
+    this.applySidebar();
+    this.fitToWidth();
+  }
+
+  private applySidebar(): void {
+    const leftOpen = this.state.leftView !== null && !this.narrow.left;
+    const aiOpen = this.state.aiOpen && !this.narrow.ai;
+
     DOM.toolLeft.classList.toggle('hidden', !leftOpen);
     DOM.toolLeftDivider.classList.toggle('hidden', !leftOpen);
     DOM.gitContainer.classList.toggle('hidden', this.state.leftView !== 'git');
     DOM.outlineContainer.classList.toggle('hidden', this.state.leftView !== 'outline');
     DOM.pluginsContainer.classList.toggle('hidden', this.state.leftView !== 'plugins');
 
-    DOM.aiPanel.classList.toggle('hidden', !this.state.aiOpen);
-    DOM.aiDivider.classList.toggle('hidden', !this.state.aiOpen);
-    DOM.aiContainer.classList.toggle('hidden', !this.state.aiOpen);
+    DOM.aiPanel.classList.toggle('hidden', !aiOpen);
+    DOM.aiDivider.classList.toggle('hidden', !aiOpen);
+    DOM.aiContainer.classList.toggle('hidden', !aiOpen);
 
-    DOM.btnSidebarGit.classList.toggle('active', this.state.leftView === 'git');
-    DOM.btnSidebarOutline.classList.toggle('active', this.state.leftView === 'outline');
-    DOM.btnSidebarPlugins.classList.toggle('active', this.state.leftView === 'plugins');
-    DOM.btnSidebarAi.classList.toggle('active', this.state.aiOpen);
+    const rail = (button: HTMLElement, on: boolean) => {
+      button.classList.toggle('active', on);
+      button.setAttribute('aria-pressed', String(on));
+      button.setAttribute('aria-expanded', String(on));
+    };
+    rail(DOM.btnSidebarGit, this.state.leftView === 'git');
+    rail(DOM.btnSidebarOutline, this.state.leftView === 'outline');
+    rail(DOM.btnSidebarPlugins, this.state.leftView === 'plugins');
+    rail(DOM.btnSidebarAi, this.state.aiOpen);
 
     this.persist();
-    this.opts.onLeftView(this.state.leftView);
-    this.opts.onAi(this.state.aiOpen);
+    this.opts.onLeftView(leftOpen ? this.state.leftView : null);
+    this.opts.onAi(aiOpen);
     this.opts.relayout();
+  }
+
+  fitToWidth(): void {
+    const room = DOM.workspace.getBoundingClientRect().width;
+    if (room <= 0) return;
+
+    let left = this.state.leftView !== null;
+    let ai = this.state.aiOpen;
+    const needed = () => FIT.editor + FIT.graph + FIT.divider
+      + (left ? FIT.left + FIT.divider : 0)
+      + (ai ? FIT.ai + FIT.divider : 0);
+
+    for (const drop of this.lastOpened === 'left' ? ['ai', 'left'] : ['left', 'ai']) {
+      if (needed() <= room) break;
+      if (drop === 'ai') ai = false; else left = false;
+    }
+
+    const next = { left: this.state.leftView !== null && !left, ai: this.state.aiOpen && !ai };
+    if (next.left === this.narrow.left && next.ai === this.narrow.ai) return;
+    this.narrow = next;
+    this.applySidebar();
   }
 
   toggleSidebar(view: NonNullable<SidebarView>): void {
@@ -161,7 +201,10 @@ export class Workbench {
 
   private syncRail(): void {
     for (const [name, parts] of Object.entries(BOTTOM_PARTS) as [BottomTab, typeof BOTTOM_PARTS[BottomTab]][]) {
-      parts.rail.classList.toggle('active', this.state.bottomOpen && this.state.bottomTab === name);
+      const on = this.state.bottomOpen && this.state.bottomTab === name;
+      parts.rail.classList.toggle('active', on);
+      parts.rail.setAttribute('aria-pressed', String(on));
+      parts.rail.setAttribute('aria-expanded', String(on));
     }
   }
 

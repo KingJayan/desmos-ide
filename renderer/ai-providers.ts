@@ -126,7 +126,14 @@ export interface CopilotAuthState {
   interval: number;
 }
 
-/** the keys an older version wrote into localStorage in the clear */
+export function aiProviderReady(): boolean {
+  try {
+    return localStorage.getItem('ai-ready') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function legacyKeys(): Record<string, string> {
   try {
     const raw = localStorage.getItem('ai-provider-configs');

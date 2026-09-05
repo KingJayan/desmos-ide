@@ -1,17 +1,27 @@
 import { iconEl } from '../icons';
 import { recentLabel } from '../session';
+import type { RecentFile } from '../session';
 import type { FolderEntry } from '../../src/shared/rpc-schema';
 
 export interface StartPageOptions {
   root: HTMLElement;
-  recents: () => string[];
+  recents: () => RecentFile[];
   chord: (command: string) => string | null;
   newFile: () => void;
   openFile: () => void;
   openFolder: () => void;
+  listFolder: (path: string) => void;
   openPath: (path: string) => void;
   forget: (path: string) => void;
   runCommand: (id: string) => void;
+}
+
+function ago(at: number): string {
+  const days = Math.floor((Date.now() - at) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days} days ago`;
+  return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 interface Action {
@@ -27,10 +37,15 @@ export class StartPage {
   private readonly recentTitle = document.createElement('div');
   private readonly recentEmpty = document.createElement('div');
   private readonly folderEl = document.createElement('div');
+  private readonly foldersTitle = document.createElement('div');
+  private readonly folderList = document.createElement('ul');
   private readonly actions: Action[];
   private folder: { root: string; entries: FolderEntry[]; truncated: boolean } | null = null;
 
   constructor(private readonly opts: StartPageOptions) {
+    this.foldersTitle.className = 'start-section-title';
+    this.foldersTitle.textContent = 'Recent Folders';
+    this.folderList.className = 'start-recent-list';
     this.actions = [
       { id: 'file.new', label: 'new file', icon: 'file-plus', run: opts.newFile },
       { id: 'file.open', label: 'open file…', icon: 'folder-open', run: opts.openFile },
@@ -56,20 +71,39 @@ export class StartPage {
 
     this.actionsEl.className = 'start-actions';
     this.recentTitle.className = 'start-section-title';
-    this.recentTitle.textContent = 'recent';
+    this.recentTitle.textContent = 'Recent Files';
     this.recentList.className = 'start-recent-list';
     this.recentEmpty.className = 'start-empty';
-    this.recentEmpty.textContent = 'nothing opened yet';
+    this.recentEmpty.textContent = 'Nothing opened yet. Open a file or a folder to begin.';
     this.folderEl.className = 'start-folder hidden';
 
     const hint = document.createElement('button');
     hint.type = 'button';
-    hint.className = 'start-hint';
-    hint.textContent = 'show all commands';
-    hint.appendChild(this.chordTag('palette.toggle'));
+    hint.className = 'start-action start-action--quiet';
+    hint.appendChild(iconEl('search', { size: 16 }));
+    const hintLabel = document.createElement('span');
+    hintLabel.className = 'start-action-label';
+    hintLabel.textContent = 'show all commands';
+    hint.append(hintLabel, this.chordTag('palette.toggle'));
     hint.addEventListener('click', () => this.opts.runCommand('palette.toggle'));
 
-    page.append(mark, title, lead, this.actionsEl, this.folderEl, this.recentTitle, this.recentList, this.recentEmpty, hint);
+    const head = document.createElement('div');
+    head.className = 'start-head';
+    head.append(mark, title, lead);
+
+    const left = document.createElement('div');
+    left.className = 'start-col start-col--actions';
+    left.append(this.actionsEl, hint, this.folderEl);
+
+    const right = document.createElement('div');
+    right.className = 'start-col start-col--recent';
+    right.append(this.recentTitle, this.recentList, this.recentEmpty, this.foldersTitle, this.folderList);
+
+    const cols = document.createElement('div');
+    cols.className = 'start-cols';
+    cols.append(left, right);
+
+    page.append(head, cols);
     this.opts.root.appendChild(page);
     this.opts.root.setAttribute('aria-label', 'start');
     this.render();
@@ -137,17 +171,44 @@ export class StartPage {
       }
     }
 
-    const paths = this.opts.recents();
+    const files = this.opts.recents();
+    const paths = files.map(f => f.path);
     this.recentList.replaceChildren();
     this.recentEmpty.classList.toggle('hidden', paths.length > 0);
     this.recentTitle.classList.toggle('hidden', paths.length === 0);
-    for (const path of paths) {
-      const { name, hint } = recentLabel(path, paths);
-      this.recentList.appendChild(this.fileRow(name, hint || path, () => this.opts.openPath(path), path));
+
+    let group = '';
+    for (const file of files) {
+      const folder = file.path.split(/[\\/]/).slice(0, -1).join('/');
+      if (folder !== group) {
+        group = folder;
+        const head = document.createElement('li');
+        head.className = 'start-recent-group';
+        head.textContent = folder.split(/[\\/]/).pop() || folder;
+        head.title = folder;
+        this.recentList.appendChild(head);
+      }
+      const { name, hint } = recentLabel(file.path, paths);
+      this.recentList.appendChild(
+        this.fileRow(name, hint || file.path, () => this.opts.openPath(file.path), file.path, file.openedAt),
+      );
+    }
+
+    const folders: string[] = [];
+    for (const file of files) {
+      const folder = file.path.split(/[\\/]/).slice(0, -1).join('/');
+      if (folder && !folders.includes(folder)) folders.push(folder);
+    }
+    this.folderList.replaceChildren();
+    this.foldersTitle.classList.toggle('hidden', folders.length === 0);
+    for (const folder of folders.slice(0, 6)) {
+      this.folderList.appendChild(
+        this.fileRow(folder.split(/[\\/]/).pop() || folder, folder, () => this.opts.listFolder(folder)),
+      );
     }
   }
 
-  private fileRow(name: string, hint: string, open: () => void, forget?: string): HTMLElement {
+  private fileRow(name: string, hint: string, open: () => void, forget?: string, at?: number): HTMLElement {
     const li = document.createElement('li');
     li.className = 'start-recent-row';
 
@@ -165,6 +226,12 @@ export class StartPage {
     where.textContent = hint;
 
     button.append(label, where);
+    if (at) {
+      const when = document.createElement('span');
+      when.className = 'start-recent-when';
+      when.textContent = ago(at);
+      button.appendChild(when);
+    }
     button.addEventListener('click', open);
     li.appendChild(button);
 

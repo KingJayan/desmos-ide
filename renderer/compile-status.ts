@@ -9,8 +9,8 @@ export function compileStatus(result: CompileResult): { msg: string; kind: Statu
   if (result.success) {
     const count = result.state.expressions.list.length;
     const warnings = result.warnings.length;
-    const note = warnings ? ` · ${warnings} warning(s)` : '';
-    return { msg: `✓ ${count} expression(s)${note}`, kind: warnings ? 'info' : 'success' };
+    const note = warnings ? ` · ${warnings} warning${warnings === 1 ? '' : 's'}` : '';
+    return { msg: `✓ ${count} expression${count === 1 ? '' : 's'}${note}`, kind: warnings ? 'info' : 'success' };
   }
   const first = result.errors[0];
   const msg = result.errors.length === 1

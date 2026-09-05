@@ -8,6 +8,7 @@ export interface SemanticError {
   line: number;
   col: number;
   phase: 2;
+  len?: number;
 }
 
 const DESMOS_IMPLICIT = new Set([
@@ -15,8 +16,6 @@ const DESMOS_IMPLICIT = new Set([
   'Infinity', 'inf',
 ]);
 
-/** remembers which statements came back clean, for as long as the declarations around
- * them stay the same. a statement's verdict depends on nothing else. */
 export interface AnalyzeCache {
   vars: Set<string> | null;
   fns: Map<string, number> | null;
@@ -71,8 +70,6 @@ export function analyze(program: T.Program, cache?: AnalyzeCache): SemanticError
     }
   }
 
-  // project() reads one camera and the transport drives one clock, so a second of
-  // either has no way to say which one is meant
   onlyOne(times, 'time', errors);
   onlyOne(cameras, 'camera', errors);
 
@@ -97,9 +94,6 @@ export function analyze(program: T.Program, cache?: AnalyzeCache): SemanticError
   return errors;
 }
 
-/** adds names to the shared scope set, runs f, then removes only what it added.
- * copying the set per scope was quadratic. removing only what this scope added is
- * what keeps a param shadowing a real declaration from erasing it */
 function withScope<R>(vars: Set<string>, names: readonly string[], f: () => R): R {
   const added = names.filter(n => !vars.has(n));
   for (const n of added) vars.add(n);
@@ -181,7 +175,6 @@ function checkStmt(
   }
 }
 
-/** reports every declaration of a kind past the first */
 function onlyOne(
   found: readonly T.Statement[],
   keyword: string,
@@ -194,6 +187,7 @@ function onlyOne(
       line: extra.pos.line,
       col: extra.pos.col,
       phase: 2,
+      len: keyword.length,
     });
   }
 }
@@ -218,6 +212,7 @@ function checkExpr(
           line: expr.pos.line,
           col: expr.pos.col,
           phase: 2,
+          len: expr.name.length,
         });
       }
       break;
@@ -255,6 +250,7 @@ function checkExpr(
           line: expr.pos.line,
           col: expr.pos.col,
           phase: 2,
+          len: expr.fn.length,
         });
       } else if (isUserFn) {
         const def = fns.get(expr.fn)!;
@@ -264,6 +260,7 @@ function checkExpr(
             line: expr.pos.line,
             col: expr.pos.col,
             phase: 2,
+            len: expr.fn.length,
           });
         }
       }

@@ -46,17 +46,27 @@
   flex-shrink: 0;
   min-width: 26px;
   text-align: center;
+  background: color-mix(in srgb, var(--overlay1) 15%, transparent);
+  color: var(--overlay2);
+  border: 1px solid color-mix(in srgb, var(--overlay1) 28%, transparent);
 }
-.outline-badge--let    { background: color-mix(in srgb, var(--blue)  18%, transparent); color: var(--blue);  border: 1px solid color-mix(in srgb, var(--blue)  30%, transparent); }
-.outline-badge--fn     { background: color-mix(in srgb, var(--mauve) 18%, transparent); color: var(--mauve); border: 1px solid color-mix(in srgb, var(--mauve) 30%, transparent); }
-.outline-badge--circle { background: color-mix(in srgb, var(--peach) 18%, transparent); color: var(--peach); border: 1px solid color-mix(in srgb, var(--peach) 30%, transparent); }
-.outline-badge--point  { background: color-mix(in srgb, var(--peach) 18%, transparent); color: var(--peach); border: 1px solid color-mix(in srgb, var(--peach) 30%, transparent); }
-.outline-badge--line   { background: color-mix(in srgb, var(--yellow) 18%, transparent); color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent); }
-.outline-badge--points { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent); }
+
+@each $kind, $slot in (
+  'var': 'blue', 'fn': 'mauve', 'point': 'peach', 'circle': 'peach',
+  'polygon': 'peach', 'segment': 'yellow', 'line': 'yellow', 'curve': 'green',
+  'spiral': 'green', 'wave': 'green', 'grid': 'green', 'region': 'red',
+  'text': 'subtext1', 'group': 'subtext1', 'time': 'blue', 'camera': 'blue'
+) {
+  .outline-badge--#{$kind} {
+    background: color-mix(in srgb, var(--#{$slot}) 18%, transparent);
+    color: var(--#{$slot});
+    border-color: color-mix(in srgb, var(--#{$slot}) 30%, transparent);
+  }
+}
 
 .outline-name {
   font-family: var(--font-mono);
-  font-size: 0.95rem;
+  font-size: var(--fs-small);
   color: var(--text);
   flex: 1;
   overflow: hidden;
@@ -65,8 +75,8 @@
 }
 
 .outline-line {
-  font-size: 0.85rem;
-  color: var(--overlay0);
+  font-size: var(--fs-micro);
+  color: var(--overlay1);
   font-family: var(--font-mono);
   flex-shrink: 0;
 }
@@ -86,7 +96,7 @@
 .expr-math:hover { background: color-mix(in srgb, var(--blue) 8%, transparent); }
 .expr-math .katex { font-size: 1em; color: var(--text); }
 .expr-math-placeholder {
-  color: var(--overlay0);
+  color: var(--overlay1);
   font-style: italic;
   font-size: 0.95rem;
   font-family: var(--font-ui);

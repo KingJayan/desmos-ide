@@ -180,7 +180,7 @@ check(true, 'escape closes the welcome dialog');
 
 await page.waitForSelector('#start-page:not(.hidden)', { timeout: 10_000 });
 check(
-  await page.locator('#start-page .start-action').count() === 3,
+  await page.locator('#start-page .start-action:not(.start-action--quiet)').count() === 3,
   'the start page offers new file, open file and open folder',
 );
 check(await page.locator('#center-col.hidden').count() === 1, 'no panes are shown beside it');

@@ -14,7 +14,9 @@ const IDS = [
 ];
 
 const { document, Element, Node } = parseHTML(
-  `<html><body>${IDS.map(id => `<div id="${id}"></div>`).join('')}</body></html>`,
+  `<html><body>${IDS.map(id => `<div id="${id}"></div>`).join('')}`
+  + '<textarea id="git-commit-message"></textarea>'
+  + '<button id="git-commit-btn"></button></body></html>',
 );
 
 Object.assign(globalThis, { document, Element, Node });
@@ -32,6 +34,7 @@ function stubApi(over: Partial<Api> = {}): void {
   };
   const status: GitStatusResult = {
     ok: true, branch: 'dev', modifiedCount: 2, modifiedFiles: ['a.dsmx', 'b.dsmx'],
+    staged: ['a.dsmx'], unstaged: ['b.dsmx'],
   } as GitStatusResult;
 
   (globalThis as { window?: unknown }).window = {
@@ -112,11 +115,61 @@ describe('the git panel renders what git reports', () => {
     assert.equal(document.getElementById('git-modified-list')!.children.length, 2);
   });
 
-  test('a failed call reaches the panel instead of the console', async () => {
+  test('a failed call reaches the panel as a sentence, not a stack trace', async () => {
     stubApi({ gitStatus: async () => { throw new Error('no git here'); } });
     await panel().refreshStatus();
-    assert.match(document.getElementById('git-summary-msg')!.textContent ?? '', /no git here/);
+    const msg = document.getElementById('git-summary-msg')!.textContent ?? '';
+    assert.match(msg, /try again/);
+    assert.doesNotMatch(msg, /no git here|Error/);
     assert.equal(document.getElementById('git-branch')!.textContent, 'branch: --');
+  });
+});
+
+describe('the git panel commits', () => {
+  beforeEach(() => {
+    calls = [];
+    container.classList.remove('hidden');
+    stubApi();
+    (document.getElementById('git-commit-message') as HTMLTextAreaElement).value = '';
+  });
+
+  test('a staged file is marked and its toggle unstages it', async () => {
+    let asked: string[] = [];
+    stubApi({ gitUnstage: async (paths: unknown) => { asked = paths as string[]; return { ok: true, message: '' }; } });
+    const p = panel();
+    await p.refreshStatus();
+    const rows = document.getElementById('git-modified-list')!.children;
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].querySelector('.git-change-name')!.className, 'git-change-name git-change-name--staged');
+    (rows[0].querySelector('.git-change-stage') as HTMLElement).dispatchEvent(new document.defaultView!.Event('click'));
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(asked, ['a.dsmx']);
+  });
+
+  test('commit stays out of reach until there is a message and something staged', async () => {
+    const p = panel();
+    await p.refreshStatus();
+    const button = document.getElementById('git-commit-btn') as HTMLButtonElement;
+    assert.equal(button.disabled, true);
+
+    const box = document.getElementById('git-commit-message') as HTMLTextAreaElement;
+    box.value = 'fix the rose';
+    box.dispatchEvent(new document.defaultView!.Event('input'));
+    assert.equal(button.disabled, false);
+  });
+
+  test('nothing staged means the button stays off however long the message', async () => {
+    stubApi({
+      gitStatus: async () => ({
+        ok: true, branch: 'dev', modifiedCount: 1, modifiedFiles: ['a.dsmx'], staged: [], unstaged: ['a.dsmx'],
+      }),
+    });
+    const p = panel();
+    await p.refreshStatus();
+    const box = document.getElementById('git-commit-message') as HTMLTextAreaElement;
+    box.value = 'a message';
+    box.dispatchEvent(new document.defaultView!.Event('input'));
+    assert.equal((document.getElementById('git-commit-btn') as HTMLButtonElement).disabled, true);
   });
 });
 

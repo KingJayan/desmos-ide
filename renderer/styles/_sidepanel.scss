@@ -33,5 +33,8 @@
 
 .sidepanel-title {
   @include eyebrow;
-  color: var(--overlay1);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: var(--fs-small);
+  color: var(--subtext1);
 }

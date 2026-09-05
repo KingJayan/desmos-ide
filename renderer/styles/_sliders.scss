@@ -3,7 +3,10 @@
   align-items: center;
   gap: 8px;
   margin-left: 12px;
-  padding: 3px 8px;
+  padding: 0 8px;
+  line-height: 1.5;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   background: color-mix(in srgb, var(--mantle) 90%, var(--mauve) 10%);
   border: 1px solid color-mix(in srgb, var(--surface1) 80%, var(--mauve) 20%);
   border-radius: var(--radius);
@@ -20,7 +23,7 @@
 .inline-slider-bound {
   font-family: var(--font-mono);
   font-size: var(--fs-micro);
-  color: var(--overlay0);
+  color: var(--overlay1);
   min-width: 3ch;
   text-align: center;
   letter-spacing: -0.03em;
@@ -30,10 +33,12 @@
 .inline-slider-track {
   -webkit-appearance: none;
   appearance: none;
+
   // the thumb hangs half its width past each end of the track, so the track is
   // inset to keep it off the min and max labels
   margin: 0 6px;
-  width: 90px;
+  width: 80px;
+  min-width: 0;
   height: 3px;
   border-radius: 2px;
   outline: none;
@@ -96,7 +101,9 @@
   appearance: none;
   margin: 0 6px 0 0;
   width: 80px;
-  height: 3px;
+  height: 23px;
+  padding: 10px 0;
+  background-clip: content-box;
   border-radius: 2px;
   outline: none;
   cursor: pointer;

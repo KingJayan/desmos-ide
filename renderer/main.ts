@@ -24,7 +24,7 @@ import { DesmosGraph } from './desmos';
 import { Layout } from './layout';
 import type { EnhancedPane } from './enhanced';
 import { Transport } from './transport';
-import { SettingsPanel, loadSettings, settingsFromJson, settingsToJson } from './settings';
+import { SettingsPanel, loadSettings, resolveEditorTheme, settingsFromJson, settingsToJson } from './settings';
 import type { EditorSettings, UiScale } from './settings';
 import type { AISidebar } from './ai-sidebar';
 import type { ConfigEditor } from './config-editor';
@@ -36,7 +36,7 @@ import { CommandPalette } from './command-palette';
 import type { PaletteCommand } from './command-palette';
 import { InlineSliderManager } from './inline-sliders';
 import { SearchPanel } from './search-panel';
-import { GraphLink } from './graph-link';
+import { GraphLink, lineForId } from './graph-link';
 import { GitPanel } from './git-panel';
 import { OptimizerPanel, groupByLine, lineHint } from './optimizer-panel';
 import { typingElsewhere } from './keys';
@@ -58,6 +58,7 @@ import { PluginPage } from './plugins/page';
 import type { PluginActions } from './plugins/actions';
 import type { RegistryEntry } from '../src/plugin/manifest';
 import { DOM } from './modules/dom';
+import { installTooltips } from './modules/tooltip';
 import { Workbench } from './modules/workbench';
 import type { BottomTab } from './modules/workbench';
 import { Outline, ProblemsPanel, Timeline } from './modules/panels';
@@ -66,6 +67,7 @@ import { StartPage } from './modules/start-page';
 import { appCommands as buildAppCommands } from './modules/commands';
 import { registerLanguageFeatures } from './modules/language-features';
 import { Writeback } from './modules/writeback';
+import { aiProviderReady } from './ai-providers';
 
 registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 registerColorProvider();
@@ -98,6 +100,7 @@ function editorOptions(s: EditorSettings): monaco.editor.IEditorOptions & monaco
     lineNumbers: s.lineNumbers,
     minimap: { enabled: s.minimap },
     wordWrap: s.wordWrap,
+    wrappingIndent: 'indent',
     tabSize: s.tabSize,
     insertSpaces: s.insertSpaces,
     cursorStyle: s.cursorStyle,
@@ -115,7 +118,7 @@ function editorOptions(s: EditorSettings): monaco.editor.IEditorOptions & monaco
 const editor = monaco.editor.create(DOM.editorContainer, {
   value: '',
   language: LANGUAGE_ID,
-  theme: initSettings.editorTheme,
+  theme: resolveEditorTheme(initSettings),
   scrollBeyondLastLine: false,
   automaticLayout: true,
   padding: { top: 12, bottom: 12 },
@@ -126,6 +129,8 @@ const editor = monaco.editor.create(DOM.editorContainer, {
   roundedSelection: false,
   scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10, useShadows: false },
   glyphMargin: false,
+  lineNumbersMinChars: 3,
+  lineDecorationsWidth: 8,
   ...editorOptions(initSettings),
 });
 
@@ -141,7 +146,6 @@ const transport = new Transport(DOM.transport, {
 const toasts = new Toasts();
 
 function markGraphStale(stale: boolean): void {
-  DOM.graphIsland.classList.toggle('is-stale', stale);
   DOM.graphStale.classList.toggle('hidden', !stale);
 }
 
@@ -163,11 +167,72 @@ const graphLink = new GraphLink({
   selectOnGraph: id => graph.select(id),
 });
 
-graph.onSelectionChange(id => graphLink.onGraphSelected(id));
+let graphSelected: string | null = null;
+graph.onSelectionChange(id => { graphSelected = id; graphLink.onGraphSelected(id); });
+
+DOM.graphContainer.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const menu = document.createElement('div');
+  menu.className = 'tb-menu';
+  menu.setAttribute('role', 'menu');
+
+  const add = (label: string, run: () => void, enabled = true) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'tb-menu-item';
+    item.setAttribute('role', 'menuitem');
+    item.disabled = !enabled;
+    const name = document.createElement('span');
+    name.className = 'tb-menu-name';
+    name.textContent = label;
+    item.appendChild(name);
+    item.addEventListener('click', () => { menu.remove(); run(); });
+    menu.appendChild(item);
+  };
+
+  const at = graphSelected ? lineForId(sourceMap, graphSelected) : null;
+  add('Copy graph as PNG', () => void copyGraphPng());
+  add('Export PNG…', () => void cmdExportImage('png'));
+  add('Reset viewport', () => { graph.resetViewport(); setStatus('Viewport reset', 'info'); });
+  add(
+    at ? `Go to source line ${at.line}` : 'Go to source line',
+    () => {
+      if (!at) return;
+      editor.setPosition({ lineNumber: at.line, column: at.col });
+      editor.revealLineInCenter(at.line);
+      editor.focus();
+    },
+    at !== null,
+  );
+
+  document.body.appendChild(menu);
+  menu.style.top = `${Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 8)}px`;
+  menu.style.left = `${Math.min(e.clientX, window.innerWidth - menu.offsetWidth - 8)}px`;
+  menu.querySelector('button')?.focus();
+  setTimeout(() => {
+    document.addEventListener('pointerdown', function away(ev) {
+      if (menu.contains(ev.target as Node)) return;
+      document.removeEventListener('pointerdown', away);
+      menu.remove();
+    });
+  }, 0);
+  menu.addEventListener('keydown', ev => { if (ev.key === 'Escape') menu.remove(); });
+});
+
+async function copyGraphPng(): Promise<void> {
+  const uri = graph.screenshot();
+  if (!uri) { reportFailure('The graph could not be captured.'); return; }
+  try {
+    const blob = await (await fetch(uri)).blob();
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    setStatus('Graph copied as PNG', 'success');
+  } catch {
+    reportFailure('The clipboard refused the image.');
+  }
+}
 
 const graphOnly = new GraphOnly();
 
-// an expression with no DSL form is not in the saved file, so it is counted where the user can see it
 function noteGraphOnly(refused: string[], seen: (string | undefined)[] = []): void {
   graphOnly.record(refused, seen);
   DOM.statusGraphOnly.textContent = graphOnly.label();
@@ -310,9 +375,9 @@ const optimizerPanel = new OptimizerPanel({
   jump: line => jumpTo(line, 1),
 });
 
-function renderOptimizations(notes: OptimizeNote[]): void {
-  if (unchanged('optimizer', notes.map(n => `${n.kind} ${n.line}:${n.col} ${n.before}>${n.after}`).join('\n'))) return;
-  optimizerPanel.render(notes);
+function renderOptimizations(notes: OptimizeNote[], compiled = true): void {
+  if (unchanged('optimizer', `${compiled}\n${notes.map(n => `${n.kind} ${n.line}:${n.col} ${n.before}>${n.after}`).join('\n')}`)) return;
+  optimizerPanel.render(notes, compiled);
   optimizerHints.set(settings.optimizerHints
     ? groupByLine(notes)
       .filter(g => g.line <= model.getLineCount())
@@ -360,7 +425,7 @@ function handleCompileResult(result: CompileResult): void {
     setMarkers('desmos-dsl-syntax', syntax);
     setMarkers('desmos-dsl-semantic', semantic);
 
-    renderOptimizations([]);
+    renderOptimizations([], false);
     updateSliders();
     markGraphStale(true);
   }
@@ -696,6 +761,7 @@ const layout = new Layout(
   },
   {
     editorIsland: DOM.editorIsland,
+    graphIsland: DOM.graphIsland,
     workspace: DOM.workspace,
     centerCol: DOM.centerCol,
     dslPane: DOM.dslPane,
@@ -896,6 +962,10 @@ async function cmdOpen(): Promise<void> {
 async function cmdOpenFolder(): Promise<void> {
   const root = await window.electronAPI?.pickFolder();
   if (!root) return;
+  await showFolder(root);
+}
+
+async function showFolder(root: string): Promise<void> {
   const listed = await window.electronAPI?.listFolder(root);
   if (!listed) { reportFailure('Opening a folder needs the desktop app.'); return; }
   if (!listed.ok) { reportFailure(listed.message); return; }
@@ -1093,6 +1163,11 @@ function inOwnDialog(target: EventTarget | null): boolean {
   return !!el?.closest('.config-overlay, .settings-overlay, .welcome-overlay');
 }
 
+DOM.statusbar.addEventListener('click', e => {
+  const host = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-command]') : null;
+  if (host) void commandIndex.get(host.dataset['command'] ?? '')?.action();
+});
+
 window.addEventListener('keydown', e => {
   if (inOwnDialog(e.target)) return;
   const chord = chordOf(e);
@@ -1179,7 +1254,7 @@ const codeLensEmitter = new monaco.Emitter<monaco.languages.CodeLensProvider>();
 monaco.languages.registerCodeLensProvider(LANGUAGE_ID, {
   onDidChange: codeLensEmitter.event,
   provideCodeLenses(model) {
-    if (!settings.codeLens) return { lenses: [], dispose: () => {} };
+    if (!settings.codeLens || !aiProviderReady()) return { lenses: [], dispose: () => {} };
     const markers = (['desmos-dsl-syntax', 'desmos-dsl-semantic'] as const)
       .flatMap(o => monaco.editor.getModelMarkers({ owner: o }));
     const seen = new Set<number>();
@@ -1243,7 +1318,71 @@ function renderBreadcrumbs(path: string | null): void {
 }
 
 DOM.searchWidget.addEventListener('click', () => palette.toggle());
-DOM.projectWidget.addEventListener('click', () => palette.show('open'));
+DOM.projectWidget.addEventListener('click', () => toggleRecentsMenu());
+
+let recentsMenu: HTMLElement | null = null;
+
+function closeRecentsMenu(): void {
+  recentsMenu?.remove();
+  recentsMenu = null;
+  DOM.projectWidget.setAttribute('aria-expanded', 'false');
+}
+
+function toggleRecentsMenu(): void {
+  if (recentsMenu) { closeRecentsMenu(); return; }
+
+  const menu = document.createElement('div');
+  menu.className = 'tb-menu';
+  menu.setAttribute('role', 'menu');
+
+  const add = (label: string, hint: string, run: () => void) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'tb-menu-item';
+    item.setAttribute('role', 'menuitem');
+    const name = document.createElement('span');
+    name.className = 'tb-menu-name';
+    name.textContent = label;
+    const where = document.createElement('span');
+    where.className = 'tb-menu-hint';
+    where.textContent = hint;
+    item.append(name, where);
+    item.addEventListener('click', () => { closeRecentsMenu(); run(); });
+    menu.appendChild(item);
+  };
+
+  const files = workspaceState.recents;
+  const paths = files.map(f => f.path);
+  if (files.length === 0) add('No recent files', '', () => {});
+  for (const file of files.slice(0, 10)) {
+    const { name, hint } = recentLabel(file.path, paths);
+    add(name, hint, () => void openPath(file.path));
+  }
+
+  const rule = document.createElement('div');
+  rule.className = 'tb-menu-rule';
+  menu.appendChild(rule);
+  add('New file', keymap.labelFor('file.new') ?? '', () => void cmdNew());
+  add('Open file…', keymap.labelFor('file.open') ?? '', () => void cmdOpen());
+  add('Open folder…', '', () => void cmdOpenFolder());
+
+  document.body.appendChild(menu);
+  const box = DOM.projectWidget.getBoundingClientRect();
+  menu.style.top = `${box.bottom + 4}px`;
+  menu.style.left = `${box.left}px`;
+  recentsMenu = menu;
+  DOM.projectWidget.setAttribute('aria-expanded', 'true');
+  menu.querySelector('button')?.focus();
+
+  setTimeout(() => {
+    document.addEventListener('pointerdown', function away(e) {
+      if (menu.contains(e.target as Node)) return;
+      document.removeEventListener('pointerdown', away);
+      closeRecentsMenu();
+    });
+  }, 0);
+  menu.addEventListener('keydown', e => { if (e.key === 'Escape') { closeRecentsMenu(); DOM.projectWidget.focus(); } });
+}
 DOM.branchWidget.addEventListener('click', () => workbench.setSidebarView('git'));
 DOM.tabClose.addEventListener('click', () => void cmdClose());
 
@@ -1255,7 +1394,7 @@ function applySettings(s: EditorSettings): void {
   refreshSavedState();
   gitPanel.applyAutofetch(s);
   applyChrome(s);
-  monaco.editor.setTheme(s.editorTheme);
+  monaco.editor.setTheme(resolveEditorTheme(s));
   editor.updateOptions(editorOptions(s));
   workbench.setSimple(s.simpleMode);
   sliderVersion = -1;
@@ -1296,11 +1435,12 @@ const commandIndex = new Map<string, PaletteCommand>();
 
 const startPage = new StartPage({
   root: DOM.startPage,
-  recents: () => workspaceState.recents.map(f => f.path),
+  recents: () => workspaceState.recents,
   chord: id => keymap.labelFor(id),
   newFile: () => void cmdNew(),
   openFile: () => void cmdOpen(),
   openFolder: () => void cmdOpenFolder(),
+  listFolder: path => void showFolder(path),
   openPath: path => void openPath(path),
   forget: path => forgetRecent(path),
   runCommand: id => void commandIndex.get(id)?.action(),
@@ -1350,6 +1490,7 @@ const baseCommands: PaletteCommand[] = buildAppCommands({
   exportSettings: () => cmdExportSettings(),
   importSettings: () => cmdImportSettings(),
   tour: () => onboarding.start(),
+  focusPane: pane => focusPane(pane),
 });
 
 let configEditor: ConfigEditor | null = null;
@@ -1364,7 +1505,7 @@ async function ensureConfigEditor(): Promise<ConfigEditor> {
       if (ok) applyConfig(file, content);
       return ok;
     },
-    theme: () => settingsNow().editorTheme,
+    theme: () => resolveEditorTheme(settingsNow()),
     fontSize: () => settingsNow().fontSize,
     fontFamily: () => settingsNow().codeFontFamily,
   });
@@ -1527,17 +1668,57 @@ function refreshPaletteCommands(): void {
   startPage.render();
 }
 
+const PANE_ORDER = ['editor', 'graph', 'sidebar'] as const;
+type Pane = (typeof PANE_ORDER)[number];
+
+function paneRoot(pane: Pane): HTMLElement | null {
+  if (pane === 'editor') return DOM.editorContainer;
+  if (pane === 'graph') return DOM.graphContainer;
+  const left = workbench.leftView ? DOM.toolLeft : null;
+  return left ?? (workbench.aiOpen ? DOM.aiPanel : null);
+}
+
+function paneHolding(node: Element | null): Pane | null {
+  for (const pane of PANE_ORDER) {
+    const root = paneRoot(pane);
+    if (root && node && root.contains(node)) return pane;
+  }
+  return null;
+}
+
+function focusPane(pane: 'editor' | 'sidebar' | 'graph' | 'next'): void {
+  if (pane === 'next') {
+    const here = paneHolding(document.activeElement);
+    const from = here ? PANE_ORDER.indexOf(here) : -1;
+    for (let step = 1; step <= PANE_ORDER.length; step++) {
+      const next = PANE_ORDER[(from + step + PANE_ORDER.length) % PANE_ORDER.length]!;
+      if (paneRoot(next)) { focusPane(next); return; }
+    }
+    return;
+  }
+  if (pane === 'editor') { editor.focus(); return; }
+  const root = paneRoot(pane);
+  if (!root) return;
+  const first = Array.from(root.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )).find(el => el.offsetParent !== null);
+  if (first) { first.focus(); return; }
+  root.tabIndex = -1;
+  root.focus();
+}
+
 function syncTooltips(): void {
   for (const el of document.querySelectorAll<HTMLElement>('[data-chord]')) {
-    const id = el.dataset['chord'] ?? '';
     el.dataset['tip'] ??= el.title;
-    const label = keymap.labelFor(id);
-    el.title = label ? `${el.dataset['tip']}  ${label}` : el.dataset['tip'];
+    el.removeAttribute('title');
   }
 }
 
 applySettings(initSettings);
+installTooltips(id => keymap.labelFor(id));
 workbench.restore();
+window.addEventListener('resize', () => workbench.fitToWidth());
+workbench.fitToWidth();
 refreshPaletteCommands();
 syncRecent();
 

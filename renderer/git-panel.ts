@@ -22,8 +22,8 @@ export interface GitAutofetchSettings {
 
 const el = (id: string): HTMLElement => document.getElementById(id)!;
 
-// every refresh spawns a git process, so repeated focus changes must not spawn one each
 const MIN_GAP_MS = 3000;
+const CALL_TIMEOUT_MS = 15000;
 
 export class GitPanel {
   private branchPill = el('git-branch') as HTMLSpanElement;
@@ -51,6 +51,9 @@ export class GitPanel {
   private modifiedEmpty = el('git-modified-empty');
   private modifiedList = el('git-modified-list');
 
+  private commitMessage = el('git-commit-message') as HTMLTextAreaElement;
+  private commitBtn = el('git-commit-btn') as HTMLButtonElement;
+
   private container = el('git-sidebar-container');
 
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -66,6 +69,12 @@ export class GitPanel {
   constructor(private opts: GitPanelOptions) {
     this.wireSectionToggles();
     this.refreshStatusBtn.addEventListener('click', () => { void this.refreshAll(); });
+
+    this.commitMessage.addEventListener('input', () => this.syncCommitBtn());
+    this.commitMessage.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void this.commit(); }
+    });
+    this.commitBtn.addEventListener('click', () => { void this.commit(); });
 
     this.branchRefreshBtn.addEventListener('click', e => {
       e.stopPropagation();
@@ -131,11 +140,19 @@ export class GitPanel {
     call: () => Promise<T | undefined> | undefined,
     render: (result: T | GitFail) => void,
   ): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await call();
+      const pending = call();
+      const result = pending && await Promise.race([
+        pending,
+        new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), CALL_TIMEOUT_MS); }),
+      ]);
       if (result) render(result);
-    } catch (err) {
-      render({ ok: false, errorCode: 'UNKNOWN', message: String(err) });
+      else render({ ok: false, errorCode: 'UNAVAILABLE', message: 'Git did not answer. Use refresh to try again.' });
+    } catch {
+      render({ ok: false, errorCode: 'UNKNOWN', message: 'Could not read the repository. Use refresh to try again.' });
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
@@ -222,6 +239,7 @@ export class GitPanel {
   private renderStatus(status: GitStatusResult): void {
     this.lastStatus = status;
     this.renderModified(status);
+    this.syncCommitBtn();
 
     this.opts.onBranch?.(status.ok ? status.branch : null);
 
@@ -261,12 +279,51 @@ export class GitPanel {
     }
 
     this.modifiedEmpty.classList.remove('git-modified-empty--show');
+    const staged = new Set(status.staged);
     for (const file of status.modifiedFiles) {
+      const on = staged.has(file);
       const li = document.createElement('li');
-      li.textContent = file;
-      li.title = file;
+      li.className = 'git-change-row';
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'git-change-stage';
+      toggle.title = on ? `Unstage ${file}` : `Stage ${file}`;
+      toggle.setAttribute('aria-label', toggle.title);
+      toggle.setAttribute('aria-pressed', String(on));
+      toggle.textContent = on ? '−' : '+';
+      toggle.addEventListener('click', () => void this.setStaged(file, !on));
+
+      const name = document.createElement('span');
+      name.className = on ? 'git-change-name git-change-name--staged' : 'git-change-name';
+      name.textContent = file;
+      name.title = file;
+
+      li.append(toggle, name);
       this.modifiedList.appendChild(li);
     }
+  }
+
+  private syncCommitBtn(): void {
+    const staged = this.lastStatus.ok ? this.lastStatus.staged.length : 0;
+    this.commitBtn.disabled = !this.commitMessage.value.trim() || staged === 0;
+    this.commitBtn.title = staged === 0 ? 'Stage a file first' : `Commit ${staged} staged file(s)`;
+  }
+
+  private async setStaged(file: string, on: boolean): Promise<void> {
+    const api = window.electronAPI;
+    this.report(await (on ? api?.gitStage([file]) : api?.gitUnstage([file])));
+    await this.refreshStatus();
+  }
+
+  private async commit(): Promise<void> {
+    const message = this.commitMessage.value.trim();
+    if (!message) return;
+    this.commitBtn.disabled = true;
+    const result = await window.electronAPI?.gitCommit(message);
+    this.report(result);
+    if (result?.ok) this.commitMessage.value = '';
+    await Promise.all([this.refreshStatus(), this.refreshHistory()]);
   }
 
   private renderBranches(result: GitBranchesResult): void {

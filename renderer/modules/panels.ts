@@ -1,3 +1,4 @@
+import { iconEl } from '../icons';
 import { DOM } from './dom';
 import type { SymbolInfo } from '../../src/index';
 
@@ -61,11 +62,38 @@ export class Outline {
 }
 
 export class ProblemsPanel {
-  constructor(private readonly jump: (line: number, col: number) => void) {}
+  private problems: Problem[] = [];
+  private show = { error: true, warning: true };
+  private readonly filters = new Map<'error' | 'warning', HTMLButtonElement>();
+
+  constructor(private readonly jump: (line: number, col: number) => void) {
+    const bar = document.createElement('div');
+    bar.className = 'problem-filters';
+    for (const severity of ['error', 'warning'] as const) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `problem-filter problem-filter--${severity}`;
+      button.setAttribute('aria-pressed', 'true');
+      button.append(
+        iconEl(severity === 'error' ? 'circle-x' : 'triangle-alert', { size: 12 }),
+        document.createTextNode(severity === 'error' ? 'errors' : 'warnings'),
+      );
+      const count = document.createElement('span');
+      count.className = 'problem-filter-count';
+      button.appendChild(count);
+      button.addEventListener('click', () => {
+        this.show[severity] = !this.show[severity];
+        this.render(this.problems);
+      });
+      this.filters.set(severity, button);
+      bar.appendChild(button);
+    }
+    DOM.problemsBody.prepend(bar);
+  }
 
   render(problems: Problem[]): void {
+    this.problems = problems;
     DOM.problemsList.replaceChildren();
-    DOM.problemsEmpty.classList.toggle('hidden', problems.length > 0);
 
     const errors = problems.filter(p => p.severity === 'error').length;
     const badgeText = String(problems.length);
@@ -75,13 +103,28 @@ export class ProblemsPanel {
     DOM.problemsCount.classList.toggle('hidden', problems.length === 0);
     DOM.problemsBadge.style.background = errors ? 'var(--red)' : 'var(--yellow)';
 
-    for (const p of problems) {
+    for (const [severity, button] of this.filters) {
+      const total = severity === 'error' ? errors : problems.length - errors;
+      button.querySelector('.problem-filter-count')!.textContent = String(total);
+      button.setAttribute('aria-pressed', String(this.show[severity]));
+      button.classList.toggle('problem-filter--off', !this.show[severity]);
+      button.disabled = total === 0;
+    }
+
+    const shown = problems.filter(p => this.show[p.severity === 'error' ? 'error' : 'warning']);
+    DOM.problemsEmpty.textContent = problems.length === 0
+      ? 'no problems, the file compiles'
+      : 'every problem is filtered out';
+    DOM.problemsEmpty.classList.toggle('hidden', shown.length > 0);
+
+    for (const p of shown) {
       const li = document.createElement('li');
       li.className = 'problem-row';
 
       const sev = document.createElement('span');
       sev.className = `problem-sev problem-sev--${p.severity}`;
-      sev.textContent = p.severity === 'error' ? 'error' : 'warn';
+      sev.appendChild(iconEl(p.severity === 'error' ? 'circle-x' : 'triangle-alert', { size: 13 }));
+      sev.setAttribute('aria-label', p.severity);
 
       const msg = document.createElement('span');
       msg.className = 'problem-msg';

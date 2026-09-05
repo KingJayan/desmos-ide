@@ -14,7 +14,7 @@
     <header id="titlebar">
       <div class="tb-group tb-group--left">
         <span class="tb-traffic"></span>
-        <button id="project-widget" class="tb-widget" type="button" title="recent files">
+        <button id="project-widget" class="tb-widget" type="button" title="Recent files and folders" aria-haspopup="menu" aria-expanded="false">
           <i data-lucide="box" aria-hidden="true"></i>
           <span class="tb-widget-label">desmos-ide</span>
           <i class="tb-widget-caret" data-lucide="chevron-down" aria-hidden="true"></i>
@@ -26,11 +26,11 @@
       </div>
 
       <div class="tb-group tb-group--center">
-        <button id="search-widget" class="tb-search" type="button" title="run a command" data-chord="palette.toggle">
-          <i data-lucide="search" aria-hidden="true"></i>
+        <div id="doc-chip" class="tb-doc">
+          <i data-lucide="file-code" aria-hidden="true"></i>
           <span id="filename">untitled.dsmx</span>
           <span id="saved-dot" class="hidden" aria-hidden="true"></span>
-        </button>
+        </div>
       </div>
 
       <div class="tb-group tb-group--right">
@@ -40,6 +40,7 @@
           <button id="btn-enhanced" class="mode-btn" title="Edit the expressions the way Desmos does. Edits are written back into the DSL file when they have a DSL form.">enhanced</button>
         </div>
         <div class="tb-actions">
+          <button id="search-widget" class="tb-icon" type="button" title="Search commands" data-chord="palette.toggle" aria-label="Search commands"><i data-lucide="search" aria-hidden="true"></i></button>
           <button id="btn-new"  class="tb-icon" title="new file" data-chord="file.new" aria-label="new file"><i data-lucide="file-plus" aria-hidden="true"></i></button>
           <button id="btn-open" class="tb-icon" title="open file" data-chord="file.open" aria-label="open file"><i data-lucide="folder-open" aria-hidden="true"></i></button>
           <button id="btn-save" class="tb-icon" title="save" data-chord="file.save" aria-label="save"><i data-lucide="save" aria-hidden="true"></i></button>
@@ -52,33 +53,33 @@
 
       <aside id="rail-left" class="rail" aria-label="left tool windows">
         <div class="rail-group">
-          <button id="btn-sidebar-git" class="rail-btn" title="commit" data-chord="sidebar.git" aria-label="commit">
+          <button id="btn-sidebar-git" class="rail-btn" title="Source Control" data-chord="sidebar.git" aria-label="Source Control">
             <i data-lucide="git-branch" aria-hidden="true"></i>
           </button>
-          <button id="btn-sidebar-outline" class="rail-btn" title="structure" data-chord="sidebar.outline" aria-label="structure">
+          <button id="btn-sidebar-outline" class="rail-btn" title="Structure" data-chord="sidebar.outline" aria-label="Structure">
             <i data-lucide="list-tree" aria-hidden="true"></i>
           </button>
-          <button id="btn-sidebar-plugins" class="rail-btn" title="plugins" data-chord="sidebar.plugins" aria-label="plugins">
+          <button id="btn-sidebar-plugins" class="rail-btn" title="Plugins" data-chord="sidebar.plugins" aria-label="Plugins">
             <i data-lucide="puzzle" aria-hidden="true"></i>
           </button>
         </div>
         <span class="rail-rule"></span>
         <div class="rail-group">
-          <button id="btn-tool-problems" class="rail-btn" title="problems" data-chord="tool.problems" aria-label="problems">
+          <button id="btn-tool-problems" class="rail-btn" title="Problems" data-chord="tool.problems" aria-label="Problems">
             <i data-lucide="circle-alert" aria-hidden="true"></i>
             <span id="problems-badge" class="rail-badge hidden">0</span>
           </button>
-          <button id="btn-tool-timeline" class="rail-btn" title="timeline" data-chord="tool.timeline" aria-label="timeline">
+          <button id="btn-tool-timeline" class="rail-btn" title="Timeline" data-chord="tool.timeline" aria-label="Timeline">
             <i data-lucide="history" aria-hidden="true"></i>
           </button>
-          <button id="btn-tool-optimizer" class="rail-btn" title="optimizer" data-chord="tool.optimizer" aria-label="optimizer">
+          <button id="btn-tool-optimizer" class="rail-btn" title="Optimizer" data-chord="tool.optimizer" aria-label="Optimizer">
             <i data-lucide="zap" aria-hidden="true"></i>
             <span id="optimizer-badge" class="rail-badge hidden">0</span>
           </button>
         </div>
         <span class="rail-spacer"></span>
         <div class="rail-group">
-          <button id="btn-sidebar-settings" class="rail-btn" title="settings" data-chord="preferences.open" aria-label="settings">
+          <button id="btn-sidebar-settings" class="rail-btn" title="Settings" data-chord="preferences.open" aria-label="Settings">
             <i data-lucide="settings" aria-hidden="true"></i>
           </button>
         </div>
@@ -89,7 +90,7 @@
           <section id="tool-left" class="island hidden" aria-label="left tool window">
             <div id="git-sidebar-container" class="tool-body hidden">
               <div class="sidepanel-header">
-                <div class="sidepanel-title">commit</div>
+                <div class="sidepanel-title">Source Control</div>
                 <button id="git-refresh-status" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh source control" aria-label="refresh source control">
                   <i data-lucide="refresh-cw" aria-hidden="true"></i>
                 </button>
@@ -101,10 +102,19 @@
               </div>
               <div id="git-summary-msg" class="git-summary-msg">Loading Git status...</div>
 
+              <div class="git-commit">
+                <textarea id="git-commit-message" class="git-commit-message" rows="2"
+                          placeholder="Message (⌘Enter to commit)" aria-label="Commit message"></textarea>
+                <button id="git-commit-btn" class="git-commit-btn" type="button" disabled>
+                  <i data-lucide="check" aria-hidden="true"></i>
+                  <span>Commit</span>
+                </button>
+              </div>
+
               <section class="git-section" id="git-section-modified">
                 <div class="git-section-header" data-section="modified" role="button" tabindex="0" aria-expanded="true" title="collapse or expand this section">
                   <span class="git-section-chevron"><i data-lucide="chevron-down" aria-hidden="true"></i></span>
-                  <div id="git-modified-panel-title" class="git-modified-panel-title">modified files</div>
+                  <div id="git-modified-panel-title" class="git-modified-panel-title">changes</div>
                 </div>
                 <div id="git-modified-empty" class="git-modified-empty git-modified-empty--show">loading…</div>
                 <ul id="git-modified-list" class="git-modified-list"></ul>
@@ -161,7 +171,7 @@
 
             <div id="plugins-sidebar-container" class="tool-body hidden">
               <div class="sidepanel-header">
-                <div class="sidepanel-title">plugins</div>
+                <div class="sidepanel-title">Plugins</div>
                 <button id="plugins-refresh" class="git-panel-btn git-panel-btn--icon" type="button" title="refresh the marketplace" aria-label="refresh the marketplace">
                   <i data-lucide="refresh-cw" aria-hidden="true"></i>
                 </button>
@@ -190,7 +200,7 @@
 
             <div id="outline-sidebar-container" class="tool-body hidden">
               <div class="sidepanel-header">
-                <div class="sidepanel-title">structure</div>
+                <div class="sidepanel-title">Structure</div>
               </div>
               <div id="outline-empty" class="outline-empty">no symbols yet, write some DSL</div>
               <ul id="outline-list" class="outline-list"></ul>
@@ -201,7 +211,7 @@
 
           <section id="editor-island" class="island">
             <div id="tab-strip" role="tablist" aria-label="open files">
-              <div id="file-tab" class="tab tab--active" role="tab" aria-selected="true">
+              <div id="file-tab" class="tab tab--active" role="tab" tabindex="0" aria-selected="true">
                 <i class="tab-icon" data-lucide="file-code" aria-hidden="true"></i>
                 <span id="tab-label" class="tab-label">untitled.dsmx</span>
                 <span id="tab-dot" class="tab-dot hidden" aria-hidden="true"></span>
@@ -209,7 +219,7 @@
                   <i data-lucide="x" aria-hidden="true"></i>
                 </button>
               </div>
-              <div id="plugin-tab" class="tab hidden" role="tab" aria-selected="false">
+              <div id="plugin-tab" class="tab hidden" role="tab" tabindex="-1" aria-selected="false">
                 <i class="tab-icon" data-lucide="puzzle" aria-hidden="true"></i>
                 <span id="plugin-tab-label" class="tab-label">extension</span>
                 <button id="plugin-tab-close" class="tab-close" title="close extension page" aria-label="close extension page">
@@ -288,7 +298,7 @@
 
       <aside id="rail-right" class="rail" aria-label="right tool windows">
         <div class="rail-group">
-          <button id="btn-sidebar-ai" class="rail-btn" title="ai assistant" data-chord="sidebar.ai" aria-label="ai assistant">
+          <button id="btn-sidebar-ai" class="rail-btn" title="AI Assistant" data-chord="sidebar.ai" aria-label="AI Assistant">
             <i data-lucide="bot" aria-hidden="true"></i>
           </button>
         </div>
@@ -296,14 +306,20 @@
     </div>
 
     <footer id="statusbar">
-      <span id="status-msg" role="status" aria-live="polite">Ready</span>
+      <button id="status-msg" class="status-fact" type="button" role="status" aria-live="polite"
+              data-command="tool.problems" data-chord="tool.problems" title="Open the problems panel">Ready</button>
       <span id="status-facts">
-        <span id="status-branch" class="status-fact hidden"></span>
-        <span id="status-save" class="status-fact"></span>
-        <span id="status-graph-only" class="status-fact status-fact--warn hidden"></span>
-        <span id="status-lang" class="status-fact">dsmx</span>
+        <button id="status-branch" class="status-fact hidden" type="button"
+                data-command="sidebar.git" data-chord="sidebar.git" title="Open source control"></button>
+        <button id="status-save" class="status-fact" type="button"
+                data-command="file.save" data-chord="file.save"></button>
+        <button id="status-graph-only" class="status-fact status-fact--warn hidden" type="button"
+                data-command="mode.enhanced" title="Review the expressions that have no DSL form"></button>
+        <button id="status-lang" class="status-fact" type="button"
+                data-command="preferences.open" data-chord="preferences.open" title="DSMX file — open settings">dsmx</button>
         <span id="status-plugins" class="status-plugins"></span>
-        <span id="status-pos" class="status-fact">Ln 1, Col 1</span>
+        <button id="status-pos" class="status-fact" type="button"
+                data-command="editor.goto-line" title="Go to line">Ln 1, Col 1</button>
       </span>
     </footer>
   </div>

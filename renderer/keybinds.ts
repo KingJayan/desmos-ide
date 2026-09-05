@@ -117,6 +117,10 @@ export const DEFAULT_KEYBINDS: readonly KeybindRule[] = [
   { key: 'mod+shift+0', command: 'layout.reset' },
   { key: 'mod+8', command: 'view.simple' },
   { key: 'mod+9', command: 'view.start-page' },
+  { key: 'f6', command: 'focus.next' },
+  { key: 'mod+0', command: 'focus.editor' },
+  { key: 'mod+alt+0', command: 'focus.sidebar' },
+  { key: 'mod+m', command: 'editor.tab-focus' },
 ];
 
 export function parseKeybinds(text: string): KeybindRule[] | null {

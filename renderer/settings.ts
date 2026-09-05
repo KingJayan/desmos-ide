@@ -2,7 +2,7 @@ import { iconEl } from './icons';
 import { THEMES, isColorTheme, type ColorTheme } from './themes';
 
 export type { ColorTheme };
-export type EditorTheme = ColorTheme;
+export type EditorTheme = ColorTheme | 'auto';
 
 export type UiScale = 'compact' | 'default' | 'large';
 export const UI_SCALES = ['compact', 'default', 'large'] as const;
@@ -59,7 +59,7 @@ export interface EditorSettings {
 
 export const DEFAULTS: EditorSettings = {
   colorTheme:  'dsmx',
-  editorTheme: 'dsmx',
+  editorTheme: 'auto',
   uiScale: 'default',
   simpleMode: false,
   reduceMotion: 'auto',
@@ -74,7 +74,7 @@ export const DEFAULTS: EditorSettings = {
   fontLigatures: true,
   minimap:     false,
   lineNumbers: 'on',
-  wordWrap:    'off',
+  wordWrap:    'on',
   tabSize: 2,
   insertSpaces: true,
   cursorStyle: 'line',
@@ -105,7 +105,7 @@ export const DEFAULTS: EditorSettings = {
 };
 
 const STORAGE_KEY = 'desmos-ide-settings';
-const SETTINGS_VERSION = 3;
+const SETTINGS_VERSION = 4;
 
 type BoolKey = { [K in keyof EditorSettings]: EditorSettings[K] extends boolean ? K : never }[keyof EditorSettings];
 type NumKey = { [K in keyof EditorSettings]: EditorSettings[K] extends number ? K : never }[keyof EditorSettings];
@@ -124,6 +124,11 @@ interface Group {
 }
 
 const THEME_OPTIONS = THEMES.map(t => ({ value: t.id, label: t.label }));
+const EDITOR_THEME_OPTIONS = [{ value: 'auto', label: 'same as color theme' }, ...THEME_OPTIONS];
+
+export function resolveEditorTheme(s: EditorSettings): string {
+  return s.editorTheme === 'auto' ? s.colorTheme : s.editorTheme;
+}
 
 const CODE_FONTS = [
   { value: '"JetBrains Mono", "Cascadia Code", Consolas, monospace', label: 'JetBrains Mono' },
@@ -175,7 +180,11 @@ export const GROUPS: readonly Group[] = [
     title: 'editor theme',
     hint: 'Applies to the DSL editor and the Enhanced view',
     fields: [
-      { key: 'editorTheme', kind: 'select', label: 'syntax theme', options: THEME_OPTIONS },
+      {
+        key: 'editorTheme', kind: 'select', label: 'syntax theme (override)',
+        options: EDITOR_THEME_OPTIONS,
+        hint: 'Keep "same as color theme" unless you want the editor to differ from the rest of the app.',
+      },
       { key: 'fontSize', kind: 'range', label: 'font size', min: 10, max: 24, step: 1, unit: 'px' },
       { key: 'codeFontFamily', kind: 'select', label: 'code font', options: CODE_FONTS },
       { key: 'lineHeight', kind: 'range', label: 'line height', min: 1.1, max: 2.4, step: 0.1, unit: '×' },
@@ -272,6 +281,8 @@ const FIELDS: readonly Field[] = GROUPS.flatMap(g => g.fields);
 
 function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   const v = typeof raw.__v === 'number' ? raw.__v : 1;
+  const hadEditorTheme = raw.editorTheme;
+  const hadColorTheme = raw.colorTheme;
   if (v < 2) {
     if (raw.theme && !raw.editorTheme) { raw.editorTheme = raw.theme; delete raw.theme; }
     if (raw.fontFamily && !raw.codeFontFamily) { raw.codeFontFamily = raw.fontFamily; delete raw.fontFamily; }
@@ -283,6 +294,9 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
     for (const key of ['colorTheme', 'editorTheme']) {
       if (raw[key] === 'desmos-dark') raw[key] = 'catppuccin-mocha';
     }
+  }
+  if (v < 4) {
+    if (hadEditorTheme === undefined || hadEditorTheme === hadColorTheme) raw.editorTheme = 'auto';
   }
   raw.__v = SETTINGS_VERSION;
   return raw;
@@ -314,7 +328,9 @@ function validate(raw: Record<string, unknown>): EditorSettings {
   }
 
   if (isColorTheme(raw.colorTheme)) out.colorTheme = raw.colorTheme;
-  if (typeof raw.editorTheme === 'string' && raw.editorTheme.startsWith('plugin-')) {
+  if (raw.editorTheme === 'auto') {
+    out.editorTheme = 'auto';
+  } else if (typeof raw.editorTheme === 'string' && raw.editorTheme.startsWith('plugin-')) {
     out.editorTheme = raw.editorTheme as EditorTheme;
   } else if (isColorTheme(raw.editorTheme)) {
     out.editorTheme = raw.editorTheme;
@@ -369,6 +385,8 @@ export class SettingsPanel {
   private controls = new Map<keyof EditorSettings, () => void>();
   private editorThemeEl: HTMLSelectElement | null = null;
   private openJson?: (file: 'settings' | 'keybinds') => void;
+  private rows = new Map<keyof EditorSettings, HTMLElement>();
+  private searchEl: HTMLInputElement | null = null;
 
   constructor(onChange: (s: EditorSettings) => void, openJson?: (file: 'settings' | 'keybinds') => void) {
     this.settings = loadSettings();
@@ -419,13 +437,32 @@ export class SettingsPanel {
   private buildField(field: Field): HTMLElement {
     const row = document.createElement('div');
     row.className = 'settings-row';
+    row.dataset['search'] = `${field.label} ${field.key} ${field.hint ?? ''}`.toLowerCase();
     const id = `s-${field.key}`;
+    this.rows.set(field.key, row);
 
     const label = document.createElement('label');
     label.className = 'settings-label';
     label.htmlFor = id;
     label.textContent = field.label;
-    row.appendChild(label);
+
+    const dot = document.createElement('span');
+    dot.className = 'settings-modified';
+    dot.setAttribute('aria-hidden', 'true');
+
+    const reset = document.createElement('button');
+    reset.className = 'settings-reset';
+    reset.type = 'button';
+    reset.title = `Reset ${field.label} to the default`;
+    reset.setAttribute('aria-label', `Reset ${field.label} to the default`);
+    reset.appendChild(iconEl('rotate-ccw', { size: 12 }));
+    reset.addEventListener('click', () => {
+      (this.settings[field.key] as EditorSettings[typeof field.key]) = DEFAULTS[field.key];
+      this.emit();
+      this.syncControls();
+    });
+
+    row.append(label, dot, reset);
 
     if (field.kind === 'toggle') {
       const wrap = document.createElement('label');
@@ -459,19 +496,30 @@ export class SettingsPanel {
       input.min = String(field.min);
       input.max = String(field.max);
       input.step = String(field.step);
-      const value = document.createElement('span');
+      const value = document.createElement('input');
+      value.type = 'number';
       value.className = 'settings-range-val';
-      wrap.append(input, value);
+      value.min = String(field.min);
+      value.max = String(field.max);
+      value.step = String(field.step);
+      value.setAttribute('aria-label', `${field.label} in ${field.unit}`);
+      const unit = document.createElement('span');
+      unit.className = 'settings-range-unit';
+      unit.textContent = field.unit;
+      wrap.append(input, value, unit);
       row.appendChild(wrap);
 
-      input.addEventListener('input', () => {
-        this.settings[field.key] = Number(input.value);
-        value.textContent = `${this.settings[field.key]}${field.unit}`;
+      const take = (raw: number) => {
+        if (!Number.isFinite(raw)) return;
+        this.settings[field.key] = Math.min(field.max, Math.max(field.min, raw));
         this.emit();
-      });
+        this.syncControls();
+      };
+      input.addEventListener('input', () => take(Number(input.value)));
+      value.addEventListener('change', () => take(Number(value.value)));
       this.controls.set(field.key, () => {
         input.value = String(this.settings[field.key]);
-        value.textContent = `${this.settings[field.key]}${field.unit}`;
+        value.value = String(this.settings[field.key]);
       });
       return row;
     }
@@ -513,14 +561,23 @@ export class SettingsPanel {
     const title = document.createElement('span');
     title.className = 'settings-title';
     title.id = 'settings-dialog-title';
-    title.textContent = 'settings';
+    title.textContent = 'Settings';
+
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'settings-search';
+    search.placeholder = 'Search settings';
+    search.setAttribute('aria-label', 'Search settings');
+    search.addEventListener('input', () => this.applySearch());
+    this.searchEl = search;
+
     const close = document.createElement('button');
     close.className = 'settings-close';
     close.type = 'button';
     close.setAttribute('aria-label', 'Close settings');
     close.appendChild(iconEl('x', { size: 14 }));
     close.addEventListener('click', () => this.hide());
-    header.append(title, close);
+    header.append(title, search, close);
 
     const body = document.createElement('div');
     body.className = 'settings-body';
@@ -531,6 +588,7 @@ export class SettingsPanel {
       const groupTitle = document.createElement('div');
       groupTitle.className = 'settings-group-title';
       groupTitle.textContent = group.title;
+      section.dataset['search'] = group.title.toLowerCase();
       section.appendChild(groupTitle);
       if (group.hint) section.appendChild(this.hintRow(group.hint));
       for (const field of group.fields) {
@@ -570,8 +628,28 @@ export class SettingsPanel {
     return { overlay, modal };
   }
 
+  private applySearch(): void {
+    const term = (this.searchEl?.value ?? '').trim().toLowerCase();
+    for (const section of Array.from(this.modal.querySelectorAll<HTMLElement>('.settings-group'))) {
+      const inGroup = (section.dataset['search'] ?? '').includes(term);
+      let shown = 0;
+      for (const row of Array.from(section.querySelectorAll<HTMLElement>('.settings-row'))) {
+        if (row.classList.contains('settings-hint-row')) continue;
+        const hit = !term || inGroup || (row.dataset['search'] ?? '').includes(term);
+        row.classList.toggle('hidden', !hit);
+        const hint = row.nextElementSibling;
+        if (hint?.classList.contains('settings-hint-row')) hint.classList.toggle('hidden', !hit);
+        if (hit) shown++;
+      }
+      section.classList.toggle('hidden', shown === 0);
+    }
+  }
+
   private syncControls(): void {
     for (const sync of this.controls.values()) sync();
+    for (const [key, row] of this.rows) {
+      row.classList.toggle('settings-row--modified', this.settings[key] !== DEFAULTS[key]);
+    }
     const period = this.overlay?.querySelector<HTMLSelectElement>('#s-gitAutofetchPeriod');
     if (period) period.disabled = !this.settings.gitAutofetch;
   }

@@ -1,6 +1,7 @@
 // code generator
 
 import * as T from './types';
+import { substituteExpr } from './optimizer';
 
 export const DESMOS_NAMED: Record<string, string> = {
   red: '#c74440', blue: '#2d70b3', green: '#388c46',
@@ -94,6 +95,7 @@ export interface DesmosExpr {
   slider?: DesmosSlider;
   title?: string;
   parametricDomain?: { min: string; max: string };
+  hidden?: boolean;
 }
 
 export interface ExprSource {
@@ -475,13 +477,17 @@ export class Codegen {
       : ((stmt.style?.color ? resolveColor(stmt.style.color) : null) ?? COLORS.curve);
     const fillOpacity = stmt.style?.opacity !== undefined ? this.toLaTeX(stmt.style.opacity) : undefined;
 
-    const bodyLatex  = this.toLaTeX(stmt.body);
     const startLatex = this.toLaTeX(stmt.start);
     const endLatex   = this.toLaTeX(stmt.end);
     const stepLatex  = stmt.step ? this.toLaTeX(stmt.step) : undefined;
-    const varLtx     = nameToLatex(stmt.var);
+    const parametric = stmt.body.type === 'Tuple';
+    const varLtx     = parametric ? 't' : nameToLatex(stmt.var);
+    const body       = parametric && stmt.var !== 't'
+      ? substituteExpr(stmt.body, new Map<string, T.Expr>([[stmt.var, { type: 'Ident', name: 't', pos: stmt.pos }]]))
+      : stmt.body;
+    const bodyLatex  = this.toLaTeX(body);
 
-    if (stmt.body.type === 'Tuple') {
+    if (parametric) {
       const partial: Omit<DesmosExpr, 'id'> = {
         type: 'expression',
         latex: bodyLatex,
@@ -562,7 +568,7 @@ export class Codegen {
     const name = nameToLatex(stmt.name);
     const params = stmt.params.map(nameToLatex).join(',');
     const body = this.toLaTeX(stmt.body);
-    this.emit({ type: 'expression', latex: `${name}\\left(${params}\\right)=${body}` }, stmt.name);
+    this.emit({ type: 'expression', latex: `${name}\\left(${params}\\right)=${body}`, hidden: true }, stmt.name);
   }
 
   private genGroupDecl(stmt: T.GroupDecl): void {
@@ -581,7 +587,7 @@ export class Codegen {
     const cx      = stmt.cx     ? this.toLaTeX(stmt.cx)     : '0';
     const cy      = stmt.cy     ? this.toLaTeX(stmt.cy)     : '0';
     const rotate  = stmt.rotate ? this.toLaTeX(stmt.rotate) : '0';
-    const tVar    = nameToLatex(`t_${stmt.name}`);
+    const tVar    = 't';
     const end     = `${turns}\\cdot 2\\pi`;
     const rx      = `${tVar}\\cdot\\left(${spacing}\\right)\\cdot\\cos\\left(${tVar}+\\left(${rotate}\\right)\\right)`;
     const ry      = `${tVar}\\cdot\\left(${spacing}\\right)\\cdot\\sin\\left(${tVar}+\\left(${rotate}\\right)\\right)`;
@@ -610,7 +616,7 @@ export class Codegen {
     const cy     = stmt.cy   ? this.toLaTeX(stmt.cy)   : '0';
     const xmin   = stmt.xmin ? this.toLaTeX(stmt.xmin) : '-10';
     const xmax   = stmt.xmax ? this.toLaTeX(stmt.xmax) : '10';
-    const tVar   = nameToLatex(`t_${stmt.name}`);
+    const tVar   = 't';
     const yBody  = `\\left(${amp}\\right)\\cdot\\sin\\left(\\left(${freq}\\right)\\cdot${tVar}+\\left(${phase}\\right)\\right)`;
     const xExpr  = cx === '0' ? tVar : `${tVar}+\\left(${cx}\\right)`;
     const yExpr  = cy === '0' ? yBody : `${yBody}+\\left(${cy}\\right)`;

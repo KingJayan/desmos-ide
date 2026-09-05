@@ -9,7 +9,7 @@ describe('the status line for a compile', () => {
   test('counts the expressions on success', () => {
     const out = compileStatus(compile('a = 1\nb = 2'));
     assert.equal(out.kind, 'success');
-    assert.match(out.msg, /^✓ 2 expression\(s\)$/);
+    assert.match(out.msg, /^✓ 2 expressions$/);
   });
 
   test('a warning reads as info, not as a failure', () => {
@@ -19,7 +19,7 @@ describe('the status line for a compile', () => {
     const withWarning = { ...result, warnings: [{ message: 'w' } as never] };
     const out = compileStatus(withWarning);
     assert.equal(out.kind, 'info');
-    assert.match(out.msg, /1 warning\(s\)/);
+    assert.match(out.msg, /1 warning$/);
   });
 
   test('one error is quoted on its own', () => {
