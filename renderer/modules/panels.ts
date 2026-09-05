@@ -1,5 +1,6 @@
 import { iconEl } from '../icons';
 import { DOM } from './dom';
+import { relativeTime } from '../../src/shared/relative-time';
 import type { SymbolInfo } from '../../src/index';
 
 export interface Problem {
@@ -13,6 +14,13 @@ export interface TimelineRow {
   when: string;
   kind: string;
   what: string;
+  who?: string;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return (parts.length === 1 ? parts[0]!.slice(0, 2) : parts[0]![0]! + parts.at(-1)![0]!).toUpperCase();
 }
 
 function activate(row: HTMLElement, run: () => void): void {
@@ -112,7 +120,7 @@ export class ProblemsPanel {
     }
 
     const shown = problems.filter(p => this.show[p.severity === 'error' ? 'error' : 'warning']);
-    DOM.problemsEmpty.textContent = problems.length === 0
+    DOM.problemsEmptyText.textContent = problems.length === 0
       ? 'no problems, the file compiles'
       : 'every problem is filtered out';
     DOM.problemsEmpty.classList.toggle('hidden', shown.length > 0);
@@ -126,15 +134,15 @@ export class ProblemsPanel {
       sev.appendChild(iconEl(p.severity === 'error' ? 'circle-x' : 'triangle-alert', { size: 13 }));
       sev.setAttribute('aria-label', p.severity);
 
-      const msg = document.createElement('span');
-      msg.className = 'problem-msg';
-      msg.textContent = p.message;
-
       const loc = document.createElement('span');
       loc.className = 'problem-loc';
       loc.textContent = `${p.line}:${p.col}`;
 
-      li.append(sev, msg, loc);
+      const msg = document.createElement('span');
+      msg.className = 'problem-msg';
+      msg.textContent = p.message;
+
+      li.append(sev, loc, msg);
       activate(li, () => this.jump(p.line, p.col));
       DOM.problemsList.appendChild(li);
     }
@@ -149,22 +157,17 @@ export class Timeline {
     if (this.saves.length > 20) this.saves.pop();
   }
 
-  private clockLabel(ms: number): string {
-    return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
   async refresh(): Promise<void> {
     const rows: TimelineRow[] = this.saves.map(s => ({
-      when: this.clockLabel(s.when),
+      when: relativeTime(s.when),
       kind: 'save',
       what: s.what,
     }));
 
     const log = await window.electronAPI?.gitHistory(20).catch(() => null);
     if (log?.ok) {
-      for (const line of log.lines) {
-        const [hash, ...rest] = line.trim().split(/\s+/);
-        rows.push({ when: hash.slice(0, 7), kind: 'commit', what: rest.join(' ') });
+      for (const commit of log.commits) {
+        rows.push({ when: relativeTime(Date.parse(commit.date)), kind: 'commit', what: commit.subject, who: commit.author });
       }
     }
 
@@ -174,19 +177,21 @@ export class Timeline {
       const li = document.createElement('li');
       li.className = 'timeline-row';
 
-      const when = document.createElement('span');
-      when.className = 'timeline-when';
-      when.textContent = row.when;
-
-      const kind = document.createElement('span');
-      kind.className = 'timeline-kind';
-      kind.textContent = row.kind;
+      const who = document.createElement('span');
+      who.className = 'timeline-who';
+      who.textContent = row.who ? initials(row.who) : '·';
+      if (row.who) who.title = row.who;
 
       const what = document.createElement('span');
       what.className = 'timeline-what';
       what.textContent = row.what;
 
-      li.append(when, kind, what);
+      const when = document.createElement('span');
+      when.className = 'timeline-when';
+      when.textContent = row.when;
+
+      li.append(who, what, when);
+      li.title = `${row.kind}${row.who ? ` by ${row.who}` : ''} — ${row.when}`;
       DOM.timelineList.appendChild(li);
     }
   }

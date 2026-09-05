@@ -26,14 +26,15 @@ export const DOM = {
   btnSplit:    need<HTMLButtonElement>('btn-split'),
   btnEnhanced: need<HTMLButtonElement>('btn-enhanced'),
   modeToggle:  need('mode-toggle'),
+  enhancedHint: need('enhanced-hint'),
+  enhancedHintClose: need<HTMLButtonElement>('enhanced-hint-close'),
+  btnSplitAxis: need<HTMLButtonElement>('btn-split-axis'),
 
   btnNew:  need<HTMLButtonElement>('btn-new'),
   btnOpen: need<HTMLButtonElement>('btn-open'),
   btnSave: need<HTMLButtonElement>('btn-save'),
 
   titlebar:   need('titlebar'),
-  filename:   need('filename'),
-  savedDot:   need('saved-dot'),
   statusbar:  need('statusbar'),
   statusMsg:  need('status-msg'),
   statusFacts: need('status-facts'),
@@ -66,7 +67,6 @@ export const DOM = {
   searchWidget:   need<HTMLButtonElement>('search-widget'),
 
   railLeft:  need('rail-left'),
-  railRight: need('rail-right'),
 
   toolLeft:        need('tool-left'),
   toolLeftDivider: need('tool-left-divider'),
@@ -80,10 +80,12 @@ export const DOM = {
   btnTabTimeline:   need<HTMLButtonElement>('btn-tab-timeline'),
   btnTabOptimizer:  need<HTMLButtonElement>('btn-tab-optimizer'),
   btnBottomClose:   need<HTMLButtonElement>('btn-tool-bottom-close'),
+  btnBottomMax:     need<HTMLButtonElement>('btn-tool-bottom-max'),
 
   problemsBody:  need('problems-body'),
   problemsList:  need('problems-list'),
   problemsEmpty: need('problems-empty'),
+  problemsEmptyText: need('problems-empty-text'),
   problemsBadge: need('problems-badge'),
   problemsCount: need('problems-count'),
   timelineBody:  need('timeline-body'),
@@ -92,6 +94,7 @@ export const DOM = {
   optimizerBody:  need('optimizer-body'),
   optimizerList:  need('optimizer-list'),
   optimizerEmpty: need('optimizer-empty'),
+  optimizerEmptyText: need('optimizer-empty-text'),
   optimizerCount: need('optimizer-count'),
   optimizerBadge: need('optimizer-badge'),
 

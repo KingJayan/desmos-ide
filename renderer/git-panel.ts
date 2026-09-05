@@ -1,3 +1,6 @@
+import { iconEl } from './icons';
+import { relativeTime } from '../src/shared/relative-time';
+import type { IconName } from './icons';
 import type {
   GitActionResult,
   GitBranchesResult,
@@ -247,15 +250,15 @@ export class GitPanel {
       this.branchPill.textContent = 'branch: --';
       this.modifiedPill.textContent = 'git unavailable';
       this.summaryMsg.textContent = status.message;
+      this.summaryMsg.classList.remove('hidden');
       this.setPillState('unknown');
       return;
     }
 
     this.branchPill.textContent = `branch: ${status.branch}`;
     this.modifiedPill.textContent = status.modifiedCount === 1 ? '1 modified' : `${status.modifiedCount} modified`;
-    this.summaryMsg.textContent = status.modifiedCount
-      ? status.modifiedFiles.slice(0, 12).join(' | ')
-      : 'Working tree clean';
+    this.summaryMsg.textContent = 'working tree clean';
+    this.summaryMsg.classList.toggle('hidden', status.modifiedCount > 0);
     this.setPillState(status.modifiedCount > 0 ? 'dirty' : 'clean');
   }
 
@@ -263,7 +266,7 @@ export class GitPanel {
     this.modifiedList.innerHTML = '';
 
     if (!status.ok) {
-      this.modifiedTitle.textContent = 'Git status';
+      this.modifiedTitle.textContent = 'git status';
       this.modifiedEmpty.textContent = status.message;
       this.modifiedEmpty.classList.add('git-modified-empty--show');
       return;
@@ -273,7 +276,7 @@ export class GitPanel {
       ? '1 modified file'
       : `${status.modifiedCount} modified files`;
     if (status.modifiedCount === 0) {
-      this.modifiedEmpty.textContent = 'Working tree clean';
+      this.modifiedEmpty.textContent = 'working tree clean';
       this.modifiedEmpty.classList.add('git-modified-empty--show');
       return;
     }
@@ -307,7 +310,7 @@ export class GitPanel {
   private syncCommitBtn(): void {
     const staged = this.lastStatus.ok ? this.lastStatus.staged.length : 0;
     this.commitBtn.disabled = !this.commitMessage.value.trim() || staged === 0;
-    this.commitBtn.title = staged === 0 ? 'Stage a file first' : `Commit ${staged} staged file(s)`;
+    this.commitBtn.title = staged === 0 ? 'stage a file first' : `commit ${staged} staged file(s)`;
   }
 
   private async setStaged(file: string, on: boolean): Promise<void> {
@@ -330,15 +333,15 @@ export class GitPanel {
     this.branchList.innerHTML = '';
 
     if (!result.ok) {
-      this.branchTitle.textContent = 'Branches';
+      this.branchTitle.textContent = 'branches';
       this.branchEmpty.textContent = result.message;
       this.branchEmpty.classList.add('git-modified-empty--show');
       return;
     }
 
-    this.branchTitle.textContent = `Branches (${result.branches.length})`;
+    this.branchTitle.textContent = `branches (${result.branches.length})`;
     if (result.branches.length === 0) {
-      this.branchEmpty.textContent = 'No branches found';
+      this.branchEmpty.textContent = 'no branches found';
       this.branchEmpty.classList.add('git-modified-empty--show');
       return;
     }
@@ -371,7 +374,7 @@ export class GitPanel {
       if (!branch.current) {
         const actions = document.createElement('div');
         actions.className = 'git-inline-actions';
-        actions.appendChild(this.actionBtn('Checkout', async () => {
+        actions.appendChild(this.actionBtn('checkout', async () => {
           this.report(await window.electronAPI?.gitCheckoutBranch(branch.name));
           await Promise.all([this.refreshStatus(), this.refreshBranches(), this.refreshHistory()]);
         }));
@@ -384,35 +387,56 @@ export class GitPanel {
   }
 
   private renderHistory(result: GitHistoryResult): void {
-    const lines = result.ok ? result.lines : [];
-    const empty = !result.ok ? result.message : lines.length === 0 ? 'No history found' : null;
+    const commits = result.ok ? result.commits : [];
+    const empty = !result.ok ? result.message : commits.length === 0 ? 'no history found' : null;
+    this.historyContent.replaceChildren();
     if (empty !== null) {
       this.historyEmpty.textContent = empty;
       this.historyEmpty.classList.add('git-modified-empty--show');
       this.historyContent.classList.remove('git-history-content--show');
-      this.historyContent.textContent = '';
       return;
     }
 
     this.historyEmpty.classList.remove('git-modified-empty--show');
     this.historyContent.classList.add('git-history-content--show');
-    this.historyContent.textContent = lines.join('\n');
+    for (const commit of commits) {
+      const row = document.createElement('li');
+      row.className = 'git-commit-row';
+      row.title = `${commit.hash}  ${commit.subject}`;
+
+      const subject = document.createElement('div');
+      subject.className = 'git-commit-subject';
+      subject.textContent = commit.subject;
+
+      const meta = document.createElement('div');
+      meta.className = 'git-commit-meta';
+      const hash = document.createElement('span');
+      hash.className = 'git-commit-hash';
+      hash.textContent = commit.hash;
+      const who = document.createElement('span');
+      who.className = 'git-commit-who';
+      who.textContent = `${commit.author} · ${relativeTime(Date.parse(commit.date))}`;
+      meta.append(hash, who);
+
+      row.append(subject, meta);
+      this.historyContent.appendChild(row);
+    }
   }
 
   private renderRemotes(result: GitRemotesResult): void {
     this.remoteList.innerHTML = '';
 
     if (!result.ok) {
-      this.remoteTitle.textContent = 'Remotes';
+      this.remoteTitle.textContent = 'remotes';
       this.remoteEmpty.textContent = result.message;
       this.remoteEmpty.classList.add('git-modified-empty--show');
       return;
     }
 
-    this.remoteTitle.textContent = `Remotes (${result.remotes.length})`;
+    this.remoteTitle.textContent = `remotes (${result.remotes.length})`;
 
     if (result.remotes.length === 0) {
-      this.remoteEmpty.textContent = 'No remotes configured';
+      this.remoteEmpty.textContent = 'no remotes configured';
       this.remoteEmpty.classList.add('git-modified-empty--show');
       return;
     }
@@ -440,23 +464,23 @@ export class GitPanel {
       const actions = document.createElement('div');
       actions.className = 'git-inline-actions';
       actions.append(
-        this.actionBtn('Fetch', async () => {
+        this.actionBtn('fetch', async () => {
           this.report(await window.electronAPI?.gitFetch(remote.name));
           await Promise.all([this.refreshStatus(), this.refreshHistory()]);
-        }),
-        this.actionBtn('Pull', async () => {
+        }, 'refresh-cw'),
+        this.actionBtn('pull', async () => {
           this.report(await window.electronAPI?.gitPull(remote.name, this.currentBranch()));
           await Promise.all([this.refreshStatus(), this.refreshHistory()]);
-        }),
-        this.actionBtn('Push', async () => {
+        }, 'arrow-down'),
+        this.actionBtn('push', async () => {
           this.report(await window.electronAPI?.gitPush(remote.name, this.currentBranch()));
           await Promise.all([this.refreshStatus(), this.refreshHistory()]);
-        }),
-        this.actionBtn('Remove', async () => {
-          if (!(await this.opts.confirm(`Remove remote ${remote.name}?`))) return;
+        }, 'arrow-up'),
+        this.actionBtn('remove', async () => {
+          if (!(await this.opts.confirm(`remove the remote ${remote.name}?`))) return;
           this.report(await window.electronAPI?.gitRemoteRemove(remote.name));
           await this.refreshRemotes();
-        }),
+        }, 'trash-2'),
       );
 
       row.appendChild(actions);
@@ -469,11 +493,14 @@ export class GitPanel {
     return this.lastStatus.ok ? this.lastStatus.branch : undefined;
   }
 
-  private actionBtn(label: string, run: () => Promise<void>): HTMLButtonElement {
+  private actionBtn(label: string, run: () => Promise<void>, icon?: IconName): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'git-panel-btn';
-    btn.textContent = label;
+    btn.className = icon ? 'git-panel-btn git-panel-btn--icon' : 'git-panel-btn';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    if (icon) btn.appendChild(iconEl(icon, { size: 13 }));
+    else btn.textContent = label;
     btn.addEventListener('click', e => {
       e.stopPropagation();
       void run();

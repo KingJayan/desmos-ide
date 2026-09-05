@@ -183,13 +183,15 @@
 
 .ai-ctx-btn {
   --btn-accent: var(--mauve);
-  gap: 3px;
-  padding: 2px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border-color: var(--border-strong);
   color: var(--overlay1);
-  font-size: var(--fs-micro);
   flex-shrink: 0;
-  white-space: nowrap;
 }
 .ai-ctx-btn--on {
   color: var(--mauve);
@@ -200,12 +202,8 @@
   background: color-mix(in srgb, var(--mauve) 20%, transparent);
 }
 
-.ai-sidebar--compact .ai-ctx-btn span { display: none; }
-.ai-sidebar--compact .ai-ctx-btn { padding: 2px 5px; }
-.ai-sidebar--compact .ai-provider-label { display: none; }
-.ai-sidebar--compact .ai-provider-state { display: none; }
 .ai-sidebar--compact .ai-status-memory { display: none; }
-.ai-sidebar--compact .ai-provider-select { max-width: 72px; font-size: var(--fs-micro); }
+.ai-sidebar--compact .ai-model-btn-provider { display: none; }
 
 .ai-send-btn {
   --btn-press: 0.9;

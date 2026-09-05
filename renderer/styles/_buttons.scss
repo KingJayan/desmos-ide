@@ -4,14 +4,14 @@ button, select { -webkit-appearance: none; appearance: none; }
 $interactive:
   '.btn',
   '.toolbar-btn', '.mode-btn', '.action-btn',
-  '.tb-widget', '.tb-icon', '.rail-btn', '.tab-close',
-  '.tool-tab', '.tool-tab-icon',
+  '.tb-widget', '.tb-icon', '.rail-btn', '.tab-close', '.mode-axis-btn',
+  '.tool-tab', '.tool-tab-icon', '.tool-empty-action', '.enhanced-hint-close',
   '.git-panel-btn', '.unsaved-export-btn', '.search-regex-btn',
   '.ai-icon-btn', '.ai-config-btn', '.ai-toolbar-btn', '.ai-code-copy-btn',
-  '.ai-action-btn', '.ai-ctx-btn', '.ai-send-btn', '.transport-play';
+  '.ai-action-btn', '.ai-ctx-btn', '.ai-send-btn', '.ai-model-btn', '.transport-play';
 
 :is(#{$interactive}) {
-  --btn-accent: var(--blue);
+  --btn-accent: var(--accent);
   --btn-press: 0.94;
   --btn-hover-border: var(--btn-accent);
   display: inline-flex;

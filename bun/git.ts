@@ -163,8 +163,16 @@ export async function getGitBranches(): Promise<GitBranchesResult> {
 export async function getGitHistory(limit: number): Promise<GitHistoryResult> {
   const maxCount = Number.isFinite(limit) ? Math.max(10, Math.min(120, Math.floor(limit))) : 40;
   return inRepo(async repoPath => {
-    const raw = await runGit(repoPath, ['log', '--graph', '--decorate', '--oneline', `--max-count=${maxCount}`], 3200);
-    return { ok: true as const, lines: raw.split(/\r?\n/).filter(Boolean) };
+    const raw = await runGit(
+      repoPath,
+      ['log', '--date=iso-strict', `--max-count=${maxCount}`, '--pretty=format:%h%x1f%s%x1f%an%x1f%ad%x1f%D'],
+      3200,
+    );
+    const commits = raw.split(/\r?\n/).filter(Boolean).map(line => {
+      const [hash = '', subject = '', author = '', date = '', refs = ''] = line.split('\u001f');
+      return { hash, subject, author, date, refs };
+    });
+    return { ok: true as const, commits };
   });
 }
 

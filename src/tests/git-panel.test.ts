@@ -41,7 +41,7 @@ function stubApi(over: Partial<Api> = {}): void {
     electronAPI: {
       gitStatus: count('status', status),
       gitBranches: count('branches', { ok: true, branches: [] }),
-      gitHistory: count('history', { ok: true, lines: [] }),
+      gitHistory: count('history', { ok: true, commits: [] }),
       gitRemotes: count('remotes', { ok: true, remotes: [] }),
       ...over,
     },

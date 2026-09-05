@@ -15,6 +15,7 @@
   border-color: var(--border-strong);
   color: var(--overlay1);
   font-family: var(--font-mono);
+  min-height: 24px;
   padding: 2px 7px;
 }
 .search-regex-btn.active {
@@ -26,6 +27,7 @@
 .search-pick-btn {
   align-self: flex-start;
   margin: 0 12px 8px;
+  min-height: 24px;
   padding: 4px 10px;
   border: 1px solid var(--accent);
   border-radius: var(--radius);
@@ -40,6 +42,14 @@
   padding: 7px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.search-placeholder {
+  list-style: none;
+  padding: 18px 16px;
+  color: var(--overlay1);
+  font-size: var(--fs-small);
+  text-align: center;
 }
 
 .search-hit-text {

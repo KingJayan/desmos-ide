@@ -1,6 +1,6 @@
 import * as monaco from '../monaco';
 import { LANGUAGE_ID, KEYWORDS, BUILTIN_FNS } from '../../src/monaco/language';
-import { builtinSignature } from '../../src/compiler/builtins';
+import { builtinDoc, builtinSignature } from '../../src/compiler/builtins';
 import { formatDsl } from '../../src/compiler/format';
 import { findRenameEdits, isValidIdent } from '../../src/compiler/rename';
 import type { CompileResult } from '../../src/index';
@@ -27,7 +27,15 @@ export function registerLanguageFeatures(lastResult: () => CompileResult | null)
       const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
 
       const sig = builtinSignature(word.word);
-      if (sig) return { range, contents: [{ value: `\`\`\`\n${sig}\n\`\`\``, isTrusted: true }] };
+      if (sig) {
+        const doc = builtinDoc(word.word);
+        return {
+          range,
+          contents: doc
+            ? [{ value: `\`\`\`\n${sig}\n\`\`\``, isTrusted: true }, { value: doc, isTrusted: true }]
+            : [{ value: `\`\`\`\n${sig}\n\`\`\``, isTrusted: true }],
+        };
+      }
 
       const result = lastResult();
       if (!result?.success) return null;

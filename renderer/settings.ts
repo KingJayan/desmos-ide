@@ -1,5 +1,5 @@
 import { iconEl } from './icons';
-import { THEMES, isColorTheme, type ColorTheme } from './themes';
+import { THEMES, isColorTheme, themeSpec, type ColorTheme } from './themes';
 
 export type { ColorTheme };
 export type EditorTheme = ColorTheme | 'auto';
@@ -123,6 +123,8 @@ interface Group {
   fields: readonly Field[];
 }
 
+const SWATCH_ROLES = ['base', 'accent', 'accent2', 'green', 'red'] as const;
+
 const THEME_OPTIONS = THEMES.map(t => ({ value: t.id, label: t.label }));
 const EDITOR_THEME_OPTIONS = [{ value: 'auto', label: 'same as color theme' }, ...THEME_OPTIONS];
 
@@ -178,7 +180,7 @@ export const GROUPS: readonly Group[] = [
   },
   {
     title: 'editor theme',
-    hint: 'Applies to the DSL editor and the Enhanced view',
+    hint: 'Applies to the DSL editor and the enhanced view',
     fields: [
       {
         key: 'editorTheme', kind: 'select', label: 'syntax theme (override)',
@@ -536,14 +538,38 @@ export class SettingsPanel {
     row.appendChild(select);
     if (field.key === 'editorTheme') this.editorThemeEl = select;
 
+    const swatch = field.key === 'colorTheme' || field.key === 'editorTheme'
+      ? this.addSwatch(row) : null;
+
     const numeric = 'numeric' in field;
     select.addEventListener('change', () => {
       if (numeric) (this.settings[field.key] as number) = Number(select.value);
       else (this.settings[field.key] as string) = select.value;
       this.emit();
+      this.syncControls();
     });
-    this.controls.set(field.key, () => { select.value = String(this.settings[field.key]); });
+    this.controls.set(field.key, () => {
+      select.value = String(this.settings[field.key]);
+      swatch?.(select.value);
+    });
     return row;
+  }
+
+  private addSwatch(row: HTMLElement): (value: string) => void {
+    const swatch = document.createElement('span');
+    swatch.className = 'settings-swatch';
+    const dots = SWATCH_ROLES.map(() => {
+      const dot = document.createElement('span');
+      dot.className = 'settings-swatch-dot';
+      swatch.appendChild(dot);
+      return dot;
+    });
+    row.appendChild(swatch);
+    return value => {
+      const spec = themeSpec((value === 'auto' ? this.settings.colorTheme : value) as ColorTheme);
+      swatch.title = spec.label;
+      SWATCH_ROLES.forEach((role, i) => { dots[i]!.style.background = spec.palette[role]; });
+    };
   }
 
   private build(): { overlay: HTMLElement; modal: HTMLElement } {
@@ -561,13 +587,13 @@ export class SettingsPanel {
     const title = document.createElement('span');
     title.className = 'settings-title';
     title.id = 'settings-dialog-title';
-    title.textContent = 'Settings';
+    title.textContent = 'settings';
 
     const search = document.createElement('input');
     search.type = 'search';
     search.className = 'settings-search';
-    search.placeholder = 'Search settings';
-    search.setAttribute('aria-label', 'Search settings');
+    search.placeholder = 'search settings';
+    search.setAttribute('aria-label', 'search settings');
     search.addEventListener('input', () => this.applySearch());
     this.searchEl = search;
 
@@ -602,7 +628,7 @@ export class SettingsPanel {
     footer.className = 'settings-footer';
     const note = document.createElement('span');
     note.className = 'settings-hint';
-    note.textContent = 'Every setting is text in settings.json.';
+    note.textContent = 'every setting is text in settings.json.';
     const links = document.createElement('span');
     links.className = 'settings-footer-links';
     for (const file of ['settings', 'keybinds'] as const) {

@@ -1,4 +1,5 @@
 import { iconEl } from './icons';
+import { hideTooltip } from './modules/tooltip';
 
 export interface TourStep {
   target: () => HTMLElement | null;
@@ -186,6 +187,7 @@ export class Onboarding {
     if (this.opts.steps.length === 0) { this.opts.onFinish(); return; }
     this.step = 0;
     this.running = true;
+    hideTooltip();
     this.pop.classList.remove('hidden');
     this.ring.classList.remove('hidden');
     window.addEventListener('keydown', this.onKey, true);

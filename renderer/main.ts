@@ -6,9 +6,9 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 
 import * as monaco from './monaco';
 import {
-  createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
+  createIcons, GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, Check, ChevronDown,
   Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode, Zap,
-  Puzzle,
+  Puzzle, PanelLeft, ChevronsUp, CircleCheck,
 } from 'lucide';
 import { registerLanguage, errorToMarker, LANGUAGE_ID } from '../src/monaco/language';
 import CompileWorker from './compile.worker?worker';
@@ -73,9 +73,9 @@ registerLanguage(monaco as Parameters<typeof registerLanguage>[0]);
 registerColorProvider();
 createIcons({
   icons: {
-    GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, List, ChevronDown,
+    GitBranch, Bot, Settings, RefreshCw, GitBranchPlus, Plus, Check, ChevronDown,
     Box, Search, FilePlus, FolderOpen, Save, X, ListTree, CircleAlert, History, FileCode, Zap,
-    Puzzle,
+    Puzzle, PanelLeft, ChevronsUp, CircleCheck,
   },
   attrs: { 'stroke-width': '1.9' },
 });
@@ -193,7 +193,7 @@ DOM.graphContainer.addEventListener('contextmenu', e => {
   const at = graphSelected ? lineForId(sourceMap, graphSelected) : null;
   add('Copy graph as PNG', () => void copyGraphPng());
   add('Export PNG…', () => void cmdExportImage('png'));
-  add('Reset viewport', () => { graph.resetViewport(); setStatus('Viewport reset', 'info'); });
+  add('Reset viewport', () => { graph.resetViewport(); setStatus('viewport reset', 'info'); });
   add(
     at ? `Go to source line ${at.line}` : 'Go to source line',
     () => {
@@ -225,7 +225,7 @@ async function copyGraphPng(): Promise<void> {
   try {
     const blob = await (await fetch(uri)).blob();
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-    setStatus('Graph copied as PNG', 'success');
+    setStatus('graph copied as PNG', 'success');
   } catch {
     reportFailure('The clipboard refused the image.');
   }
@@ -248,7 +248,7 @@ graph.onExpressionEdited(exprs => {
 
 editor.onDidChangeCursorPosition(e => {
   graphLink.onCursorMoved(e.position.lineNumber);
-  DOM.statusPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+  DOM.statusPos.textContent = `ln ${e.position.lineNumber}, col ${e.position.column}`;
 });
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -321,7 +321,7 @@ DOM.btnExportJson.addEventListener('click', async () => {
     enhanced.clearDirty();
     graphOnly.clear();
     noteGraphOnly([]);
-    setStatus('Exported', 'success');
+    setStatus('exported', 'success');
   } else if (!result.canceled) {
     setStatus(result.message, 'error');
   }
@@ -370,6 +370,7 @@ const optimizerHints = editor.createDecorationsCollection();
 const optimizerPanel = new OptimizerPanel({
   list: DOM.optimizerList,
   empty: DOM.optimizerEmpty,
+  emptyText: DOM.optimizerEmptyText,
   count: DOM.optimizerCount,
   badge: DOM.optimizerBadge,
   jump: line => jumpTo(line, 1),
@@ -453,7 +454,7 @@ function handleCompileResult(result: CompileResult): void {
         }))),
   ]);
   const { msg, kind } = compileStatus(result);
-  setStatus(msg, kind);
+  setCompileStatus(msg, kind);
 }
 
 registerLanguageFeatures(() => lastCompileResult);
@@ -489,10 +490,30 @@ window.addEventListener('unload', () => {
   gitPanel.dispose();
 });
 
-function setStatus(msg: string, kind: 'success' | 'error' | 'info' = 'info'): void {
+type StatusPaint = { msg: string; kind: 'success' | 'error' | 'info' };
+
+let compileLine: StatusPaint = { msg: 'ready', kind: 'info' };
+let statusTimer: number | undefined;
+
+function paintStatus({ msg, kind }: StatusPaint): void {
   DOM.statusMsg.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
   DOM.statusMsg.textContent = msg;
-  DOM.statusMsg.className = kind;
+  DOM.statusMsg.className = `status-fact ${kind}`;
+}
+
+// the compile summary is the permanent left item; an event borrows the slot and gives it back
+function setCompileStatus(msg: string, kind: 'success' | 'error' | 'info'): void {
+  compileLine = { msg, kind };
+  if (statusTimer === undefined) paintStatus(compileLine);
+}
+
+function setStatus(msg: string, kind: 'success' | 'error' | 'info' = 'info'): void {
+  paintStatus({ msg, kind });
+  clearTimeout(statusTimer);
+  statusTimer = window.setTimeout(() => {
+    statusTimer = undefined;
+    paintStatus(compileLine);
+  }, 3000);
 }
 
 // a failure the user cannot see is a failure the user cannot act on
@@ -597,7 +618,7 @@ const pluginActions: PluginActions = {
   loadError: id => pluginHost.loadError(id),
 
   install: async id => {
-    setStatus(`Installing ${id}…`, 'info');
+    setStatus(`installing ${id}…`, 'info');
     const result = await window.electronAPI?.pluginInstall(id);
     if (!result?.ok) {
       reportFailure(result?.message ?? 'Plugins need the desktop app');
@@ -605,7 +626,7 @@ const pluginActions: PluginActions = {
     }
     await pluginHost.refresh();
     void runCompile();
-    setStatus(`Installed ${result.plugin.manifest.name}`, 'success');
+    setStatus(`installed ${result.plugin.manifest.name}`, 'success');
   },
 
   uninstall: async id => {
@@ -619,7 +640,7 @@ const pluginActions: PluginActions = {
     forgetIcon(id);
     await pluginHost.refresh();
     void runCompile();
-    setStatus(`Removed ${id}`, 'success');
+    setStatus(`removed ${id}`, 'success');
   },
 
   setEnabled: async (id, enabled) => {
@@ -729,6 +750,7 @@ async function refreshRegistry(): Promise<void> {
 
 function openPluginPage(id: string): void {
   DOM.pluginTab.classList.remove('hidden');
+  workbench.syncTabStrip();
   DOM.pluginTabLabel.textContent = pluginHost.list().find(p => p.manifest.id === id)?.manifest.name
     ?? registryEntries.find(p => p.manifest.id === id)?.manifest.name
     ?? id;
@@ -739,6 +761,7 @@ function openPluginPage(id: string): void {
 
 function closePluginTab(): void {
   DOM.pluginTab.classList.add('hidden');
+  workbench.syncTabStrip();
   pluginPage.close();
   workbench.setActiveTab('file');
 }
@@ -810,6 +833,15 @@ function showMode(m: Mode): void {
 
 DOM.btnDsl.addEventListener('click', () => showMode('dsl'));
 DOM.btnSplit.addEventListener('click', () => showMode('split'));
+DOM.btnBottomMax.addEventListener('click', () => workbench.toggleBottomMaximized());
+DOM.btnSplitAxis.addEventListener('click', e => { e.stopPropagation(); workbench.toggleSplitAxis(); });
+
+const HINT_KEY = 'ide-enhanced-hint-done';
+DOM.enhancedHint.classList.toggle('hidden', localStorage.getItem(HINT_KEY) === '1');
+DOM.enhancedHintClose.addEventListener('click', () => {
+  DOM.enhancedHint.classList.add('hidden');
+  try { localStorage.setItem(HINT_KEY, '1'); } catch { /* private mode has no store */ }
+});
 DOM.btnEnhanced.addEventListener('click', () => showMode('enhanced'));
 
 for (const [tab, rail, button] of [
@@ -830,9 +862,7 @@ DOM.btnSidebarPlugins.addEventListener('click', () => workbench.toggleSidebar('p
 //file ops
 function setFilename(p: string | null): Promise<unknown> {
   if (workspaceState.setPath(p)) void pluginHost.reloadWorkspace();
-  const name = workspaceState.name();
-  DOM.filename.textContent = name;
-  DOM.tabLabel.textContent = name;
+  DOM.tabLabel.textContent = workspaceState.name();
   renderBreadcrumbs(p);
   refreshSavedState();
   return Promise.resolve(window.electronAPI?.setGitContext(p)).then(() => gitPanel.refreshAll());
@@ -845,12 +875,9 @@ function markSaved(content: string): void {
 
 function refreshSavedState(): void {
   const unsaved = workspaceState.isUnsaved(editor.getValue());
-  DOM.savedDot.classList.toggle('hidden', !unsaved);
   DOM.tabDot.classList.toggle('hidden', !unsaved);
-  DOM.savedDot.title = workspaceState.path
-    ? 'Unsaved changes — ⌘S to write them to the file'
-    : 'This buffer has no file yet — ⌘S to choose one';
-  DOM.filename.classList.toggle('filename--unsaved', unsaved);
+  DOM.fileTab.title = workspaceState.path ?? 'this buffer has no file yet — ⌘S to choose one';
+  DOM.fileTab.classList.toggle('tab--unsaved', unsaved);
   refreshSaveFact(unsaved);
 }
 
@@ -860,8 +887,12 @@ function refreshSaveFact(unsaved: boolean): void {
     ? (unsaved ? 'autosave: saving…' : 'autosave: on')
     : (unsaved ? 'unsaved' : 'saved');
   DOM.statusSave.title = on
-    ? `This file is written ${settings.autosaveDelay} ms after you stop typing`
-    : 'Autosave is off — ⌘S to write the file. Turn it on in Settings';
+    ? `This file is written ${settings.autosaveDelay} ms after you stop typing — click to open settings`
+    : unsaved
+      ? 'This buffer has changes that are not on disk — click to write the file'
+      : 'Autosave is off — click to open settings and turn it on';
+  // a status fact reports state, so only the one that says "unsaved" performs a write
+  DOM.statusSave.dataset['command'] = !on && unsaved ? 'file.save' : 'preferences.open';
 }
 
 function startWatching(path: string): void {
@@ -894,7 +925,6 @@ async function enhancedDirtyGuard(): Promise<boolean> {
 function openWorkspaceView(): void {
   workbench.setEmpty(false);
   startPage.clearFolder();
-  DOM.filename.textContent = workspaceState.name();
 }
 
 async function cmdNew(): Promise<void> {
@@ -905,7 +935,7 @@ async function cmdNew(): Promise<void> {
   void setFilename(null);
   openWorkspaceView();
   applyMode('dsl');
-  setStatus('New file', 'info');
+  setStatus('new file', 'info');
   void runCompile();
   editor.focus();
 }
@@ -936,8 +966,7 @@ async function cmdClose(): Promise<void> {
 function showStartPage(): void {
   startPage.render();
   workbench.setEmpty(true);
-  DOM.filename.textContent = 'no file open';
-  setStatus('Ready', 'info');
+  setStatus('ready', 'info');
   startPage.focus();
 }
 
@@ -984,7 +1013,7 @@ async function cmdSave(saveAs = false): Promise<void> {
     markSaved(sent);
     void setFilename(result.path);
     startWatching(result.path);
-    setStatus(`Saved to ${result.path}`, 'success');
+    setStatus(`saved to ${result.path}`, 'success');
     noteSave(result.path.split(/[\\/]/).pop()!);
     persistSession();
   } else if (!result.canceled) {
@@ -1030,7 +1059,7 @@ async function cmdExportImage(format: 'png' | 'svg'): Promise<void> {
   }
   const saved = await window.electronAPI?.exportImage(data, `${baseName()}.${format}`, format);
   if (!saved) return;
-  if (saved.ok) setStatus(`Exported to ${saved.path}`, 'success');
+  if (saved.ok) setStatus(`exported to ${saved.path}`, 'success');
   else if (!saved.canceled) reportFailure(saved.message);
 }
 
@@ -1049,7 +1078,7 @@ async function cmdCopyShareLink(): Promise<void> {
   if (!url) return;
   try {
     await navigator.clipboard.writeText(url);
-    setStatus('Share link copied', 'success');
+    setStatus('share link copied', 'success');
   } catch {
     reportFailure('Could not reach the clipboard');
   }
@@ -1059,7 +1088,7 @@ async function cmdOpenShareLink(): Promise<void> {
   const url = await buildShareUrl();
   if (!url) return;
   await window.electronAPI?.openExternal(url);
-  setStatus('Opened the share link in your browser', 'success');
+  setStatus('opened the share link in your browser', 'success');
 }
 
 DOM.btnNew.addEventListener('click',  () => cmdNew());
@@ -1088,7 +1117,7 @@ async function autosave(): Promise<void> {
     if (result?.ok) {
       markSaved(sent);
       noteSave(`${baseNameOf(path)} (autosave)`);
-      setStatus('Autosaved', 'info');
+      setStatus('autosaved', 'info');
     }
     else if (result && !result.canceled) reportFailure(result.message);
   } finally {
@@ -1443,6 +1472,7 @@ const startPage = new StartPage({
   listFolder: path => void showFolder(path),
   openPath: path => void openPath(path),
   forget: path => forgetRecent(path),
+  openExample: () => cmdOpenExample(),
   runCommand: id => void commandIndex.get(id)?.action(),
 });
 
@@ -1461,17 +1491,17 @@ const baseCommands: PaletteCommand[] = buildAppCommands({
     graph.update([]);
     sourceMap = [];
     graphLink.reset();
-    setStatus('Graph reset', 'info');
+    setStatus('graph reset', 'info');
   },
-  recompile: () => { void runCompile(); setStatus('Recompiling…', 'info'); },
+  recompile: () => { void runCompile(); setStatus('recompiling…', 'info'); },
   editorAction: id => runEditorAction(id),
   findWithRegex: () => runFindWithRegex(),
   migrateSyntax: () => {
     const before = model.getValue();
-    if (!needsMigration(before)) { setStatus('This file already uses the current grammar', 'info'); return; }
+    if (!needsMigration(before)) { setStatus('this file already uses the current grammar', 'info'); return; }
     const after = migrateDsl(before);
     editor.executeEdits('migrate', [{ range: model.getFullModelRange(), text: after }]);
-    setStatus('Syntax migrated', 'info');
+    setStatus('syntax migrated', 'info');
   },
   setMode: mode => showMode(mode),
   toggleSidebar: view => workbench.toggleSidebar(view),
@@ -1479,7 +1509,7 @@ const baseCommands: PaletteCommand[] = buildAppCommands({
   toggleBottom: tab => workbench.toggleBottom(tab),
   toggleBottomPanel: () => workbench.setBottomOpen(!workbench.bottomOpen),
   maximize: pane => workbench.toggleMaximized(pane),
-  resetLayout: () => { workbench.resetLayout(); setStatus('Layout reset', 'info'); },
+  resetLayout: () => { workbench.resetLayout(); setStatus('layout reset', 'info'); },
   toggleSimple: () => ensureSettingsPanel().patch({ simpleMode: !settings.simpleMode }),
   showStartPage: () => showStartPage(),
   search: () => searchPanel.show(),
@@ -1580,7 +1610,7 @@ async function cmdResetKeybinds(): Promise<void> {
   const ok = await window.electronAPI?.configWrite('keybinds', text);
   keymap.apply([]);
   refreshPaletteCommands();
-  if (ok) setStatus('Keybinds reset to the defaults', 'success');
+  if (ok) setStatus('keybinds reset to the defaults', 'success');
   else reportFailure('Could not write keybinds.json');
 }
 
@@ -1591,7 +1621,7 @@ async function cmdExportSettings(): Promise<void> {
     if (!result.canceled) reportFailure(result.message);
     return;
   }
-  setStatus(`Settings written to ${result.path}`, 'success');
+  setStatus(`settings written to ${result.path}`, 'success');
 }
 
 async function cmdImportSettings(): Promise<void> {
@@ -1604,7 +1634,7 @@ async function cmdImportSettings(): Promise<void> {
   const next = settingsFromJson(result.content);
   if (!next) { reportFailure('That file is not a settings file.'); return; }
   ensureSettingsPanel().patch(next);
-  setStatus('Settings imported', 'success');
+  setStatus('settings imported', 'success');
 }
 
 function syncRecent(): void {
@@ -1727,7 +1757,7 @@ async function restoreSession(): Promise<void> {
   if (!saved || (!saved.path && !saved.source.trim())) {
     void setFilename(null);
     applyMode('dsl');
-    if (settingsNow().tourDone) showStartPage();
+    showStartPage();
     return;
   }
 

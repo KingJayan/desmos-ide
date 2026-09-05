@@ -22,6 +22,7 @@ export class SearchPanel {
   private summary: HTMLElement;
   private list: HTMLElement;
   private hits: SearchHit[] = [];
+  private placeholder = '';
   private activeIdx = 0;
   private useRegex = false;
   private inFolder = false;
@@ -76,7 +77,7 @@ export class SearchPanel {
     searchWrap.append(icon, this.input, this.scopeBtn, this.regexBtn);
 
     this.summary = document.createElement('div');
-    this.summary.className = 'search-summary';
+    this.summary.className = 'search-summary hidden';
     this.summary.setAttribute('role', 'status');
 
     this.pickBtn = document.createElement('button');
@@ -193,24 +194,28 @@ export class SearchPanel {
     const paths = this.opts.paths();
     const id = ++this.runId;
 
+    // the header counts results, so it stays away until there are results to count
     if (!query.trim()) {
       this.hits = [];
-      this.summary.textContent = folder
-        ? `Searching ${folder.split('/').pop() || folder}`
+      this.placeholder = folder
+        ? `type to search ${folder.split(/[\\/]/).pop() || folder}`
         : paths.length
-          ? `${paths.length} recent ${paths.length === 1 ? 'file' : 'files'}`
-          : 'Nothing to search yet — choose a folder, or open a file';
+          ? `type to search ${paths.map(p => p.split(/[\\/]/).pop()).slice(0, 2).join(' and ')}${paths.length > 2 ? ` and ${paths.length - 2} more` : ''}`
+          : 'nothing to search yet — choose a folder, or open a file';
+      this.say(null);
       this.render();
       return;
     }
     if (!folder && !paths.length) {
       this.hits = [];
-      this.summary.textContent = 'Nothing to search yet — choose a folder, or open a file';
+      this.placeholder = 'nothing to search yet — choose a folder, or open a file';
+      this.say(null);
       this.render();
       return;
     }
 
-    if (folder) this.summary.textContent = 'Searching…';
+    this.placeholder = 'searching…';
+    if (folder) this.say(null);
     const result = folder
       ? await this.opts.searchFolder(folder, query, this.useRegex)
       : await this.opts.search(paths, query, this.useRegex);
@@ -218,22 +223,36 @@ export class SearchPanel {
 
     if (!result.ok) {
       this.hits = [];
-      this.summary.textContent = result.message;
+      this.placeholder = result.message;
+      this.say(null);
       this.render();
       return;
     }
 
     this.hits = result.hits;
     this.activeIdx = 0;
-    this.summary.textContent = result.hits.length
-      ? `${result.hits.length} ${result.hits.length === 1 ? 'result' : 'results'} in ${result.scanned} ${result.scanned === 1 ? 'file' : 'files'}`
-      : `No results in ${result.scanned} ${result.scanned === 1 ? 'file' : 'files'}`;
+    const files = `${result.scanned} ${result.scanned === 1 ? 'file' : 'files'}`;
+    this.placeholder = `no results in ${files}`;
+    this.say(result.hits.length
+      ? `${result.hits.length} ${result.hits.length === 1 ? 'result' : 'results'} in ${files}`
+      : null);
     this.render();
+  }
+
+  private say(text: string | null): void {
+    this.summary.textContent = text ?? '';
+    this.summary.classList.toggle('hidden', text === null);
   }
 
   private render(): void {
     this.list.innerHTML = '';
-    if (!this.hits.length) return;
+    if (!this.hits.length) {
+      const empty = document.createElement('li');
+      empty.className = 'search-placeholder';
+      empty.textContent = this.placeholder;
+      this.list.appendChild(empty);
+      return;
+    }
 
     this.hits.forEach((hit, i) => {
       const li = document.createElement('li');

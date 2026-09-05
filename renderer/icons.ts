@@ -1,7 +1,7 @@
 // unified icon source for all ui
 
 import {
-  ArrowDown, Box, Check, ChevronDown, ChevronRight, CircleX, Copy, ExternalLink, FileCode, FilePlus,
+  ArrowDown, ArrowUp, Bot, Box, Check, ChevronDown, ChevronRight, CircleX, Copy, ExternalLink, FileCode, FilePlus,
   FileText, FolderOpen, Info, Maximize2, Minimize2, Pause, Play, Plus, Puzzle, RefreshCw, RotateCcw,
   Search, Send, Square, SquarePen, Trash2, TriangleAlert, X,
 } from 'lucide';
@@ -70,6 +70,7 @@ const DsmxMark: IconNode = [
 const ICONS = {
   'dsmx-mark': DsmxMark,
   'arrow-down': ArrowDown as IconNode,
+  'arrow-up': ArrowUp as IconNode,
   check: Check as IconNode,
   plus: Plus as IconNode,
   'chevron-down': ChevronDown as IconNode,
@@ -82,6 +83,7 @@ const ICONS = {
   puzzle: Puzzle as IconNode,
   'refresh-cw': RefreshCw as IconNode,
   'trash-2': Trash2 as IconNode,
+  bot: Bot as IconNode,
   box: Box as IconNode,
   'file-code': FileCode as IconNode,
   'file-plus': FilePlus as IconNode,

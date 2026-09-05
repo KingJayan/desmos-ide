@@ -1,11 +1,11 @@
 .inline-slider-widget {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: auto auto auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   margin-left: 12px;
-  padding: 0 8px;
+  padding: 2px 8px;
   line-height: 1.5;
-  flex-wrap: nowrap;
   white-space: nowrap;
   background: color-mix(in srgb, var(--mantle) 90%, var(--mauve) 10%);
   border: 1px solid color-mix(in srgb, var(--surface1) 80%, var(--mauve) 20%);
@@ -28,7 +28,6 @@
   text-align: center;
   letter-spacing: -0.03em;
   pointer-events: none;
-  flex-shrink: 0;
 }
 .inline-slider-track {
   -webkit-appearance: none;
@@ -36,8 +35,8 @@
 
   // the thumb hangs half its width past each end of the track, so the track is
   // inset to keep it off the min and max labels
-  margin: 0 6px;
-  width: 80px;
+  margin: 0 4px;
+  width: 92px;
   min-width: 0;
   height: 3px;
   border-radius: 2px;
@@ -71,9 +70,9 @@
   min-width: 4ch;
   text-align: right;
   letter-spacing: -0.02em;
-  padding-left: 8px;
+  padding-left: 4px;
+  margin-left: 4px;
   border-left: 1px solid color-mix(in srgb, var(--mauve) 25%, transparent);
-  flex-shrink: 0;
 }
 .inline-slider-line {
   padding-right: 260px;

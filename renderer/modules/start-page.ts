@@ -13,6 +13,7 @@ export interface StartPageOptions {
   listFolder: (path: string) => void;
   openPath: (path: string) => void;
   forget: (path: string) => void;
+  openExample: () => void;
   runCommand: (id: string) => void;
 }
 
@@ -31,6 +32,13 @@ interface Action {
   run: () => void;
 }
 
+interface Card {
+  icon: 'file-code' | 'info' | 'puzzle' | 'search';
+  title: string;
+  body: string;
+  run: () => void;
+}
+
 export class StartPage {
   private readonly actionsEl = document.createElement('div');
   private readonly recentList = document.createElement('ul');
@@ -40,16 +48,43 @@ export class StartPage {
   private readonly foldersTitle = document.createElement('div');
   private readonly folderList = document.createElement('ul');
   private readonly actions: Action[];
+  private readonly cards: Card[];
   private folder: { root: string; entries: FolderEntry[]; truncated: boolean } | null = null;
 
   constructor(private readonly opts: StartPageOptions) {
     this.foldersTitle.className = 'start-section-title';
-    this.foldersTitle.textContent = 'Recent Folders';
+    this.foldersTitle.textContent = 'recent folders';
     this.folderList.className = 'start-recent-list';
     this.actions = [
       { id: 'file.new', label: 'new file', icon: 'file-plus', run: opts.newFile },
       { id: 'file.open', label: 'open file…', icon: 'folder-open', run: opts.openFile },
       { id: 'workspace.open-folder', label: 'open folder…', icon: 'box', run: opts.openFolder },
+    ];
+    this.cards = [
+      {
+        icon: 'file-code',
+        title: 'open the example',
+        body: 'a short file that uses points, curves, sliders and styles.',
+        run: opts.openExample,
+      },
+      {
+        icon: 'info',
+        title: 'take the tour',
+        body: 'four steps across the editor, the graph and the palette.',
+        run: () => opts.runCommand('help.tour'),
+      },
+      {
+        icon: 'puzzle',
+        title: 'browse plugins',
+        body: 'macros, preludes and themes from the marketplace.',
+        run: () => opts.runCommand('sidebar.plugins'),
+      },
+      {
+        icon: 'search',
+        title: 'show all commands',
+        body: 'files, export, git and preferences all start in the palette.',
+        run: () => opts.runCommand('palette.toggle'),
+      },
     ];
     this.build();
   }
@@ -67,37 +102,57 @@ export class StartPage {
 
     const lead = document.createElement('p');
     lead.className = 'start-lead';
-    lead.textContent = 'A text language for Desmos graphs. Open a file to start, or write a new one.';
+    lead.textContent = 'a text language for Desmos graphs. open a file to start, or write a new one.';
 
     this.actionsEl.className = 'start-actions';
     this.recentTitle.className = 'start-section-title';
-    this.recentTitle.textContent = 'Recent Files';
+    this.recentTitle.textContent = 'recent files';
     this.recentList.className = 'start-recent-list';
     this.recentEmpty.className = 'start-empty';
-    this.recentEmpty.textContent = 'Nothing opened yet. Open a file or a folder to begin.';
+    this.recentEmpty.textContent = 'nothing opened yet. open a file or a folder to begin.';
     this.folderEl.className = 'start-folder hidden';
-
-    const hint = document.createElement('button');
-    hint.type = 'button';
-    hint.className = 'start-action start-action--quiet';
-    hint.appendChild(iconEl('search', { size: 16 }));
-    const hintLabel = document.createElement('span');
-    hintLabel.className = 'start-action-label';
-    hintLabel.textContent = 'show all commands';
-    hint.append(hintLabel, this.chordTag('palette.toggle'));
-    hint.addEventListener('click', () => this.opts.runCommand('palette.toggle'));
 
     const head = document.createElement('div');
     head.className = 'start-head';
     head.append(mark, title, lead);
 
     const left = document.createElement('div');
-    left.className = 'start-col start-col--actions';
-    left.append(this.actionsEl, hint, this.folderEl);
+    left.className = 'start-col start-col--main';
+    left.append(
+      this.actionsEl, this.folderEl,
+      this.recentTitle, this.recentList, this.recentEmpty, this.foldersTitle, this.folderList,
+    );
+
+    const learnTitle = document.createElement('div');
+    learnTitle.className = 'start-section-title';
+    learnTitle.textContent = 'learn';
+
+    const cardList = document.createElement('div');
+    cardList.className = 'start-cards';
+    for (const card of this.cards) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'start-card';
+      button.appendChild(iconEl(card.icon, { size: 18 }));
+
+      const body = document.createElement('span');
+      body.className = 'start-card-text';
+      const cardTitle = document.createElement('span');
+      cardTitle.className = 'start-card-title';
+      cardTitle.textContent = card.title;
+      const cardBody = document.createElement('span');
+      cardBody.className = 'start-card-body';
+      cardBody.textContent = card.body;
+      body.append(cardTitle, cardBody);
+
+      button.appendChild(body);
+      button.addEventListener('click', card.run);
+      cardList.appendChild(button);
+    }
 
     const right = document.createElement('div');
-    right.className = 'start-col start-col--recent';
-    right.append(this.recentTitle, this.recentList, this.recentEmpty, this.foldersTitle, this.folderList);
+    right.className = 'start-col start-col--learn';
+    right.append(learnTitle, cardList);
 
     const cols = document.createElement('div');
     cols.className = 'start-cols';

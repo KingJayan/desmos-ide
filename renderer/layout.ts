@@ -1,4 +1,4 @@
-import type { DividerName } from './modules/layout-store';
+import type { DividerName, SplitAxis } from './modules/layout-store';
 
 export interface Panes {
   editorIsland: HTMLElement;
@@ -47,6 +47,7 @@ const clamp = (value: number, low: number, high: number): number =>
   Math.max(low, Math.min(value, high));
 
 export class Layout {
+  private splitAxis: SplitAxis = 'v';
   private readonly dividers: Divider[];
   private readonly byName = new Map<DividerName, Divider>();
   private readonly collapsedFrom = new Map<DividerName, number>();
@@ -95,16 +96,24 @@ export class Layout {
         fromPointer: e => e.clientX - panes.editorIsland.getBoundingClientRect().left,
       },
       {
-        name: 'pane', handle: handles.pane, axis: 'h', label: 'dsl and expression list', relayout: true,
-        grows: 'down',
-        read: () => panes.dslPane.getBoundingClientRect().height,
+        name: 'pane', handle: handles.pane, axis: 'v', label: 'dsl and expression list', relayout: true,
+        grows: 'right',
+        read: () => this.splitAxis === 'v'
+          ? panes.dslPane.getBoundingClientRect().width
+          : panes.dslPane.getBoundingClientRect().height,
         write: px => {
           const rect = panes.editorIsland.getBoundingClientRect();
+          const room = this.splitAxis === 'v' ? rect.width : rect.height;
+          const size = clamp(px, LIMITS.paneMin, Math.max(LIMITS.paneMin, room - LIMITS.paneRoom));
           panes.dslPane.style.flex = 'none';
-          panes.dslPane.style.height = `${clamp(px, LIMITS.paneMin, Math.max(LIMITS.paneMin, rect.height - LIMITS.paneRoom))}px`;
+          panes.dslPane.style.width = this.splitAxis === 'v' ? `${size}px` : '';
+          panes.dslPane.style.height = this.splitAxis === 'v' ? '' : `${size}px`;
         },
-        clear: () => { panes.dslPane.style.height = ''; panes.dslPane.style.flex = ''; },
-        fromPointer: e => e.clientY - panes.editorIsland.getBoundingClientRect().top,
+        clear: () => { panes.dslPane.style.width = ''; panes.dslPane.style.height = ''; panes.dslPane.style.flex = ''; },
+        fromPointer: e => {
+          const rect = panes.editorIsland.getBoundingClientRect();
+          return this.splitAxis === 'v' ? e.clientX - rect.left : e.clientY - rect.top;
+        },
       },
       {
         name: 'toolLeft', handle: handles.toolLeft, axis: 'v', label: 'left tool window', relayout: true,
@@ -135,7 +144,7 @@ export class Layout {
           panes.aiPanel.style.width = `${clamp(px, LIMITS.aiMin, LIMITS.aiMax)}px`;
         },
         clear: () => { panes.aiPanel.style.width = ''; },
-        fromPointer: e => panes.workspace.getBoundingClientRect().right - e.clientX,
+        fromPointer: e => panes.aiPanel.getBoundingClientRect().right - e.clientX,
       },
     ];
 
@@ -145,12 +154,28 @@ export class Layout {
       divider.handle.setAttribute('tabindex', '0');
       divider.handle.setAttribute('aria-orientation', divider.axis === 'v' ? 'vertical' : 'horizontal');
       divider.handle.setAttribute('aria-label', `resize ${divider.label}`);
+      divider.handle.title = `drag to resize ${divider.label} — double click to collapse`;
       divider.handle.addEventListener('mousedown', this.onDown(divider));
       divider.handle.addEventListener('dblclick', () => this.toggleCollapse(divider));
       divider.handle.addEventListener('keydown', e => this.onKey(divider, e));
     }
     document.addEventListener('mousemove', this.onMove);
     document.addEventListener('mouseup', this.onUp);
+  }
+
+  /** split mode is side by side or stacked, and the divider between the two panes turns with it */
+  setSplitAxis(axis: SplitAxis): void {
+    const pane = this.byName.get('pane')!;
+    pane.axis = axis;
+    pane.grows = axis === 'v' ? 'right' : 'down';
+    pane.handle.classList.toggle('gutter--v', axis === 'v');
+    pane.handle.classList.toggle('gutter--h', axis === 'h');
+    pane.handle.setAttribute('aria-orientation', axis === 'v' ? 'vertical' : 'horizontal');
+    if (axis === this.splitAxis) return;
+    this.splitAxis = axis;
+    pane.clear();
+    this.collapsedFrom.delete('pane');
+    this.relayout();
   }
 
   private onKey(divider: Divider, e: KeyboardEvent): void {

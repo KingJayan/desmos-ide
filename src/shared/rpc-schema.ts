@@ -36,8 +36,10 @@ export type GitBranchesResult =
   | { ok: true; currentBranch: string; branches: GitBranchInfo[] }
   | { ok: false; errorCode: string; message: string };
 
+export type GitCommit = { hash: string; subject: string; author: string; date: string; refs: string };
+
 export type GitHistoryResult =
-  | { ok: true; lines: string[] }
+  | { ok: true; commits: GitCommit[] }
   | { ok: false; errorCode: string; message: string };
 
 export type GitRemoteInfo = { name: string; fetchUrl: string; pushUrl: string };

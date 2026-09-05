@@ -15,11 +15,31 @@
 #enhanced-unsaved-bar.hidden { display: none; }
 
 #enhanced-hint {
-  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
   border-bottom: 1px solid var(--border);
   font-size: var(--fs-micro);
   color: var(--overlay1);
   flex-shrink: 0;
+}
+#enhanced-hint span { flex: 1; min-width: 0; }
+
+.enhanced-hint-close {
+  --btn-hover-border: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-xs);
+  color: var(--overlay1);
+
+  .lucide { width: 12px; height: 12px; }
+  &:hover { color: var(--text); background: var(--hover); }
 }
 
 .unsaved-export-btn {

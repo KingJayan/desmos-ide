@@ -8,7 +8,9 @@ export class ParseError extends Error {
     msg: string,
     public readonly tok: Token,
   ) {
-    super(`[${tok.pos?.line ?? tok.line}:${tok.col}] Parse error: ${msg} (got '${tok.value}')`);
+    // an empty token value is the end of the line, and printing '' says nothing
+    const got = tok.value === '' ? 'at end of line' : `got '${tok.value}'`;
+    super(`[${tok.pos?.line ?? tok.line}:${tok.col}] Parse error: ${msg} (${got})`);
     this.name = 'ParseError';
   }
 }

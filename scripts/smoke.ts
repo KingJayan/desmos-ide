@@ -169,7 +169,7 @@ page.on('pageerror', e => consoleErrors.push(String(e)));
 stage = 'loading the page';
 await page.goto(`http://localhost:${port}/`);
 stage = 'waiting for the editor';
-await page.waitForSelector('#editor-container .monaco-editor', { timeout: 20_000 });
+await page.waitForSelector('#editor-container .monaco-editor', { state: 'attached', timeout: 20_000 });
 stage = 'checking the page';
 
 await page.waitForSelector('.welcome-overlay:not(.hidden)', { timeout: 10_000 });
@@ -180,7 +180,7 @@ check(true, 'escape closes the welcome dialog');
 
 await page.waitForSelector('#start-page:not(.hidden)', { timeout: 10_000 });
 check(
-  await page.locator('#start-page .start-action:not(.start-action--quiet)').count() === 3,
+  await page.locator('#start-page .start-action').count() === 3,
   'the start page offers new file, open file and open folder',
 );
 check(await page.locator('#center-col.hidden').count() === 1, 'no panes are shown beside it');
@@ -188,6 +188,7 @@ check(await page.locator('#rail-left.hidden').count() === 1, 'the rails are put 
 
 await page.click('#start-page .start-action');
 await page.waitForSelector('#start-page', { state: 'hidden' });
+await page.waitForSelector('#editor-container .monaco-editor', { timeout: 20_000 });
 check(await page.locator('#center-col:not(.hidden)').count() === 1, 'new file brings the panes back');
 
 check(await page.locator('#status-msg').getAttribute('aria-live') === 'polite', 'status is announced');
@@ -209,7 +210,7 @@ await page.waitForFunction(
 check(true, 'a compile error is announced as assertive');
 
 await page.keyboard.press('ArrowRight');
-check(/^Ln \d+, Col \d+$/.test((await page.locator('#status-pos').textContent()) ?? ''), 'the bar says where the cursor is');
+check(/^ln \d+, col \d+$/.test((await page.locator('#status-pos').textContent()) ?? ''), 'the bar says where the cursor is');
 check(((await page.locator('#status-save').textContent()) ?? '').length > 0, 'the bar says how the file is saved');
 
 await page.click('#btn-sidebar-ai');
@@ -279,6 +280,11 @@ check(hint.includes('7'), `the line carries the optimizer hint (saw "${hint}")`)
 
 await page.click('#btn-tool-optimizer');
 check(await page.locator('#tool-bottom.hidden').count() === 1, 'the optimizer tab closes again');
+
+// the chat takes its width out of the editor, so it has to be away before the
+// editor-and-graph divider is measured
+await page.click('#btn-sidebar-ai');
+await page.waitForSelector('#ai-panel', { state: 'hidden' });
 
 check(
   await page.locator('#divider[role="separator"][tabindex="0"]').count() === 1,

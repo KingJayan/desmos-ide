@@ -33,6 +33,7 @@ export function lineHint(group: OptimizerGroup): string {
 export interface OptimizerPanelHost {
   list: HTMLElement;
   empty: HTMLElement;
+  emptyText: HTMLElement;
   count: HTMLElement;
   badge: HTMLElement;
   jump(line: number): void;
@@ -42,9 +43,9 @@ export class OptimizerPanel {
   constructor(private host: OptimizerPanelHost) {}
 
   render(notes: OptimizeNote[], compiled = true): void {
-    const { list, empty, count, badge } = this.host;
+    const { list, empty, emptyText, count, badge } = this.host;
     list.replaceChildren();
-    empty.textContent = compiled
+    emptyText.textContent = compiled
       ? 'nothing to fold, the source is already direct'
       : 'the file did not compile, so nothing was folded';
     empty.classList.toggle('hidden', notes.length > 0);

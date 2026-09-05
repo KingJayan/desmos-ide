@@ -175,23 +175,25 @@
 
 .ai-chips-container {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
-  max-width: 280px;
-  align-items: center;
+  max-width: 320px;
 }
 
 .ai-prompt-chip {
   background: var(--surface0);
   border: 1px solid var(--border-strong);
   color: var(--subtext1);
-  border-radius: var(--radius);
-  padding: 6px 12px;
-  font-size: var(--fs-small);
+  border-radius: 999px;
+  min-height: 24px;
+  padding: 4px 12px;
+  font-size: var(--fs-micro);
   font-family: var(--font-ui);
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
   pointer-events: auto;
 }
 .ai-prompt-chip:hover {
@@ -200,15 +202,14 @@
   background: color-mix(in srgb, var(--surface0) 120%, transparent);
 }
 .ai-prompt-chip--more {
-  background: none;
-  border: none;
+  background: transparent;
+  border-color: transparent;
   color: var(--overlay1);
-  font-size: var(--fs-micro);
-  padding: 2px 6px;
-  margin-top: 2px;
+  margin-top: 6px;
 }
 .ai-prompt-chip--more:hover {
-  background: none;
+  background: var(--hover);
+  border-color: var(--border-strong);
   color: var(--mauve);
 }
 

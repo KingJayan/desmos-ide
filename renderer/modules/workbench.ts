@@ -2,12 +2,12 @@ import { DOM } from './dom';
 import type { Layout } from '../layout';
 import {
   loadLayout, saveLayout,
-  type BottomTab, type LayoutState, type LeftView, type MaximizedPane,
+  type BottomTab, type LayoutState, type LeftView, type MaximizedPane, type SplitAxis,
 } from './layout-store';
 import type { Mode } from '../session';
 
 export type SidebarView = LeftView | 'ai' | null;
-export type { BottomTab, LeftView, MaximizedPane };
+export type { BottomTab, LeftView, MaximizedPane, SplitAxis };
 
 export interface WorkbenchOptions {
   layout: Layout;
@@ -33,11 +33,15 @@ export class Workbench {
   private empty = false;
   private simple = false;
   private narrow = { left: false, ai: false };
+  private aiTookRoom = false;
+  private bottomHeld: number | null = null;
   private lastOpened: 'left' | 'ai' | null = null;
 
   constructor(private readonly opts: WorkbenchOptions) {}
 
   restore(): void {
+    this.syncTabStrip();
+    this.applySplitAxis();
     this.opts.layout.apply(this.state.sizes);
     if (this.state.leftView) this.setSidebarView(this.state.leftView);
     if (this.state.aiOpen) this.setSidebarView('ai');
@@ -63,7 +67,29 @@ export class Workbench {
   get bottomTab(): BottomTab { return this.state.bottomTab; }
   get bottomOpen(): boolean { return this.state.bottomOpen; }
   get maximized(): MaximizedPane | null { return this.state.maximized; }
+  get splitAxis(): SplitAxis { return this.state.splitAxis; }
   get isEmpty(): boolean { return this.empty; }
+
+  private applySplitAxis(): void {
+    document.documentElement.setAttribute('data-split-axis', this.state.splitAxis);
+    this.opts.layout.setSplitAxis(this.state.splitAxis);
+    const sideBySide = this.state.splitAxis === 'v';
+    DOM.btnSplitAxis.classList.toggle('mode-axis-btn--stacked', !sideBySide);
+    DOM.btnSplitAxis.title = sideBySide ? 'stack the two panes' : 'put the two panes side by side';
+    DOM.btnSplitAxis.setAttribute('aria-label', DOM.btnSplitAxis.title);
+  }
+
+  setSplitAxis(axis: SplitAxis): void {
+    this.state.splitAxis = axis;
+    this.state.sizes = { ...this.state.sizes, pane: undefined };
+    this.applySplitAxis();
+    this.persist();
+    this.opts.relayout();
+  }
+
+  toggleSplitAxis(): void {
+    this.setSplitAxis(this.state.splitAxis === 'v' ? 'h' : 'v');
+  }
 
   setMode(mode: Mode): void {
     this.mode = mode;
@@ -81,8 +107,18 @@ export class Workbench {
     DOM.enhancedPane.classList.toggle('hidden', !showEnhanced);
     DOM.enhancedPane.classList.toggle('split', mode === 'split');
     DOM.paneDivider.classList.toggle('hidden', mode !== 'split');
-    if (mode !== 'split') { DOM.dslPane.style.height = ''; DOM.dslPane.style.flex = ''; }
+    DOM.btnSplitAxis.classList.toggle('hidden', mode !== 'split');
+    if (mode !== 'split') {
+      DOM.dslPane.style.width = '';
+      DOM.dslPane.style.height = '';
+      DOM.dslPane.style.flex = '';
+    }
     if (showDsl) this.opts.relayout();
+  }
+
+  /** one buffer needs no tab strip: the breadcrumb already names the file */
+  syncTabStrip(): void {
+    DOM.tabStrip.classList.toggle('hidden', DOM.pluginTab.classList.contains('hidden'));
   }
 
   setActiveTab(tab: 'file' | 'plugin'): void {
@@ -93,11 +129,13 @@ export class Workbench {
     DOM.pluginTab.classList.toggle('tab--active', !onFile);
     DOM.pluginTab.setAttribute('aria-selected', String(!onFile));
     DOM.pluginPage.classList.toggle('hidden', onFile);
+    this.syncTabStrip();
 
     if (onFile) { this.setMode(this.mode); return; }
     DOM.dslPane.classList.add('hidden');
     DOM.enhancedPane.classList.add('hidden');
     DOM.paneDivider.classList.add('hidden');
+    DOM.btnSplitAxis.classList.add('hidden');
   }
 
   setSidebarView(next: SidebarView): void {
@@ -125,9 +163,21 @@ export class Workbench {
     DOM.outlineContainer.classList.toggle('hidden', this.state.leftView !== 'outline');
     DOM.pluginsContainer.classList.toggle('hidden', this.state.leftView !== 'plugins');
 
+    // the graph is only ever the leftover width, so the chat has to take its room out of
+    // the editor by hand or the graph is the pane that pays for it
+    const roomBack = !aiOpen && this.aiTookRoom ? this.aiRoom() : 0;
+
     DOM.aiPanel.classList.toggle('hidden', !aiOpen);
     DOM.aiDivider.classList.toggle('hidden', !aiOpen);
     DOM.aiContainer.classList.toggle('hidden', !aiOpen);
+
+    if (aiOpen && !this.aiTookRoom) {
+      this.resizeEditor(-this.aiRoom());
+      this.aiTookRoom = true;
+    } else if (!aiOpen && this.aiTookRoom) {
+      this.resizeEditor(roomBack);
+      this.aiTookRoom = false;
+    }
 
     const rail = (button: HTMLElement, on: boolean) => {
       button.classList.toggle('active', on);
@@ -143,6 +193,15 @@ export class Workbench {
     this.opts.onLeftView(leftOpen ? this.state.leftView : null);
     this.opts.onAi(aiOpen);
     this.opts.relayout();
+  }
+
+  private aiRoom(): number {
+    return DOM.aiPanel.getBoundingClientRect().width + FIT.divider;
+  }
+
+  private resizeEditor(by: number): void {
+    const width = DOM.editorIsland.getBoundingClientRect().width;
+    DOM.editorIsland.style.width = `${Math.max(FIT.editor, width + by)}px`;
   }
 
   fitToWidth(): void {
@@ -208,6 +267,18 @@ export class Workbench {
     }
   }
 
+  toggleBottomMaximized(): void {
+    if (this.bottomHeld === null) {
+      this.bottomHeld = DOM.toolBottom.getBoundingClientRect().height;
+      this.opts.layout.apply({ bottom: DOM.centerCol.getBoundingClientRect().height });
+    } else {
+      this.opts.layout.apply({ bottom: this.bottomHeld });
+      this.bottomHeld = null;
+    }
+    DOM.btnBottomMax.classList.toggle('active', this.bottomHeld !== null);
+    this.noteResize();
+  }
+
   setMaximized(pane: MaximizedPane | null): void {
     this.state.maximized = pane;
     DOM.editorIsland.classList.toggle('hidden', pane === 'graph');
@@ -235,7 +306,6 @@ export class Workbench {
     DOM.startPage.classList.toggle('hidden', !empty);
     DOM.centerCol.classList.toggle('hidden', empty);
     DOM.railLeft.classList.toggle('hidden', empty);
-    DOM.railRight.classList.toggle('hidden', empty);
     if (!empty) this.opts.relayout();
   }
 

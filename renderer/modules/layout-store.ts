@@ -3,6 +3,7 @@ export type DividerName = 'editor' | 'pane' | 'toolLeft' | 'bottom' | 'ai';
 export type LeftView = 'git' | 'outline' | 'plugins';
 export type BottomTab = 'problems' | 'timeline' | 'optimizer';
 export type MaximizedPane = 'editor' | 'graph';
+export type SplitAxis = 'v' | 'h';
 
 export interface LayoutState {
   sizes: Partial<Record<DividerName, number>>;
@@ -11,6 +12,7 @@ export interface LayoutState {
   bottomOpen: boolean;
   bottomTab: BottomTab;
   maximized: MaximizedPane | null;
+  splitAxis: SplitAxis;
 }
 
 export const DIVIDERS: readonly DividerName[] = ['editor', 'pane', 'toolLeft', 'bottom', 'ai'];
@@ -27,6 +29,7 @@ export const DEFAULT_LAYOUT: LayoutState = {
   bottomOpen: false,
   bottomTab: 'problems',
   maximized: null,
+  splitAxis: 'v',
 };
 
 export function parseLayout(raw: string | null): LayoutState {
@@ -54,6 +57,7 @@ export function parseLayout(raw: string | null): LayoutState {
     bottomOpen: s.bottomOpen === true,
     bottomTab: BOTTOM_TABS.includes(s.bottomTab as string) ? s.bottomTab as BottomTab : 'problems',
     maximized: MAXIMIZED.includes(s.maximized as string) ? s.maximized as MaximizedPane : null,
+    splitAxis: s.splitAxis === 'h' ? 'h' : 'v',
   };
 }
 

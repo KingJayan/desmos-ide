@@ -83,7 +83,7 @@ export class AISidebar {
   private chatSelectEl!: HTMLSelectElement;
   private providerLabelEl!: HTMLElement;
   private providerStateEl!: HTMLElement;
-  private configBtnEl!: HTMLButtonElement;
+  private providerNameEl!: HTMLElement;
   private configEl!: HTMLElement;
   private cfgProviderEl!: HTMLSelectElement;
   private cfgModelEl!: HTMLSelectElement;
@@ -191,7 +191,7 @@ export class AISidebar {
   }
 
   private newChat(): Chat {
-    return { id: Date.now().toString(36), title: 'New Chat', history: [] };
+    return { id: Date.now().toString(36), title: 'new chat', history: [] };
   }
 
   private loadState(): void {
@@ -235,7 +235,7 @@ export class AISidebar {
     this.inputEl      = ui.input;
     this.sendBtn      = ui.sendBtn;
     this.chatSelectEl = ui.chatSelect;
-    this.configBtnEl  = ui.providerChip;
+    this.providerNameEl = ui.providerName;
     this.providerLabelEl = ui.providerLabel;
     this.providerStateEl = ui.statusModel;
     this.configEl = ui.config;
@@ -299,7 +299,7 @@ export class AISidebar {
       if (this.streaming) return;
       if (this.chats.length === 1) {
         this.activeChat.history = [];
-        this.activeChat.title = 'New Chat';
+        this.activeChat.title = 'new chat';
         this.pendingTitles.delete(this.activeChat.id);
         this.saveState();
         this.syncChatSelect();
@@ -321,17 +321,9 @@ export class AISidebar {
       if (chat) { this.activeChat = chat; this.renderMessages(); }
     });
 
-    this.configBtnEl.addEventListener('click', (e: Event) => {
-      e.stopPropagation();
-      if (this.configEl.hidden) {
-        this.syncConfigFields();
-        this.configEl.hidden = false;
-      } else {
-        this.configEl.hidden = true;
-      }
-    });
     this.providerStateEl.addEventListener('click', (e: Event) => {
       e.stopPropagation();
+      if (!this.configEl.hidden) { this.configEl.hidden = true; return; }
       const cfg = this.getProviderConfig();
       this.cfgCopilotEl.hidden = true;
       this.ui.cfgStandard.hidden = false;
@@ -411,8 +403,8 @@ export class AISidebar {
       localStorage.setItem('ai-auto-approve', String(this.autoApprove));
       this.autoApproveBtn.classList.toggle('ai-ctx-btn--on', this.autoApprove);
       this.autoApproveBtn.title = this.autoApprove
-        ? 'Auto-approve ON — code applied without diff preview'
-        : 'Auto-approve OFF — shows diff before applying';
+        ? 'auto-approve on — code is applied with no diff preview'
+        : 'auto-approve off — the diff is shown before it is applied';
     });
 
     this.messagesEl.addEventListener('scroll', () => {
@@ -519,22 +511,15 @@ export class AISidebar {
     localStorage.setItem('ai-ready', this.provider === 'ollama' || cfg.apiKey ? '1' : '');
     const p = PROVIDERS.find(x => x.id === this.provider);
 
-    const providerChip = this.ui.providerChip;
-    if (this.provider === 'github-copilot') {
-      const connected = !!cfg.apiKey;
-      this.providerLabelEl.textContent = '';
-      this.providerLabelEl.classList.add('ai-provider-label--dot');
-      this.providerLabelEl.classList.toggle('ai-provider-label--on', connected);
-      this.providerLabelEl.title = connected ? 'GitHub Copilot connected' : 'Not connected';
-      providerChip.textContent = 'Copilot';
-    } else {
-      this.providerLabelEl.classList.remove('ai-provider-label--dot', 'ai-provider-label--on');
-      this.providerLabelEl.textContent = p?.label.split('-')[0] || this.provider;
-      providerChip.textContent = p?.label || this.provider;
-    }
+    const copilot = this.provider === 'github-copilot';
+    const connected = !!cfg.apiKey;
+    this.providerLabelEl.classList.toggle('ai-model-btn-mark--off', copilot && !connected);
+    this.providerNameEl.textContent = copilot ? 'Copilot' : p?.label || this.provider;
     this.providerStateEl.textContent = cfg.model;
-    this.providerStateEl.title = `Model: ${cfg.model}`;
-    this.configBtnEl.title = `Provider: ${p?.label || this.provider} — click to switch to OpenRouter, Ollama or Copilot`;
+    this.ui.providerChip.title =
+      `${p?.label || this.provider} · ${cfg.model}${copilot && !connected ? ' — not connected' : ''}`
+      + ' — click to change the provider or the model';
+    this.ui.providerChip.setAttribute('aria-label', this.ui.providerChip.title);
   }
 
   private populateProviderSelect(): void {
@@ -774,7 +759,7 @@ export class AISidebar {
 
     if (name === '/clear') {
       this.activeChat.history = [];
-      this.activeChat.title = 'New Chat';
+      this.activeChat.title = 'new chat';
       this.pendingTitles.delete(this.activeChat.id);
       this.saveState();
       this.syncChatSelect();
@@ -864,7 +849,7 @@ export class AISidebar {
     const userContent = this.buildUserContent(prompt);
 
     this.activeChat.history.push({ role: 'user', content: userContent });
-    if (this.activeChat.title === 'New Chat' && this.activeChat.history.length === 1) {
+    if (this.activeChat.title === 'new chat' && this.activeChat.history.length === 1) {
       this.pendingTitles.set(this.activeChat.id, prompt);
       this.syncChatSelect();
     }

@@ -15,7 +15,8 @@ export interface SidebarParts {
   scrollFabDot: HTMLElement;
   providerChip: HTMLButtonElement;
   providerLabel: HTMLElement;
-  statusModel: HTMLButtonElement;
+  providerName: HTMLElement;
+  statusModel: HTMLElement;
   statusMemory: HTMLElement;
   ctxBtn: HTMLButtonElement;
   autoApproveBtn: HTMLButtonElement;
@@ -76,47 +77,33 @@ export function buildSidebar(root: HTMLElement, state: TemplateState): SidebarPa
   const chatSelect = el('select', 'ai-chat-select');
   chatSelect.setAttribute('aria-label', 'chat');
   picker.append(chatSelect, iconEl('chevron-down', { size: 12 }));
-  const newBtn = iconButton('ai-icon-btn', 'ai-new-btn', 'plus', 'New Chat');
-  const delBtn = iconButton('ai-icon-btn ai-icon-btn--danger', 'ai-del-btn', 'trash-2', 'Delete or Clear Chat');
+  const newBtn = iconButton('ai-icon-btn', 'ai-new-btn', 'plus', 'new chat');
+  const delBtn = iconButton('ai-icon-btn ai-icon-btn--danger', 'ai-del-btn', 'trash-2', 'delete or clear chat');
   header.append(picker, newBtn, delBtn);
 
   const messages = el('div', 'ai-messages');
 
   const strip = el('div', 'ai-status-strip');
-  const scrollFab = iconButton('ai-scroll-fab', '', 'arrow-down', 'Scroll to latest');
+  const scrollFab = iconButton('ai-scroll-fab', '', 'arrow-down', 'scroll to latest');
   scrollFab.hidden = true;
   const scrollFabDot = el('span', 'ai-scroll-fab-dot');
   scrollFabDot.hidden = true;
   scrollFab.appendChild(scrollFabDot);
 
   const statusLeft = el('div', 'ai-status-left');
-  const providerChip = el('button', 'ai-provider-chip');
+  // one picker for both halves of the answer: which provider, and which model on it
+  const providerChip = el('button', 'ai-model-btn');
   providerChip.type = 'button';
   providerChip.id = 'ai-provider-chip';
-  providerChip.title = 'Change the AI provider and model';
-  const providerLabel = el('span', 'ai-status-provider-label');
-  providerChip.appendChild(providerLabel);
-  const statusModel = el('button', 'ai-status-model');
-  statusModel.type = 'button';
-  statusModel.title = 'Change model';
+  const providerLabel = el('span', 'ai-model-btn-mark');
+  providerLabel.appendChild(iconEl('bot', { size: 12, strokeWidth: 2.2 }));
+  const providerName = el('span', 'ai-model-btn-provider');
+  const statusModel = el('span', 'ai-model-btn-model');
+  providerChip.append(providerLabel, providerName, statusModel, iconEl('chevron-down', { size: 11 }));
   const statusMemory = el('span', 'ai-status-memory');
-  statusLeft.append(providerChip, statusModel, statusMemory);
+  statusLeft.append(providerChip, statusMemory);
 
-  const statusRight = el('div', 'ai-status-right');
-  const ctxBtn = el('button', `ai-ctx-btn${state.sendContext ? ' ai-ctx-btn--on' : ''}`);
-  ctxBtn.type = 'button';
-  ctxBtn.id = 'ai-ctx-btn';
-  ctxBtn.title = 'Send code context with each message. Toggle off to protect sensitive code.';
-  ctxBtn.append(iconEl('file-text', { size: 12, strokeWidth: 2.5 }), el('span', '', 'ctx'));
-  const autoApproveBtn = el('button', `ai-ctx-btn${state.autoApprove ? ' ai-ctx-btn--on' : ''}`);
-  autoApproveBtn.type = 'button';
-  autoApproveBtn.id = 'ai-autoapprove-btn';
-  autoApproveBtn.title = state.autoApprove
-    ? 'Auto-approve ON — code applied without diff preview'
-    : 'Auto-approve OFF — shows diff before applying';
-  autoApproveBtn.append(iconEl('check', { size: 12, strokeWidth: 2.5 }), el('span', '', 'auto'));
-  statusRight.append(ctxBtn, autoApproveBtn);
-  strip.append(scrollFab, statusLeft, statusRight);
+  strip.append(scrollFab, statusLeft);
 
   const compose = el('div', 'ai-compose');
   const autocomplete = el('div', 'ai-autocomplete');
@@ -124,17 +111,30 @@ export function buildSidebar(root: HTMLElement, state: TemplateState): SidebarPa
   const ctxPill = el('div', 'ai-ctx-pill');
   ctxPill.hidden = true;
   const ctxPillText = el('span', 'ai-ctx-pill-text');
-  const ctxPillClose = iconButton('ai-ctx-pill-close', '', 'x', 'Disable context for this message', 12);
+  const ctxPillClose = iconButton('ai-ctx-pill-close', '', 'x', 'disable context for this message', 12);
   ctxPill.append(ctxPillText, ctxPillClose);
 
   const composeWrap = el('div', 'ai-compose-wrap');
   const input = el('textarea', 'ai-input');
   input.rows = 1;
-  input.placeholder = 'Ask about your DSL…';
+  input.placeholder = 'ask about your dsl…';
   input.setAttribute('aria-label', 'message');
   const composeBar = el('div', 'ai-compose-bar');
-  const sendBtn = iconButton('ai-send-btn', '', 'send', 'Send (Enter)');
-  composeBar.appendChild(sendBtn);
+  const composeLeft = el('div', 'ai-compose-bar-left');
+  const ctxBtn = iconButton(
+    `ai-ctx-btn${state.sendContext ? ' ai-ctx-btn--on' : ''}`, 'ai-ctx-btn', 'file-text',
+    'send code context with each message. toggle off to protect sensitive code.', 13,
+  );
+  const autoApproveBtn = iconButton(
+    `ai-ctx-btn${state.autoApprove ? ' ai-ctx-btn--on' : ''}`, 'ai-autoapprove-btn', 'check',
+    state.autoApprove
+      ? 'auto-approve on — code is applied with no diff preview'
+      : 'auto-approve off — the diff is shown before it is applied',
+    13,
+  );
+  composeLeft.append(ctxBtn, autoApproveBtn);
+  const sendBtn = iconButton('ai-send-btn', '', 'send', 'send (enter)');
+  composeBar.append(composeLeft, sendBtn);
   composeWrap.append(input, composeBar);
 
   const config = el('div', 'ai-config-popover');
@@ -146,7 +146,7 @@ export function buildSidebar(root: HTMLElement, state: TemplateState): SidebarPa
   cfgCopilot.hidden = true;
   const copilotRow = el('div', 'ai-copilot-row');
   const copilotStatus = el('span', 'ai-copilot-status');
-  const copilotConnect = el('button', 'ai-copilot-connect', 'Sign in');
+  const copilotConnect = el('button', 'ai-copilot-connect', 'sign in');
   copilotConnect.type = 'button';
   const copilotCancel = el('button', 'ai-copilot-cancel', 'cancel');
   copilotCancel.type = 'button';
@@ -196,7 +196,7 @@ export function buildSidebar(root: HTMLElement, state: TemplateState): SidebarPa
 
   return {
     chatSelect, newBtn, delBtn, messages, scrollFab, scrollFabDot,
-    providerChip, providerLabel, statusModel, statusMemory, ctxBtn, autoApproveBtn,
+    providerChip, providerLabel, providerName, statusModel, statusMemory, ctxBtn, autoApproveBtn,
     autocomplete, ctxPill, ctxPillText, ctxPillClose, input, sendBtn,
     config, cfgProvider, cfgCopilot, copilotStatus, copilotConnect, copilotDisconnect,
     copilotCodeWrap, copilotLink, copilotUserCode,
